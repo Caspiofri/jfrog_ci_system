@@ -121,6 +121,9 @@ class Cell(BaseModel):
     # the value no longer stated): it is kept, but not re-confirmed by later runs until an extraction confirms it
     stale: bool = False
     stale_reason: str = ""
+    # an analyst should check this cell although no Changes item was emitted (e.g. "evidence gone, value repeated")
+    needs_review: bool = False
+    review_reason: str = ""
 
 
 class ChangeItem(BaseModel):
@@ -174,7 +177,7 @@ class CellStore:
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         cols = ("competitor TEXT, axis TEXT, value TEXT, evidence TEXT, confidence REAL, tiers TEXT, "
                 "source_url TEXT, page_key TEXT, as_of TEXT, checked_at TEXT, note TEXT, stale INTEGER, "
-                "stale_reason TEXT")
+                "stale_reason TEXT, needs_review INTEGER, review_reason TEXT")
         self._db.execute(f"CREATE TABLE IF NOT EXISTS cells ({cols}, PRIMARY KEY (competitor, axis))")
         self._db.execute(f"CREATE TABLE IF NOT EXISTS cell_history ({cols}, run_id TEXT, event TEXT, change_id TEXT)")
 
@@ -182,14 +185,16 @@ class CellStore:
     def _values(c: Cell) -> tuple:
         return (c.competitor, c.axis, c.value, c.evidence, c.confidence,
                 json.dumps([t.model_dump() for t in c.tiers]), c.source_url, c.page_key, c.as_of.isoformat(),
-                c.checked_at.isoformat(), c.note, int(c.stale), c.stale_reason)
+                c.checked_at.isoformat(), c.note, int(c.stale), c.stale_reason,
+                int(c.needs_review), c.review_reason)
 
     @staticmethod
     def _cell(row) -> Cell:
         return Cell(competitor=row[0], axis=row[1], value=row[2], evidence=row[3], confidence=row[4],
                     tiers=json.loads(row[5] or "[]"), source_url=row[6], page_key=row[7],
                     as_of=datetime.fromisoformat(row[8]), checked_at=datetime.fromisoformat(row[9]), note=row[10] or "",
-                    stale=bool(row[11]), stale_reason=row[12] or "")
+                    stale=bool(row[11]), stale_reason=row[12] or "",
+                    needs_review=bool(row[13]), review_reason=row[14] or "")
 
     def get(self, competitor: str, axis: str) -> Cell | None:
         row = self._db.execute("SELECT * FROM cells WHERE competitor = ? AND axis = ?", (competitor, axis)).fetchone()

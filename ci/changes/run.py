@@ -17,7 +17,7 @@ from pathlib import Path
 
 from ci.changes.config import JFROG, TrackedPage, TrackedPages
 from ci.changes.diff import Cell, CellStore, ChangeItem, make_change, same_field, section_diff
-from ci.changes.extract import AxisField, extract_fields
+from ci.changes.extract import AxisField, extract_fields, quote_in_text
 from ci.changes.snapshot import Fetch, FetchError, SnapshotStore, content_hash, http_fetch, normalize_text
 from ci.llm import JsonLLM
 from config.settings import DATA_DIR, OUTPUT_DIR
@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 CHANGES_DIR = OUTPUT_DIR / "changes"
 CI_DATA_DIR = DATA_DIR / "ci"
 DB_NAME = "changes.sqlite"
+EVIDENCE_GONE = "evidence gone, value repeated"
 
 
 @dataclass
@@ -39,6 +40,8 @@ class PageResult:
     items: list[ChangeItem] = field(default_factory=list)
     unconfirmed: list[str] = field(default_factory=list)  # axes whose new value was unstated or unverified
     reasons: dict[str, str] = field(default_factory=dict)  # axis -> why it was unconfirmed
+    review: dict[str, str] = field(default_factory=dict)  # axis -> why the cell was flagged needs_review
+    reworded: list[str] = field(default_factory=list)  # axes whose value differed only in wording (no item)
     cells: int = 0  # cells stored or confirmed for this page
     fetched: bool = False  # the page was fetched and had text (a later LLM failure still fails the page)
     error: str = ""
@@ -78,6 +81,11 @@ def _unconfirmed_reason(new: AxisField, old: Cell | None) -> str:
                                                                  confidence=old.confidence)):
         return "not stated on the page any more"
     return ""
+
+
+def _reworded(old: Cell, new: AxisField, prev_text: str, text: str) -> bool:
+    quotes = [old.evidence, new.evidence]
+    return bool(prev_text) and all(quotes) and all(quote_in_text(q, t) for q in quotes for t in (prev_text, text))
 
 
 def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, llm: JsonLLM | None,
@@ -123,7 +131,19 @@ def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, l
             cells.put(cell, run_id, "baseline")
             res.cells += 1
         elif same_field(old, new):
-            cells.put(cell, run_id, "")
+            if old.evidence and not quote_in_text(old.evidence, text):
+                # the model repeated the anchored value, but what it rested on is gone from the page
+                cells.put(cell.model_copy(update={"needs_review": True, "review_reason": EVIDENCE_GONE}), run_id,
+                          "review")
+                res.review[axis] = EVIDENCE_GONE
+            else:
+                cells.put(cell, run_id, "")
+            res.cells += 1
+        elif not baseline and _reworded(old, new, prev_text, text):
+            # both quotes are on both page versions: the facts did not move, only the model's wording. The cell
+            # keeps its wording (so later anchored extractions stay stable) and is re-confirmed.
+            cells.put(old.model_copy(update={"checked_at": now, "stale": False, "stale_reason": ""}), run_id, "")
+            res.reworded.append(axis)
             res.cells += 1
         elif baseline or not _usable(AxisField(axis=axis, value=old.value, confidence=old.confidence)):
             cells.put(cell, run_id, "filled")  # the old cell had no usable value: nothing to compare against
@@ -156,6 +176,10 @@ def build_report(run_id: str, results: list[PageResult], live: bool, started: da
                      for r in by["failed"]],
         "unconfirmed": [{"competitor": r.competitor, "page": r.page_key, "axes": r.unconfirmed, "reasons": r.reasons}
                         for r in results if r.unconfirmed],
+        "needs_review": [{"competitor": r.competitor, "page": r.page_key, "axes": r.review}
+                         for r in results if r.review],
+        "reworded": [{"competitor": r.competitor, "page": r.page_key, "axes": r.reworded}
+                     for r in results if r.reworded],
         "per_page": [{"competitor": r.competitor, "page": r.page_key, "status": r.status, "cells": r.cells,
                       "changes": len(r.items)} for r in results],
     }
@@ -172,6 +196,8 @@ def format_report(report: dict) -> str:
         out.append(f"  would extract {report['would_extract']} pages (new or changed hash)")
     out += [f"  FAILED {f['competitor']}/{f['page']}: {f['error']}" for f in report["failures"]]
     out += [f"  unconfirmed {u['competitor']}/{u['page']}: {', '.join(u['axes'])}" for u in report["unconfirmed"]]
+    out += [f"  needs review {r['competitor']}/{r['page']}: {', '.join(f'{a} ({why})' for a, why in r['axes'].items())}"
+            for r in report["needs_review"]]
     return "\n".join(out)
 
 

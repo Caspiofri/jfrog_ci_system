@@ -391,3 +391,67 @@ def test_a_page_without_prices_tells_the_extractor_and_notes_its_cells(tmp_path)
     assert store.get("acme", "pricing_model").note == "prices rendered client-side; pricing model only"
     store.close()
 
+
+def test_a_repeated_value_whose_evidence_is_gone_is_flagged_for_review(env):
+    site, _, go, tmp = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_v1").replace(
+        "Enterprise customers can also self-host Acme Registry in their own\ndata center, including fully air-gapped "
+        "installations.", "Enterprise customers get a dedicated cloud region.")
+    assert "self-host" not in site.pages[PRICING_URL]
+
+    def repeats_old_value(prompt, schema):  # follows the anchor although the page dropped self-hosting
+        out = answer(prompt, schema)
+        if "deployment" in out:
+            out["deployment"]["evidence"] = "Every plan runs as a managed cloud service"
+        return out
+
+    res = go(T2, llm=FakeLLM(repeats_old_value))
+    assert res.items == []
+    assert res.report["needs_review"] == [{"competitor": "acme", "page": "pricing",
+                                           "axes": {"deployment": "evidence gone, value repeated"}}]
+    store = cells(tmp)
+    cell = store.get("acme", "deployment")
+    assert cell.needs_review and cell.review_reason == "evidence gone, value repeated"
+    assert [h["event"] for h in store.history("acme", "deployment")] == ["baseline", "review"]
+    assert not store.get("acme", "pricing_model").needs_review
+    store.close()
+
+
+def test_a_reworded_value_with_both_quotes_on_both_pages_is_no_change(env):
+    site, _, go, tmp = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_article_date_edit")
+
+    def rewords(prompt, schema):  # ignores the anchor and words the same facts differently
+        out = answer(prompt, schema)
+        if "deployment" in out:
+            out["deployment"] = {"value": "managed cloud on every plan, Enterprise may run it on premises",
+                                 "evidence": "Every plan runs as a managed cloud service", "confidence": 0.8}
+        return out
+
+    res = go(T2, llm=FakeLLM(rewords))
+    assert res.items == [] and statuses(res)["pricing"] == "same_fields"
+    assert res.report["reworded"] == [{"competitor": "acme", "page": "pricing", "axes": ["deployment"]}]
+    store = cells(tmp)
+    cell = store.get("acme", "deployment")
+    assert cell.value == "SaaS; self-hosted and air-gapped on Enterprise" and cell.checked_at == T2
+    store.close()
+
+
+def test_a_real_change_is_not_mistaken_for_rewording(env):
+    site, _, go, _ = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_v1").replace(
+        "Every plan runs as a managed cloud service.", "Every plan runs as a managed cloud service on AWS or GCP.")
+
+    def new_fact(prompt, schema):
+        out = answer(prompt, schema)
+        if "deployment" in out:
+            out["deployment"] = {"value": "SaaS on AWS or GCP; self-hosted and air-gapped on Enterprise",
+                                 "evidence": "managed cloud service on AWS or GCP", "confidence": 0.8}
+        return out
+
+    [item] = go(T2, llm=FakeLLM(new_fact)).items
+    assert item.axis == "deployment" and "GCP" in item.new_value
+
