@@ -32,6 +32,21 @@ def test_rubric_is_verbatim_in_the_prompt():
     assert "| 5 | Direct threat: acquisition, a head-on competing product, a direct comparison to JFrog |" in prompt
 
 
+def test_rubric_states_impact_not_size_with_ofris_anchors():
+    llm = FakeLLM(_scores({}))
+    Ranker(llm).rank([_item(1)], [_cls(1)])
+    prompt = llm.calls[0][0]
+    assert "competitive impact on JFrog, not the size of the improvement" in prompt
+    assert "| 4 | Closes or opens a gap against JFrog, or changes what buyers compare" in prompt
+    assert "| 3 | A competitor improves a capability it already had" in prompt
+    assert "vendor marketing with no event" in prompt
+    for anchor in ('"Amazon ECR now supports replication backfill for existing container images" = 3',
+                   '"GitHub package firewall in public preview" = 5',
+                   '"5 Best SCA Tools" (a vendor listicle) = 2',
+                   '"GitLab vs SonarQube - 2026 Comparison" (a review-site page) = 1, noise'):
+        assert anchor in prompt
+
+
 @pytest.mark.parametrize("raw,status,jfrog,noise,expected", [
     (3, "full", True, False, 4),    # bonus
     (5, "full", True, False, 5),    # bonus capped at 5

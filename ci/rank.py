@@ -33,10 +33,20 @@ RUBRIC = """Importance (D14). 1–5, answering "how much does this change JFrog'
 | Score | Meaning |
 | --- | --- |
 | 5 | Direct threat: acquisition, a head-on competing product, a direct comparison to JFrog |
-| 4 | Change on a head-to-head axis: pricing, an AI or MCP capability |
-| 3 | Routine product update, or relevant industry news |
-| 2 | Related, no competitive impact |
-| 1 | Noise |"""
+| 4 | Closes or opens a gap against JFrog, or changes what buyers compare (pricing, packaging, a new capability) |
+| 3 | A competitor improves a capability it already had; or relevant industry news |
+| 2 | Related, no competitive impact; vendor marketing with no event (listicles, opinion, recaps) |
+| 1 | Noise |
+
+The score is the competitive impact on JFrog, not the size of the improvement: a large upgrade to something the
+competitor already offered is still a 3; a small change that closes a gap with JFrog or shifts a buyer comparison
+is a 4.
+
+Anchor examples:
+- "Amazon ECR now supports replication backfill for existing container images" = 3 (improves an existing capability)
+- "GitHub package firewall in public preview" = 5 (a head-on competing product to JFrog Curation)
+- "5 Best SCA Tools" (a vendor listicle) = 2 (marketing, no event)
+- "GitLab vs SonarQube - 2026 Comparison" (a review-site page) = 1, noise"""
 
 
 class Ranked(BaseModel):
