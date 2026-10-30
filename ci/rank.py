@@ -24,6 +24,8 @@ JFROG_BONUS = 1
 SNIPPET_SCORE_CAP = 4  # an item we could only read a snippet of cannot score above this (Ofri, Oct 30: was 3)
 SNIPPET_REVIEW_MIN = 4  # ...and at or above this it goes to review: a high score resting on a teaser needs a human
 NOISE_SCORE = 1
+WHY_MAX_CHARS = 160
+NOISE_WHY = "Not relevant to JFrog's competitive picture."
 
 # PRD "Item lifecycle", Importance (D14), verbatim
 RUBRIC = """Importance (D14). 1–5, answering "how much does this change JFrog's competitive picture?"
@@ -43,6 +45,7 @@ class Ranked(BaseModel):
     degraded: bool = False  # the LLM gave no usable score: score is None and the item is in review
     score: int | None  # after the code adjustments; None when degraded
     reason: str  # one line
+    why_it_matters: str = ""  # one line, to JFrog, <= WHY_MAX_CHARS; NOISE_WHY for noise, "" when degraded
     adjustments: list[str] = []
     needs_review: bool = False  # D9: routed to the analyst review queue whatever the autonomy threshold
     review_reasons: list[str] = []
@@ -95,6 +98,16 @@ def review_reasons(item: dict, cls: Classification, score: int) -> list[str]:
     return [reason for reason, applies in REVIEW_RULES if applies(item, cls, score)] + held
 
 
+def why_line(value, reason: str) -> str:
+    """The model's why_it_matters as one line when it is usable (non-empty, <= WHY_MAX_CHARS); otherwise the reason
+    line, cut to fit."""
+    why = " ".join(str(value or "").split()) if isinstance(value, str) else ""
+    if why and len(why) <= WHY_MAX_CHARS:
+        return why
+    fallback = " ".join((reason or "").split())
+    return fallback if len(fallback) <= WHY_MAX_CHARS else fallback[:WHY_MAX_CHARS - 1].rstrip() + "…"
+
+
 def sort_key(r: Ranked):
     ts = r.published_at.timestamp() if r.published_at else float("-inf")
     return (r.score is None, -(r.score or 0), -r.confidence, -ts, r.id)
@@ -121,8 +134,9 @@ class Ranker:
                     "id": {"type": "string", "enum": ids},
                     "score": {"type": "integer", "minimum": MIN_SCORE, "maximum": MAX_SCORE},
                     "reason": {"type": "string"},
+                    "why_it_matters": {"type": "string", "maxLength": WHY_MAX_CHARS},
                 },
-                "required": ["id", "score", "reason"],
+                "required": ["id", "score", "reason", "why_it_matters"],
             }}},
             "required": ["items"],
         }
@@ -138,15 +152,18 @@ scanning), Curation, and AI/MCP tooling. Score each item on this rubric:
 
 {RUBRIC}
 
-Score the content against the rubric only; code applies its own adjustments afterwards. For each id give the score
-and a one-line reason (under 25 words) naming what drove it. Answer only about the ids given, once each.
+Score the content against the rubric only; code applies its own adjustments afterwards. For each id give the score,
+a one-line reason (under 25 words) naming what drove the score, and why_it_matters: one line, at most
+{WHY_MAX_CHARS} characters, saying what this means for JFrog (e.g. "Puts Sonatype head-to-head with Artifactory on AI
+model curation."). Answer only about the ids given, once each.
 
 Items (JSON):
 {json.dumps(payload, ensure_ascii=False, indent=1)}
 """
 
-    def _llm_scores(self, pairs: list[tuple[dict, Classification]]) -> tuple[dict[str, tuple[int, str]], str]:
-        """({id: (score, reason)} for the usable answers, the error class when the whole batch failed)."""
+    def _llm_scores(self, pairs: list[tuple[dict, Classification]]) -> tuple[dict[str, tuple[int, str, str]], str]:
+        """({id: (score, reason, why_it_matters)} for the usable answers, the error class when the whole batch
+        failed)."""
         ids = [it["id"] for it, _ in pairs]
         try:
             answer = self.llm.complete(self.prompt(pairs), self.schema(ids))
@@ -166,7 +183,7 @@ Items (JSON):
             if isinstance(score, bool) or not isinstance(score, int) or not MIN_SCORE <= score <= MAX_SCORE:
                 continue
             reason = " ".join(str(reason or "").split())
-            out[row["id"]] = (score, reason)
+            out[row["id"]] = (score, reason, why_line(row.get("why_it_matters"), reason))
         return out, ""
 
     def rank(self, items: list[dict], classifications: list[Classification]) -> list[Ranked]:
@@ -174,7 +191,7 @@ Items (JSON):
         by_id = {c.id: c for c in classifications}
         pairs = [(it, by_id[it["id"]]) for it in items]
         to_score = [(it, c) for it, c in pairs if not c.noise]
-        scores: dict[str, tuple[int, str]] = {}
+        scores: dict[str, tuple[int, str, str]] = {}
         errors: dict[str, str] = {}
         for start in range(0, len(to_score), self.batch_size):
             batch = to_score[start:start + self.batch_size]
@@ -190,11 +207,12 @@ Items (JSON):
                 ranked.append(Ranked(**common, raw_score=None, degraded=True, score=None, needs_review=True,
                                      review_reasons=reasons, reason=""))
                 continue
-            raw, reason = (None, "classified as noise") if c.noise else scores[it["id"]]
+            raw, reason, why = (None, "classified as noise", NOISE_WHY) if c.noise else scores[it["id"]]
             score, notes = adjust(NOISE_SCORE if raw is None else raw, it, c)
             reasons = review_reasons(it, c, score)
             ranked.append(Ranked(**common, raw_score=raw, score=score, needs_review=bool(reasons),
-                                 review_reasons=reasons, reason=reason or "(no reason given)", adjustments=notes))
+                                 review_reasons=reasons, reason=reason or "(no reason given)", adjustments=notes,
+                                 why_it_matters=why))
         return order(ranked)
 
 

@@ -130,3 +130,29 @@ def test_snippet_item_scored_4_or_more_needs_review(status, raw, review):
     (r,) = Ranker(FakeLLM(_scores({"id1": raw}))).rank([_item(1, text_status=status)], [_cls(1)])
     assert r.needs_review is review
     assert r.review_reasons == (["snippet-only item scored >= 4"] if review else [])
+
+
+def test_why_it_matters_comes_from_the_same_call_and_falls_back_to_the_reason():
+    from ci.rank import NOISE_WHY, WHY_MAX_CHARS
+
+    answer = {"items": [
+        {"id": "id1", "score": 4, "reason": "pricing change",
+         "why_it_matters": "  Undercuts Artifactory\n Pro pricing."},
+        {"id": "id2", "score": 3, "reason": "routine release"},  # missing
+        {"id": "id3", "score": 3, "reason": "r" * 200, "why_it_matters": "w" * (WHY_MAX_CHARS + 1)},  # too long
+    ]}
+    llm = FakeLLM([answer])
+    items, cls = [_item(i) for i in (1, 2, 3, 4)], [_cls(1), _cls(2), _cls(3), _cls(4, noise=True)]
+    out = {r.id: r for r in Ranker(llm).rank(items, cls)}
+    assert len(llm.calls) == 1  # no extra call
+    schema = llm.calls[0][1]["properties"]["items"]["items"]
+    assert "why_it_matters" in schema["required"] and schema["properties"]["why_it_matters"]["maxLength"] == 160
+    assert out["id1"].why_it_matters == "Undercuts Artifactory Pro pricing."
+    assert out["id2"].why_it_matters == "routine release"
+    assert len(out["id3"].why_it_matters) == WHY_MAX_CHARS and out["id3"].why_it_matters.startswith("rrr")
+    assert out["id4"].why_it_matters == NOISE_WHY
+
+
+def test_a_degraded_item_has_no_why_it_matters():
+    (r,) = Ranker(FakeLLM([LLMError("down")])).rank([_item(1)], [_cls(1)])
+    assert r.degraded and r.why_it_matters == ""

@@ -53,7 +53,8 @@ STORY_SIMILARITY = 0.72
 EMBED_MODEL_TAG = "chroma-onnx-all-MiniLM-L6-v2"
 EMBED_CACHE_PATH = DATA_DIR / "ci" / "eval_story_embeddings.json"
 SPLIT_ASSIGNMENTS_PATH = EVALS_DIR / "split_assignments.json"  # item id -> side, fixed the first time it is assigned
-RANKED_FIELDS = {"raw_score", "degraded", "score", "reason", "adjustments", "needs_review", "review_reasons"}
+RANKED_FIELDS = {"raw_score", "degraded", "score", "why_it_matters", "reason", "adjustments", "needs_review",
+                 "review_reasons"}
 TEST_LOG_NAME = "test_runs.log"  # every --split test run is appended here, so repeated peeking at test is visible
 
 
