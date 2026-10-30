@@ -11,6 +11,7 @@ from ci.dedupe import normalize_url
 from ci.packet import CollectorResult, Packet
 
 SOURCE = "vendor_feed"
+DAY_STAMP = time(12, 0)  # a day-only date is stamped at noon UTC: off by at most 12h either way
 
 
 def keyword_re(keyword: str) -> re.Pattern:
@@ -61,7 +62,8 @@ def listing_packet(entry: ListingEntry, competitor: Competitor, page: ListingPag
         title=entry.title,
         url=entry.url,
         original_url=entry.url,
-        published_at=datetime.combine(entry.day, time.min, tzinfo=UTC),  # the listing gives the day only
+        published_at=datetime.combine(entry.day, DAY_STAMP, tzinfo=UTC),
+        date_precision="day",  # the listing gives the day only
         text=entry.teaser,
         text_status="snippet",
         text_source="teaser",
@@ -102,7 +104,8 @@ def collect(cfg: CIConfig, since: datetime) -> CollectorResult:
             entries, errors = read_listing(page, since)
         except Exception as e:  # a parser crash stays inside its listing
             return [], [short_error(page.url, e)]
-        return [listing_packet(e, competitor, page) for e in entries], errors
+        packets = [listing_packet(e, competitor, page) for e in entries]
+        return [p for p in packets if p.published_at >= since], errors  # the window, on the stamped time
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         feed_runs, listing_runs = pool.map(one_feed, feed_jobs), pool.map(one_listing, listing_jobs)

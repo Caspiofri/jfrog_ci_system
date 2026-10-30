@@ -10,6 +10,8 @@ from ci.classify import own_sources
 from ci.collectors import feedutil, listing_pages, vendor_feeds
 from ci.collectors.listing_pages import parse_github_changelog, read_listing
 from ci.config import CIConfig, ListingPage
+from ci.packet import Packet
+from ci.pipeline import stamp
 
 FIXTURES = Path(__file__).parent / "fixtures"
 LISTING = "https://github.blog/changelog/"
@@ -152,7 +154,8 @@ def test_collect_adds_listing_entries_the_feed_missed(web):
     assert lockfiles.published_at == datetime(2026, 10, 28, 16, 30, tzinfo=UTC)
     ai_scan = by_title["AI Scan for repositories in public preview"]
     assert ai_scan.source == "vendor_feed" and ai_scan.origin == LISTING and ai_scan.competitor == "github"
-    assert ai_scan.published_at == datetime(2026, 10, 28, tzinfo=UTC) and ai_scan.publisher == "GitHub"
+    assert ai_scan.published_at == datetime(2026, 10, 28, 12, tzinfo=UTC) and ai_scan.date_precision == "day"
+    assert ai_scan.publisher == "GitHub"
     assert ai_scan.text == "" and ai_scan.text_status == "snippet" and ai_scan.text_source == "teaser"
     assert ai_scan.url == ai_scan.original_url
 
@@ -177,3 +180,36 @@ def test_collect_keeps_the_listing_when_the_feed_fails(web):
 def test_listing_host_counts_as_the_competitors_own_source():
     competitor = cfg([]).competitors[0]
     assert "github.blog" in own_sources(competitor)
+
+
+@pytest.mark.parametrize("since_hour,kept", [(11, True), (12, True), (13, False)])
+def test_window_edge_is_the_noon_stamp(web, since_hour, kept):
+    """A day-only entry is stamped 12:00 UTC and kept only if that is not before since."""
+    since_dt = datetime(2026, 10, 20, since_hour, tzinfo=UTC)
+    result = vendor_feeds.collect(cfg([]), since_dt)
+    assert ("GitHub package firewall in public preview" in [p.title for p in result.packets]) is kept
+    assert all(p.published_at >= since_dt for p in result.packets)
+
+
+def test_feed_entries_keep_time_precision(web):
+    routes, _, _ = web
+    routes[FEED] = "github_changelog_feed.xml"
+    [p] = vendor_feeds.collect(cfg([{"url": FEED}]), since(21)).packets[:1]
+    assert p.origin == FEED and p.date_precision == "time"
+
+
+def _packet(published: datetime, precision: str) -> Packet:
+    return Packet(source="vendor_feed", origin=LISTING, competitor="github", title="t", url="https://u",
+                  original_url="https://u", published_at=published, date_precision=precision)
+
+
+@pytest.mark.parametrize("published,precision,in_24h", [
+    (datetime(2026, 10, 29, 12, tzinfo=UTC), "day", True),  # today
+    (datetime(2026, 10, 28, 12, tzinfo=UTC), "day", True),  # yesterday: it may have been posted at 23:00
+    (datetime(2026, 10, 27, 12, tzinfo=UTC), "day", False),
+    (datetime(2026, 10, 28, 7, tzinfo=UTC), "time", False),  # an exact time is still compared exactly
+    (datetime(2026, 10, 28, 9, tzinfo=UTC), "time", True),
+])
+def test_in_24h_compares_day_precision_dates_by_date(published, precision, in_24h):
+    now = datetime(2026, 10, 29, 8, 30, tzinfo=UTC)
+    assert stamp(_packet(published, precision), "run", now).in_24h is in_24h

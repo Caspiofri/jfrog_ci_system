@@ -32,6 +32,8 @@ class Packet(BaseModel):
     original_url: str  # as the source gave it (e.g. a news.google.com redirect)
     url_resolved: bool = True  # False when a redirect could not be decoded and url == original_url
     published_at: datetime | None = None  # timezone-aware UTC
+    # "day": the source gave a date only (a listing page); published_at is that day at 12:00 UTC
+    date_precision: Literal["time", "day"] = "time"
     text: str = ""  # plain text: the source's teaser, replaced by the full page text when fetched
     text_status: TextStatus = "snippet"
     text_source: TextSource = "teaser"  # where text came from: the feed's full entry body, the fetched page, a teaser

@@ -88,7 +88,10 @@ def stamp(p: Packet, run_id: str, now: datetime) -> Packet:
     published = p.published_at
     if published and published.tzinfo is None:
         published = published.replace(tzinfo=UTC)
-    in_24h = bool(published and published >= now - timedelta(hours=24))
+    if published and p.date_precision == "day":  # no time to compare: today or yesterday (UTC) counts
+        in_24h = published.date() >= (now - timedelta(hours=24)).date()
+    else:
+        in_24h = bool(published and published >= now - timedelta(hours=24))
     return p.model_copy(update={"id": packet_id(p.url), "run_id": run_id, "collected_at": now, "in_24h": in_24h,
                                 "published_at": published})
 
