@@ -82,8 +82,11 @@ def test_metrics_on_a_mini_golden_set_with_known_answers():
     assert (m["category"]["correct"], m["category"]["n"]) == (2, 3)  # noise label c is not scored on category
     assert m["noise"] == {"tp": 1, "fp": 1, "fn": 0, "tn": 2, "precision": 0.5, "precision_n": 2, "recall": 1.0,
                           "recall_n": 1}
-    assert m["score"] == {"n": 4, "exact": 0.5, "within_1": 0.75, "missing": 0}  # noise label counts as score 1
-    # important = score >= 4: a (5 vs 5) is a hit, d (predicted 1, labeled 4) a miss
+    # rubric v2: noise has no score. Agreement only over a (5 vs 5) and b (3 vs 2); c (noise/noise) and d (4 vs
+    # predicted noise) are excluded because one side is noise
+    assert m["score"] == {"n": 2, "exact": 0.5, "within_1": 1.0, "missing": 0, "excluded_noise": 2,
+                          "excluded_noise_n": 4}
+    # important = score >= 4: a (5 vs 5) is a hit; d (labeled 4, predicted noise) a miss: noise is never important
     assert m["important"] == {"min": 4, "n": 4, "missing": 0, "tp": 1, "fp": 0, "fn": 1, "precision": 1.0,
                               "precision_n": 1, "recall": 0.5, "recall_n": 2}
     assert "precision_at_k" not in m  # P@k is not an eval metric any more
@@ -470,10 +473,10 @@ def test_errors_are_broken_down_by_label_basis():
         "category": {"n": 2, "errors": 1, "error_rate": 0.5}, "noise": {"n": 2, "errors": 0, "error_rate": 0.0},
         "score": {"n": 2, "errors": 1, "error_rate": 0.5, "off_by_2_plus": 1, "off_by_2_plus_rate": 0.5,
                   "missing": 0}}
-    assert m["by_basis"]["partial"] == {
+    assert m["by_basis"]["partial"] == {  # c: labeled noise, so it has no score to compare
         "n": 1, "competitor": {"n": 0, "errors": 0, "error_rate": None},
         "category": {"n": 0, "errors": 0, "error_rate": None}, "noise": {"n": 1, "errors": 1, "error_rate": 1.0},
-        "score": {"n": 1, "errors": 1, "error_rate": 1.0, "off_by_2_plus": 1, "off_by_2_plus_rate": 1.0,
+        "score": {"n": 0, "errors": 0, "error_rate": None, "off_by_2_plus": 0, "off_by_2_plus_rate": None,
                   "missing": 0}}
     assert m["by_basis"]["unknown"]["n"] == 1 and m["by_basis"]["unknown"]["score"]["errors"] == 0
     report = {"split": "all", "live": True, "model": "m", "fingerprint": "f", "n": 4, "labels_total": 4,
@@ -526,7 +529,8 @@ def test_degraded_ranker_items_are_missing_not_a_midpoint_score():
     ranked = [_ranked("a", 3), Ranked(id="b", raw_score=None, degraded=True, score=None, reason="", confidence=0.5,
                                        needs_review=True, review_reasons=["ranker unavailable: LLMError"])]
     m = evaluate(labels, cls, ranked)
-    assert m["score"] == {"n": 1, "exact": 1.0, "within_1": 1.0, "missing": 1}
+    assert m["score"] == {"n": 1, "exact": 1.0, "within_1": 1.0, "missing": 1, "excluded_noise": 0,
+                          "excluded_noise_n": 1}
     assert m["important"]["n"] == 1 and m["important"]["missing"] == 1  # the unscored item is left out
 
 
@@ -650,3 +654,35 @@ def test_pr_and_label_score_are_in_the_fingerprint(monkeypatch):
                             else real(obj))
         assert eval_golden.fingerprint(CFG) != base
         monkeypatch.undo()
+
+
+def test_label_noise_predicted_noise_is_not_in_agreement_but_counts_in_noise_pr():
+    labels = [_label("a", "snyk", noise=True), _label("b", "snyk", "Security", 3)]
+    cls = [_cls("a", "snyk", "Security", noise=True), _cls("b", "snyk", "Security")]
+    m = evaluate(labels, cls, [_ranked("a", 1), _ranked("b", 3)])
+    assert (m["score"]["n"], m["score"]["excluded_noise"]) == (1, 1)
+    assert (m["noise"]["tp"], m["noise"]["fp"], m["noise"]["fn"]) == (1, 0, 0)
+    assert m["important"]["fp"] == 0  # noise is never important
+
+
+def test_a_routine_1_predicted_noise_is_a_noise_false_positive_outside_agreement():
+    labels = [_label("a", "gitlab", "Product & Features", 1), _label("b", "snyk", "Security", 3)]
+    cls = [_cls("a", "gitlab", "Product & Features", noise=True), _cls("b", "snyk", "Security")]
+    m = evaluate(labels, cls, [_ranked("a", 1), _ranked("b", 3)])
+    assert (m["noise"]["fp"], m["noise"]["tp"]) == (1, 0)
+    assert (m["score"]["n"], m["score"]["exact"], m["score"]["excluded_noise"]) == (1, 1.0, 1)
+    table = format_report({"split": "all", "live": True, "model": "m", "fingerprint": "f", "n": 2,
+                           "labels_total": 2, "stories": 2, "split_counts": {}, "aborted": False,
+                           "fallbacks": {"classify": 0, "rank": 0}, "metrics": m})
+    assert "excluded: one side noise" in table and "(n=2)" in table
+
+
+def test_the_rubric_file_hash_is_in_the_fingerprint(monkeypatch, tmp_path):
+    from ci import rank
+
+    base = eval_golden.fingerprint(CFG)
+    assert len(eval_golden.rubric_sha()) == 12
+    other = tmp_path / "rubric.md"
+    other.write_text(rank.RUBRIC_PATH.read_text(encoding="utf-8") + "\nedited", encoding="utf-8")
+    monkeypatch.setattr(rank, "RUBRIC_PATH", other)
+    assert eval_golden.fingerprint(CFG) != base

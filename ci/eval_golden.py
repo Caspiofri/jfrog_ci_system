@@ -248,6 +248,7 @@ def fingerprint(cfg: ci_config.CIConfig | None = None, side_hashes: dict[str, st
         "eval.metrics": "".join(inspect.getsource(f) for f in (evaluate, detector_vs_flags, _pr, label_score)),
         "classify.source": inspect.getsource(classify_mod),
         "rank.source": inspect.getsource(rank_mod),
+        "rubric_v2.sha256": rubric_sha(),
         "extraction_quality.source": inspect.getsource(extraction_quality),
         "prefilter.source": inspect.getsource(prefilter),
         **{f"prefilter.{k}": _frozen(v) for k, v in sorted(vars(prefilter).items()) if k.isupper()},
@@ -293,9 +294,14 @@ def label_basis(label: dict) -> str:
     return basis if basis in ("full", "partial") else "unknown"
 
 
-def label_score(label: dict) -> int:
-    """The label's importance; noise is 1 on the D14 rubric."""
-    return 1 if label["noise"] else int(label["score"])
+def rubric_sha() -> str:
+    """First 12 hex of config/rubric_v2.md's sha256: the ranker reads it verbatim, so it is part of the setup."""
+    return hashlib.sha256(rank_mod.RUBRIC_PATH.read_bytes()).hexdigest()[:12]
+
+
+def label_score(label: dict) -> int | None:
+    """The label's importance 1-5; None for noise, which has no score on rubric v2."""
+    return None if label["noise"] else int(label["score"])
 
 
 def rebuild_item(label: dict, runs_dir: Path, run_cache: dict[str, dict[str, dict]]) -> tuple[dict, bool]:
@@ -348,14 +354,28 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
     j_fp = sum(not row.get("mentions_jfrog") and cls[row["id"]].mentions_jfrog for row in labels)
     j_fn = sum(bool(row.get("mentions_jfrog")) and not cls[row["id"]].mentions_jfrog for row in labels)
 
-    # degraded items (no score: the ranker failed) are missing, counted apart, never scored as anything
-    scored = [row for row in labels if final[row["id"]].score is not None]
-    diffs = [abs(final[row["id"]].score - label_score(row)) for row in scored]
-    # "important": predicted final score >= IMPORTANT_MIN vs labeled score >= IMPORTANT_MIN (noise counts as 1),
-    # over the scored items; this replaces P@k, which needs a full daily run to mean anything
-    i_tp = sum(final[row["id"]].score >= IMPORTANT_MIN and label_score(row) >= IMPORTANT_MIN for row in scored)
-    i_fp = sum(final[row["id"]].score >= IMPORTANT_MIN and label_score(row) < IMPORTANT_MIN for row in scored)
-    i_fn = sum(final[row["id"]].score < IMPORTANT_MIN and label_score(row) >= IMPORTANT_MIN for row in scored)
+    # rubric v2: noise has no score. Predicted noise is the classifier's flag; a degraded item (the ranker failed,
+    # not noise) is missing and counted apart
+    def pred_noise(row: dict) -> bool:
+        return cls[row["id"]].noise
+
+    def degraded(row: dict) -> bool:
+        return not pred_noise(row) and final[row["id"]].score is None
+
+    judged = [row for row in labels if not degraded(row)]
+    # score agreement only where both sides have a score; noise vs non-noise is the noise P/R's job
+    both = [row for row in judged if not row["noise"] and not pred_noise(row)]
+    one_side_noise = len(judged) - len(both)
+    diffs = [abs(final[row["id"]].score - label_score(row)) for row in both]
+
+    # "important": score >= IMPORTANT_MIN on each side; noise, labeled or predicted, is never important
+    def important(score: int | None) -> bool:
+        return score is not None and score >= IMPORTANT_MIN
+
+    pairs = [(important(None if pred_noise(r) else final[r["id"]].score), important(label_score(r))) for r in judged]
+    i_tp = sum(p and lab for p, lab in pairs)
+    i_fp = sum(p and not lab for p, lab in pairs)
+    i_fn = sum(lab and not p for p, lab in pairs)
 
     # accuracy split by who settled the item: competitor and category on non-noise labels, noise on all
     by_method = {}
@@ -376,7 +396,9 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
     def errors_for(rows: list[dict]) -> dict:
         relevant = [row for row in rows if not row["noise"]]
         cat_rows = [row for row in relevant if row.get("category")]
-        rows_scored = [r for r in rows if final[r["id"]].score is not None]
+        # score errors over items where both sides have a score (rubric v2: noise has none)
+        rows_scored = [r for r in rows if not r["noise"] and not cls[r["id"]].noise
+                       and final[r["id"]].score is not None]
         def err(n: int, errors: int) -> dict:
             return {"n": n, "errors": errors, "error_rate": _ratio(errors, n)}
 
@@ -388,7 +410,7 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
             "noise": err(len(rows), sum(row["noise"] != cls[row["id"]].noise for row in rows)),
             "score": {**err(len(rows_scored), sum(final[row["id"]].score != label_score(row) for row in rows_scored)),
                       "off_by_2_plus": off2, "off_by_2_plus_rate": _ratio(off2, len(rows_scored)),
-                      "missing": len(rows) - len(rows_scored)},
+                      "missing": sum(degraded(r) for r in rows)},
         }
 
     # the noise pre-filter (shadow or on): what it flags, against the labels; it must never flag a relevant item
@@ -420,8 +442,11 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
         "noise": _pr(tp, fp, fn) | {"tn": tn},
         "mentions_jfrog": _pr(j_tp, j_fp, j_fn),
         "score": {"n": len(diffs), "exact": _ratio(sum(d == 0 for d in diffs), len(diffs)),
-                  "within_1": _ratio(sum(d <= 1 for d in diffs), len(diffs)), "missing": len(labels) - len(scored)},
-        "important": {"min": IMPORTANT_MIN, "n": len(scored), "missing": len(labels) - len(scored),
+                  "within_1": _ratio(sum(d <= 1 for d in diffs), len(diffs)),
+                  "missing": len(labels) - len(judged),
+                  # left out because the label or the prediction is noise (out of the n judged items)
+                  "excluded_noise": one_side_noise, "excluded_noise_n": len(judged)},
+        "important": {"min": IMPORTANT_MIN, "n": len(judged), "missing": len(labels) - len(judged),
                       **_pr(i_tp, i_fp, i_fn)},
         "by_method": by_method,
         "prefilter": prefilter_stats,
@@ -447,7 +472,7 @@ def precision_at_k(labels: list[dict], ranked: list[Ranked], k_values=K_VALUES) 
     out = {}
     for k in k_values:
         top = [r.id for r in ranked if r.id in lab and r.score is not None][:k]
-        hits = sum(label_score(lab[i]) >= IMPORTANT_MIN for i in top)
+        hits = sum((label_score(lab[i]) or 0) >= IMPORTANT_MIN for i in top)
         out[str(k)] = {"k": len(top), "hits": hits, "precision": _ratio(hits, len(top)), "n": len(top)}
     return out
 
@@ -612,7 +637,10 @@ def format_report(report: dict) -> str:
     if "suppressed" in sc:
         lines.append(row.format("Score agreement", "-", sc["suppressed"]))
     else:
-        lines.append(row.format("Score exact", _rate(sc["exact"], sc["n"]), f"{sc['missing']} unscored (degraded)"))
+        lines.append(row.format("Score exact", _rate(sc["exact"], sc["n"]),
+                                f"both sides scored; {sc['missing']} unscored (degraded)"))
+        lines.append(row.format("  excluded: one side noise", str(sc["excluded_noise"]),
+                                f"(n={sc['excluded_noise_n']}); noise agreement is the noise P/R"))
         lines.append(row.format("Score within ±1", _rate(sc["within_1"], sc["n"]), ""))
     lines.append("\n  Settled by        items       competitor          category             noise")
     for method, v in m["by_method"].items():
