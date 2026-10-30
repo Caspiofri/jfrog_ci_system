@@ -88,6 +88,8 @@ def stamp(p: Packet, run_id: str, now: datetime) -> Packet:
     published = p.published_at
     if published and published.tzinfo is None:
         published = published.replace(tzinfo=UTC)
+    if published and p.date_precision == "day" and published > now:  # a made-up time never after the run start
+        published = now
     # the same rule as the collectors' window; a day-only date (date_precision "day") is its noon-UTC stamp, so its
     # in_24h can be off by up to 12h either way
     in_24h = bool(published and published >= now - timedelta(hours=24))

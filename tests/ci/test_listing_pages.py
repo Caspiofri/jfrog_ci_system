@@ -235,3 +235,20 @@ def test_day_stamp_is_noon_but_never_after_the_run(now, expected):
     entry = listing_pages.ListingEntry(title="t", url="https://u", day=date(2026, 10, 28))
     p = vendor_feeds.listing_packet(entry, cfg([]).competitors[0], ListingPage(url=LISTING), now)
     assert p.published_at == expected and p.date_precision == "day"
+
+
+def test_day_stamp_is_never_after_the_run_start():
+    """The collector caps at its own clock; the pipeline caps again at the run start, so published <= collected."""
+    run_start = datetime(2026, 10, 28, 8, tzinfo=UTC)
+    entry = listing_pages.ListingEntry(title="t", url="https://u", day=date(2026, 10, 28))
+    late_clock = datetime(2026, 10, 28, 13, tzinfo=UTC)  # the collector ran after noon
+    p = vendor_feeds.listing_packet(entry, cfg([]).competitors[0], ListingPage(url=LISTING), late_clock)
+    assert p.published_at == datetime(2026, 10, 28, 12, tzinfo=UTC)
+    stamped = stamp(p, "run", run_start)
+    assert stamped.published_at == run_start == stamped.collected_at and stamped.in_24h
+
+
+def test_exact_times_are_not_capped():
+    run_start = datetime(2026, 10, 28, 8, tzinfo=UTC)
+    future = datetime(2026, 10, 28, 9, tzinfo=UTC)  # a source clock ahead of ours is kept as given
+    assert stamp(_packet(future, "time"), "run", run_start).published_at == future
