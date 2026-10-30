@@ -24,31 +24,30 @@ def _scores(mapping):
     return respond
 
 
-def test_rubric_is_verbatim_in_the_prompt():
+def test_rubric_v2_file_is_verbatim_in_the_prompt():
+    from config.settings import CONFIG_DIR
+
     llm = FakeLLM(_scores({}))
     Ranker(llm).rank([_item(1)], [_cls(1)])
     prompt = llm.calls[0][0]
-    assert RUBRIC in prompt
-    assert "| 5 | Direct threat: acquisition, a head-on competing product, a direct comparison to JFrog |" in prompt
+    text = (CONFIG_DIR / "rubric_v2.md").read_text(encoding="utf-8").strip()
+    assert RUBRIC == text and text in prompt
+    assert "Score each item 1-5 on this rubric" in prompt
+    assert "never sent to you" in prompt and 'never answer "Noise"' in prompt
 
 
-def test_rubric_states_impact_not_size_with_ofris_anchors():
+def test_prompt_carries_the_v2_anchors_and_lines():
     llm = FakeLLM(_scores({}))
     Ranker(llm).rank([_item(1)], [_cls(1)])
     prompt = llm.calls[0][0]
-    assert "competitive impact on JFrog, not the size of the improvement" in prompt
-    assert 'Keywords such as "enterprise", "data residency"' in prompt
-    assert "do not raise a score by themselves" in prompt
-    assert "| 4 | Closes or opens a gap against JFrog, or changes what buyers compare" in prompt
-    assert "| 3 | A competitor improves a capability it already had" in prompt
-    assert "vendor marketing with no event" in prompt
-    for anchor in ('"Amazon ECR now supports replication backfill for existing container images" = 3',
-                   '"GitHub package firewall in public preview" = 5 (head-on vs a JFrog core product',
-                   "a preview does not lower a core-capability move",
-                   '"5 Best SCA Tools" (a vendor listicle) = 2',
-                   '"GitLab vs SonarQube - 2026 Comparison" (a review-site page) = noise, no score'):
+    for anchor in ("Amazon ECR replication backfill = 3", "GitHub package firewall, public preview = 5",
+                   '"5 Best SCA Tools" vendor listicle = 2', "Cloudsmith Mumbai storage region = 3",
+                   "GitHub Enterprise includes Copilot = 3", "GitLab patch release 19.5.3 = 1",
+                   "GitLab vs SonarQube review-site page = Noise"):
         assert anchor in prompt
-    assert "= 1, noise" not in prompt  # a noise item gets no score
+    assert "**Capability vs sub-feature (the 3-vs-4 line):**" in prompt
+    assert "Uncertainty doesn't raise a score: an unverifiable gap is not a 4." in prompt
+    assert "Direct threat: acquisition" not in prompt  # the v1 (D14) table is gone
 
 
 @pytest.mark.parametrize("raw,status,jfrog,noise,expected", [

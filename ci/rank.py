@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from ci.classify import Classification, content_text
 from ci.llm import JsonLLM, LLMError
+from config.settings import CONFIG_DIR
 
 log = logging.getLogger(__name__)
 
@@ -27,28 +28,10 @@ NOISE_SCORE = 1
 WHY_MAX_CHARS = 160
 NOISE_WHY = "Not relevant to JFrog's competitive picture."
 
-# PRD "Item lifecycle", Importance (D14), verbatim
-RUBRIC = """Importance (D14). 1–5, answering "how much does this change JFrog's competitive picture?"
-
-| Score | Meaning |
-| --- | --- |
-| 5 | Direct threat: acquisition, a head-on competing product, a direct comparison to JFrog |
-| 4 | Closes or opens a gap against JFrog, or changes what buyers compare (pricing, packaging, a new capability) |
-| 3 | A competitor improves a capability it already had; or relevant industry news |
-| 2 | Related, no competitive impact; vendor marketing with no event (listicles, opinion, recaps) |
-| 1 | Noise |
-
-The score is the competitive impact on JFrog, not the size of the improvement: a large upgrade to something the
-competitor already offered is still a 3; a small change that closes a gap with JFrog or shifts a buyer comparison
-is a 4. Keywords such as "enterprise", "data residency", "AI" or "security" do not raise a score by themselves;
-only the impact on JFrog's competitive picture does.
-
-Anchor examples:
-- "Amazon ECR now supports replication backfill for existing container images" = 3 (improves an existing capability)
-- "GitHub package firewall in public preview" = 5 (head-on vs a JFrog core product at GitHub's distribution scale;
-  a preview does not lower a core-capability move)
-- "5 Best SCA Tools" (a vendor listicle) = 2 (marketing, no event)
-- "GitLab vs SonarQube - 2026 Comparison" (a review-site page) = noise, no score"""
+# Importance rubric v2 (Ofri, Oct 30; frozen until after the eval): config/rubric_v2.md is the single source, read
+# verbatim into the prompt, so the labels, the coverage list and the ranker all score on the same text
+RUBRIC_PATH = CONFIG_DIR / "rubric_v2.md"
+RUBRIC = RUBRIC_PATH.read_text(encoding="utf-8").strip()
 
 
 class Ranked(BaseModel):
@@ -163,11 +146,13 @@ class Ranker:
                     "text": content_text(it)[:LLM_TEXT_CHARS]} for it, c in pairs]
         return f"""You rank news items for JFrog's competitive-intelligence team.
 JFrog sells a software supply chain platform: Artifactory (artifact and package repositories), Xray (security
-scanning), Curation, and AI/MCP tooling. Score each item on this rubric:
+scanning), Curation, and AI/MCP tooling. Score each item 1-5 on this rubric:
 
 {RUBRIC}
 
-Score the content against the rubric only; code applies its own adjustments afterwards. For each id give the score,
+Items judged noise are filtered out before this step and are never sent to you, so give every item below a score
+from 1 to 5; never answer "Noise". Score the content against the rubric only; code applies its own adjustments
+(the JFrog-mention bonus, the snippet cap, tie-breaks) afterwards. For each id give the score,
 a one-line reason (under 25 words) naming what drove the score, and why_it_matters: one line, at most
 {WHY_MAX_CHARS} characters, saying what this means for JFrog (e.g. "Puts Sonatype head-to-head with Artifactory on AI
 model curation."). Answer only about the ids given, once each.
