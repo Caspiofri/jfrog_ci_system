@@ -245,7 +245,7 @@ def fingerprint(cfg: ci_config.CIConfig | None = None, side_hashes: dict[str, st
         "eval.EMBED_TEXT_CHARS": EMBED_TEXT_CHARS,
         "eval.TEST_PERCENT": TEST_PERCENT,
         "eval.IMPORTANT_MIN": IMPORTANT_MIN,
-        "eval.metrics": inspect.getsource(evaluate) + inspect.getsource(detector_vs_flags),
+        "eval.metrics": "".join(inspect.getsource(f) for f in (evaluate, detector_vs_flags, _pr, label_score)),
         "classify.source": inspect.getsource(classify_mod),
         "rank.source": inspect.getsource(rank_mod),
         "extraction_quality.source": inspect.getsource(extraction_quality),
@@ -416,6 +416,10 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
     }
 
 
+LLM_ONLY_METRICS = ("important", "score")  # need the ranker's scores; suppressed in an offline run
+OFFLINE_NOTE = "LLM-only metric, offline"
+
+
 def _pr(tp: int, fp: int, fn: int) -> dict:
     """Precision and recall, each with the n it is computed over."""
     return {"tp": tp, "fp": fp, "fn": fn, "precision": _ratio(tp, tp + fp), "precision_n": tp + fp,
@@ -491,6 +495,9 @@ def run(split: str = "train", live: bool = False, labels_path: Path | None = Non
         _log_test_run(report, out_dir)
         return report
     report["metrics"] = evaluate(labels, classifications, ranked)
+    if not live:  # the abstaining LLM scores nothing but noise: these would only measure the noise items
+        for key in LLM_ONLY_METRICS:
+            report["metrics"][key] = {"suppressed": OFFLINE_NOTE}
     report["metrics"]["extraction_detector"] = detector_vs_flags(labels, items)
     cls, fin = {c.id: c for c in classifications}, {r.id: r for r in ranked}
     for row, item in zip(labels, items, strict=True):
@@ -514,12 +521,16 @@ def _log_test_run(report: dict, out_dir: Path | None) -> None:
     if report["split"] != "test" or out_dir is None:
         return
     m = report["metrics"] or {}
-    pick = {"competitor": ("competitor", "accuracy"), "category": ("category", "accuracy"),
-            "noise_precision": ("noise", "precision"), "noise_recall": ("noise", "recall"),
-            "score_exact": ("score", "exact"), "score_within_1": ("score", "within_1")}
+    # metric -> (section, rate key, key of its n): every logged rate carries the n it was computed over
+    pick = {"competitor": ("competitor", "accuracy", "n"), "category": ("category", "accuracy", "n"),
+            "noise_precision": ("noise", "precision", "precision_n"), "noise_recall": ("noise", "recall", "recall_n"),
+            "important_precision": ("important", "precision", "precision_n"),
+            "important_recall": ("important", "recall", "recall_n"),
+            "score_exact": ("score", "exact", "n"), "score_within_1": ("score", "within_1", "n")}
     entry = {"at": report["created_at"], "fingerprint": report["fingerprint"], "live": report["live"],
              "model": report["model"], "n": report["n"], "aborted": report["aborted"],
-             "metrics": {name: (m.get(a) or {}).get(b) for name, (a, b) in pick.items()}}
+             "metrics": {name: {"value": (m.get(a) or {}).get(b), "n": (m.get(a) or {}).get(nk)}
+                         for name, (a, b, nk) in pick.items()}}
     out_dir.mkdir(parents=True, exist_ok=True)
     with (out_dir / TEST_LOG_NAME).open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
@@ -573,11 +584,21 @@ def format_report(report: dict) -> str:
     on_noise = comp["on_noise"]
     lines.append(row.format("  (on noise items)", _rate(on_noise["accuracy"], on_noise["n"]), ""))
     lines.append(row.format("Category accuracy", _rate(cat["accuracy"], cat["n"]), "non-noise"))
-    for name, pr in (("Noise", nz), ("Mentions JFrog", jf), (f"Important (score >= {imp['min']})", imp)):
+    for name, pr in (("Noise", nz), ("Mentions JFrog", jf)):
         lines.append(row.format(f"{name} precision", _rate(pr["precision"], pr["precision_n"]), "predicted"))
         lines.append(row.format(f"{name} recall", _rate(pr["recall"], pr["recall_n"]), "labeled"))
-    lines.append(row.format("Score exact", _rate(sc["exact"], sc["n"]), f"{sc['missing']} unscored (degraded)"))
-    lines.append(row.format("Score within ±1", _rate(sc["within_1"], sc["n"]), ""))
+    if "suppressed" in imp:
+        lines.append(row.format("Important (score >= 4)", "-", imp["suppressed"]))
+    else:
+        lines.append(row.format(f"Important (score >= {imp['min']}) precision",
+                                _rate(imp["precision"], imp["precision_n"]), "predicted"))
+        lines.append(row.format(f"Important (score >= {imp['min']}) recall", _rate(imp["recall"], imp["recall_n"]),
+                                f"labeled; {imp['missing']} unscored (degraded) left out"))
+    if "suppressed" in sc:
+        lines.append(row.format("Score agreement", "-", sc["suppressed"]))
+    else:
+        lines.append(row.format("Score exact", _rate(sc["exact"], sc["n"]), f"{sc['missing']} unscored (degraded)"))
+        lines.append(row.format("Score within ±1", _rate(sc["within_1"], sc["n"]), ""))
     lines.append("\n  Settled by        items       competitor          category             noise")
     for method, v in m["by_method"].items():
         cells = [f"{_rate(v[k]['accuracy'], v[k]['n']):>16}" for k in ("competitor", "category", "noise")]

@@ -317,12 +317,15 @@ def test_mentions_jfrog_precision_and_recall():
                                    "recall_n": 2}
 
 
-def test_offline_run_shows_unscored_rates_as_na_with_n(golden):
+def test_offline_run_suppresses_the_llm_only_metrics(golden):
     labels, runs, _ = golden
     report = run(split="all", labels_path=labels, runs_dir=runs, out_dir=None, cfg=CFG)
-    assert report["metrics"]["important"]["n"] == 0  # the abstaining LLM scores nothing
+    # offline, only noise items get a score: important and score agreement would measure just those
+    assert report["metrics"]["important"] == {"suppressed": "LLM-only metric, offline"}
+    assert report["metrics"]["score"] == {"suppressed": "LLM-only metric, offline"}
     table = format_report(report)
-    assert "Precision@" not in table and "n/a (n=0)" in table
+    assert "Precision@" not in table and table.count("LLM-only metric, offline") == 2
+    assert "Important (score >= 4) recall" not in table and "Score exact" not in table
 
 
 def test_reworded_copies_join_by_embedding_similarity(tmp_path):
@@ -605,3 +608,45 @@ def test_metric_code_is_in_the_fingerprint(monkeypatch):
     monkeypatch.setattr(eval_golden.inspect, "getsource",
                         lambda obj: real(obj) + "#" if obj is eval_golden.evaluate else real(obj))
     assert eval_golden.fingerprint(CFG) != base
+
+
+def test_a_noise_label_predicted_important_is_a_false_positive():
+    labels = [_label("a", "snyk", noise=True), _label("b", "snyk", "Security", 4)]
+    cls = [_cls("a", "snyk", "Security"), _cls("b", "snyk", "Security")]
+    m = evaluate(labels, cls, [_ranked("a", 4), _ranked("b", 4)])
+    assert (m["important"]["tp"], m["important"]["fp"], m["important"]["fn"]) == (1, 1, 0)
+    assert m["important"]["precision"] == 0.5 and m["important"]["precision_n"] == 2
+
+
+def test_important_recall_line_shows_the_unscored_items():
+    labels = [_label("a", "snyk", "Security", 5), _label("b", "snyk", "Security", 5)]
+    ranked = [_ranked("a", 5), Ranked(id="b", raw_score=None, degraded=True, score=None, reason="", confidence=0.5)]
+    m = evaluate(labels, [_cls("a", "snyk", "Security"), _cls("b", "snyk", "Security")], ranked)
+    report = {"split": "all", "live": True, "model": "m", "fingerprint": "f", "n": 2, "labels_total": 2,
+              "stories": 2, "split_counts": {}, "aborted": False, "fallbacks": {"classify": 0, "rank": 0},
+              "metrics": m}
+    line = next(x for x in format_report(report).splitlines() if "Important (score >= 4) recall" in x)
+    assert "1.00 (n=1)" in line and "1 unscored (degraded) left out" in line
+
+
+def test_test_split_log_carries_each_rate_with_its_n(tmp_path):
+    labels = tmp_path / "golden.jsonl"
+    rows = [_label(f"i{i}", "snyk", "Security", 4, title=f"Story {i}") for i in range(30)]
+    labels.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    out = tmp_path / "out"
+    run(split="test", live=True, labels_path=labels, runs_dir=tmp_path / "none", out_dir=out, cfg=CFG,
+        llm=FakeLLM(_respond))
+    entry = json.loads((out / "test_runs.log").read_text(encoding="utf-8").splitlines()[0])
+    assert {"important_precision", "important_recall"} <= set(entry["metrics"])
+    assert all(set(v) == {"value", "n"} for v in entry["metrics"].values())
+    assert entry["metrics"]["important_recall"]["n"] >= 1
+
+
+def test_pr_and_label_score_are_in_the_fingerprint(monkeypatch):
+    base = eval_golden.fingerprint(CFG)
+    real = eval_golden.inspect.getsource
+    for fn in (eval_golden._pr, eval_golden.label_score):
+        monkeypatch.setattr(eval_golden.inspect, "getsource", lambda obj, fn=fn: real(obj) + "#" if obj is fn
+                            else real(obj))
+        assert eval_golden.fingerprint(CFG) != base
+        monkeypatch.undo()
