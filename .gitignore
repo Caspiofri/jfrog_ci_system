@@ -20,19 +20,20 @@ env/
 .vscode/
 .idea/
 
-# Planning / design docs (not production code)
-PRD.md
-docs/PRD-upgrade.md
-docs/superpowers/
-
 # Runtime data (Chroma DB, learned weights) and run output (logs, traces, eval reports)
 data/
 output/
 docs/EVAL-IMPROVEMENTS.md
 docs/ranking_labels_*.json
 
-# User labels (copied article text) and Telegram rating bot state
+# User labels (copied article text)
 evals/ranking_golden.json
-evals/telegram_state.json*
-evals/telegram_labels.jsonl
-evals/telegram_recheck.jsonl
+
+# Claude: specs, plans and agent instructions (local only, never committed)
+.claude/
+CLAUDE.md
+docs/specs/
+docs/plans/
+docs/superpowers/
+PRD*.md
+docs/PRD-upgrade.md

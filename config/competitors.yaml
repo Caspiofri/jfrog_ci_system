@@ -1,0 +1,79 @@
+# Who the CI tool tracks (PRD D10) and where each source looks. Adding a competitor is one block here, not code.
+# Feed URLs and repos were verified live on Oct 30; queries were tuned on that day's results.
+window_days: 7  # a run collects this many days back; items are flagged in/out of the last 24h
+
+competitors:
+  - key: cloudsmith
+    name: Cloudsmith
+    news_queries: ['"Cloudsmith"']
+    hn_queries: ["Cloudsmith"]
+    feeds:
+      # was https://cloudsmith.com/blog/rss.xml (404); this is the feed the blog page advertises
+      - url: https://cloudsmith.com/rss/blog.xml
+      # added: product changelog
+      - url: https://cloudsmith.com/rss/changelog.xml
+    github_repos: [cloudsmith-io/cloudsmith-cli]
+
+  - key: sonatype
+    name: Sonatype
+    news_queries: ['"Sonatype"', '"Sonatype Nexus"']  # "Nexus Repository" matched a VC firm
+    hn_queries: ["Sonatype", "Nexus Repository"]
+    feeds:
+      - url: https://www.sonatype.com/blog/rss.xml
+    github_repos: [sonatype/nexus-public]
+
+  - key: github
+    name: GitHub
+    # "GitHub Packages" returned nothing; plain "Copilot security" was mostly launch news
+    news_queries: ['"GitHub Advanced Security"', '"GitHub" npm security',
+                   '"GitHub Copilot" (vulnerability OR "supply chain" OR CVE)', '"npm registry"']
+    hn_queries: ["GitHub Advanced Security", "Dependabot", "CodeQL", "GitHub Actions"]
+    feeds:
+      - url: https://github.blog/changelog/feed/
+      - url: https://github.blog/feed/
+        keywords: [security, supply chain, packages, npm, dependabot, codeql, copilot, mcp, agent]
+    github_repos: [github/github-mcp-server, github/codeql-action]
+
+  - key: gitlab
+    name: GitLab
+    news_queries: ['"GitLab" -stock -GTLB']  # plain "GitLab" was dominated by stock news
+    hn_queries: ["GitLab"]
+    feeds:
+      - url: https://about.gitlab.com/atom.xml
+      # added: monthly release notes and patch/security releases (about.gitlab.com/releases.xml redirects here)
+      - url: https://docs.gitlab.com/releases/releases.xml
+      - url: https://docs.gitlab.com/releases/patch-releases.xml
+    github_repos: []
+
+  - key: snyk
+    name: Snyk
+    news_queries: ['"Snyk"']
+    hn_queries: ["Snyk"]
+    feeds:
+      - url: https://snyk.io/blog/feed/
+      # added: Snyk product changelog
+      - url: https://updates.snyk.io/rss/
+    github_repos: []  # snyk/cli releases were all -preview builds; the changelog feed covers releases
+
+  - key: aws_codeartifact
+    name: AWS CodeArtifact
+    news_queries: ['CodeArtifact', '"Amazon Inspector"']  # the quoted "AWS CodeArtifact" returned nothing
+    hn_queries: ["CodeArtifact"]
+    feeds:
+      - url: https://aws.amazon.com/about-aws/whats-new/recent/feed/
+        keywords: [codeartifact, inspector, codecatalyst, software supply chain]
+      # added: AWS Security Blog, filtered to the supply-chain products
+      - url: https://aws.amazon.com/blogs/security/feed/
+        keywords: [codeartifact, inspector, software supply chain, sbom]
+    github_repos: []
+
+  - key: industry
+    name: Industry
+    news_queries:
+      - '"software supply chain attack"'
+      - '"malicious packages" npm OR PyPI'
+      - '"MCP server" vulnerability'
+      - '"AI agent" security supply chain'
+    hn_queries: ["supply chain", "malicious package"]  # "MCP security" returned only junk
+    feeds: []
+    github_repos: []
