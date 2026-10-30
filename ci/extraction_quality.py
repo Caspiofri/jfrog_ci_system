@@ -22,9 +22,10 @@ TITLE_MIN_COVERAGE = 0.25  # below this share of the title's content words, the 
 TITLE_CHECK_MIN_WORDS = 40  # shorter texts (release notes, teasers) are not judged on title coverage
 TITLE_MIN_CONTENT_WORDS = 2  # a title with fewer content words gives no signal
 BOILERPLATE_MAX_RATIO = 0.5  # above this share of characters on boilerplate lines, the text is junk
-# Below this many characters the ratio is not applied (short release notes, changelog entries and a short SSO
-# "sign in" item scored 78-100%); WALL_RE judges short texts instead. The smallest consent wall in the fixtures is
-# ~380 chars and the walls of run 20261030T0836Z-5d06a9 are 29-93 chars, all caught by their wall phrases.
+# Below this many characters the ratio is applied only to menu-like texts (see menu_like): short release notes,
+# changelog entries and a short SSO "sign in" item scored 78-100%. WALL_RE also judges short texts. The smallest
+# consent wall in the fixtures is ~380 chars and the walls of run 20261030T0836Z-5d06a9 are 29-93 chars, all caught
+# by their wall phrases.
 BOILERPLATE_MIN_CHARS = 500
 NAV_LINE_MAX_WORDS = 3  # a short line with no sentence punctuation reads as a menu entry...
 NAV_LINE_MAX_CHARS = 40  # ...if it is also short in characters
@@ -44,13 +45,39 @@ BOILERPLATE_RE = re.compile(
     r"advertisement|sponsored|enable javascript|your browser)\b|©",
     re.IGNORECASE)
 
-# a page that is only a gate in front of the content: JS / bot checks, consent walls, a lone loading line
+# A page that is only a gate in front of the content: JS / bot checks, consent walls, error pages, a lone loading
+# line. The phrase must sit at the start of a short line of its own (at most WALL_LEAD_WORDS words before it, e.g.
+# "You need to enable JavaScript to run this app."; WALL_LINE_MAX_WORDS in all; not a list bullet): "captcha" or
+# "cookie settings" inside a CVE note or a release-note entry is content, not a wall.
+WALL_LINE_MAX_WORDS = 10
+WALL_LEAD_WORDS = 3
 WALL_RE = re.compile(
-    r"enable javascript|javascript (?:is )?(?:required|disabled)|verifying (?:your browser|you are (?:a )?human)|"
-    r"checking (?:your browser|if the site connection is secure)|just a moment\.\.\.|are you a robot|captcha|"
-    r"access denied|we use cookies|accept (?:all )?cookies|cookie (?:settings|preferences)|we value your privacy|"
-    r"^\s*(?:loading|please wait)\W*$",
-    re.IGNORECASE | re.MULTILINE)
+    r"^\W*(?:\w+\s+){0,3}?(?:please\s+)?(?:enable javascript|javascript (?:is )?(?:required|disabled)|"
+    r"verifying (?:your browser|you are (?:a )?human)|checking (?:your browser|if the site connection is secure)|"
+    r"just a moment|are you a robot|(?:complete the )?captcha|access denied|we use cookies|"
+    r"accept (?:all )?cookies|cookie (?:settings|preferences)|we value your privacy|(?:error )?404\b|"
+    r"page not found|the page you (?:are|were) looking for|loading\W*$|please wait\W*$)",  # {0,3}: WALL_LEAD_WORDS
+    re.IGNORECASE)
+MENU_LINE_MIN_WORDS = 6  # a line this long, or a 3+ word line ending a sentence, is content, not a menu entry
+
+
+def wall_phrase(text: str) -> str | None:
+    """The wall phrase opening a short line of the text, or None."""
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if line[:1] in "-*•" or len(line.split()) > WALL_LINE_MAX_WORDS:
+            continue
+        if m := WALL_RE.search(line):
+            return " ".join(m.group(0).split()).strip(" .!-:").lower()
+    return None
+
+
+def menu_like(text: str) -> bool:
+    """No content line: none of MENU_LINE_MIN_WORDS words, none of 3+ words ending in . ! or ?"""
+    def content(line: str) -> bool:
+        n = len(line.split())
+        return n >= MENU_LINE_MIN_WORDS or (n >= 3 and line.rstrip().endswith((".", "!", "?")))
+    return not any(content(line) for line in (text or "").splitlines())
 
 
 @dataclass
@@ -97,11 +124,11 @@ def assess(title: str, text: str) -> Quality:
     if coverage is not None and len(_words(text)) >= TITLE_CHECK_MIN_WORDS and coverage < TITLE_MIN_COVERAGE:
         reasons.append(f"title words missing from the text ({coverage:.0%} found)")
     ratio = boilerplate_ratio(text)
-    if len((text or "").strip()) < BOILERPLATE_MIN_CHARS:
-        wall = WALL_RE.search(text or "")
-        if wall:
-            reasons.append(f"page wall ({' '.join(wall.group(0).split()).lower()!r})")
-    elif ratio > BOILERPLATE_MAX_RATIO:
+    short = len((text or "").strip()) < BOILERPLATE_MIN_CHARS
+    wall = wall_phrase(text) if short else None
+    if wall:
+        reasons.append(f"page wall ({wall!r})")
+    elif (not short or menu_like(text)) and ratio > BOILERPLATE_MAX_RATIO:
         reasons.append(f"mostly boilerplate ({ratio:.0%} of the text)")
     return Quality(ok=not reasons, reasons=reasons, title_coverage=1.0 if coverage is None else coverage,
                    boilerplate_ratio=ratio)

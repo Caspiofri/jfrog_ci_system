@@ -97,6 +97,9 @@ def test_short_real_pages_are_not_junk(name):
     "M\nmali-pagecache-root\nLoading",
     "Verifying your browser before proceeding...\nIncident ID:\nd548d34c-bsff-4369-b9dd-83432f06706c",
     "We use cookies to give you the best experience.\nAccept all\nReject all",
+    "404\nPage not found\nThe page you are looking for does not exist.\nGo home",
+    "Page Not Found\nSorry, we couldn't find that page.",
+    "You need to enable JavaScript to run this app.",
 ])
 def test_tiny_walls_fail_on_their_wall_phrase_even_without_title_signal(text):
     q = assess("Roku developer repositories moved from GitHub to GitLab", text)
@@ -106,3 +109,28 @@ def test_tiny_walls_fail_on_their_wall_phrase_even_without_title_signal(text):
 def test_title_coverage_matches_word_forms_and_ignores_stopwords():
     assert title_coverage("GitLab launches Orbit", "gitlab launched the orbit graph") == 1.0
     assert title_coverage("Is it here?", "anything") is None  # no content words: no signal
+
+
+NAV_MENU = ("Skip to content\nProducts\nSolutions\nPricing\nDocs\nBlog\nSign in\nGet started\nContact sales\n"
+            "About us\nCareers\nPress")
+
+
+def test_a_short_nav_menu_still_fails_on_boilerplate():
+    assert len(NAV_MENU) < BOILERPLATE_MIN_CHARS
+    q = assess("GitLab ships Orbit to every tier", NAV_MENU)
+    assert not q.ok and any("boilerplate" in r for r in q.reasons)
+
+
+@pytest.mark.parametrize(("title", "text"), [
+    ("CVE-2026-1234: captcha bypass in Example Login", "CVE-2026-1234: an attacker can bypass the captcha and reach "
+     "the login form; requests then fail with access denied only after the lockout. Fixed in 2.3.1."),
+    ("example-cli v2.3.1", "v2.3.1\n- fix: the cookie settings dialog no longer resets on reload in the web UI\n"
+     "- chore: bump deps"),
+    ("example-cli v2.3.2", "v2.3.2\n- fix: cookie settings now persist\nUpgrade with `pip install -U example-cli`."),
+    ("Login hardening", "Login hardening\nThe new captcha flow is now on for every tenant by default."),
+])
+def test_wall_words_inside_content_sentences_are_not_walls(title, text):
+    assert len(text) < BOILERPLATE_MIN_CHARS
+    q = assess(title, text)
+    assert q.ok, q.reasons
+
