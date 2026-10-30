@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ci.changes.config import JFROG, TrackedPage, TrackedPages
-from ci.changes.diff import Cell, CellStore, ChangeItem, make_change, same_field, section_diff
+from ci.changes.diff import Cell, CellStore, ChangeItem, make_change, same_field, section_diff, tier_changes
 from ci.changes.extract import AxisField, extract_fields, quote_in_text
 from ci.changes.snapshot import Fetch, FetchError, SnapshotStore, content_hash, http_fetch, normalize_text
 from ci.llm import JsonLLM
@@ -42,6 +42,7 @@ class PageResult:
     reasons: dict[str, str] = field(default_factory=dict)  # axis -> why it was unconfirmed
     review: dict[str, str] = field(default_factory=dict)  # axis -> why the cell was flagged needs_review
     reworded: list[str] = field(default_factory=list)  # axes whose value differed only in wording (no item)
+    renamed: list[dict] = field(default_factory=list)  # pricing tiers renamed at the same price (no item, info only)
     cells: int = 0  # cells stored or confirmed for this page
     fetched: bool = False  # the page was fetched and had text (a later LLM failure still fails the page)
     error: str = ""
@@ -130,6 +131,8 @@ def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, l
             cells.put(cell, run_id, "baseline")
             res.cells += 1
         elif same_field(old, new):
+            if axis == "pricing_model" and old.tiers and new.tiers:
+                res.renamed += tier_changes(old.tiers, new.tiers)  # only renames reach here
             if old.evidence and not quote_in_text(old.evidence, text):
                 # the model repeated the anchored value, but what it rested on is gone from the page
                 cells.put(cell.model_copy(update={"needs_review": True, "review_reason": EVIDENCE_GONE}), run_id,
@@ -179,6 +182,9 @@ def build_report(run_id: str, results: list[PageResult], live: bool, started: da
                          for r in results if r.review],
         "reworded": [{"competitor": r.competitor, "page": r.page_key, "axes": r.reworded}
                      for r in results if r.reworded],
+        "renamed_tiers": [{"competitor": r.competitor, "page": r.page_key,
+                           "tiers": [f"{c['old_name']} -> {c['tier']}" for c in r.renamed]}
+                          for r in results if r.renamed],
         "per_page": [{"competitor": r.competitor, "page": r.page_key, "status": r.status, "cells": r.cells,
                       "changes": len(r.items)} for r in results],
     }
@@ -199,6 +205,8 @@ def format_report(report: dict) -> str:
     out += [f"  unconfirmed {u['competitor']}/{u['page']}: {', '.join(u['axes'])}" for u in report["unconfirmed"]]
     out += [f"  needs review {r['competitor']}/{r['page']}: {', '.join(f'{a} ({why})' for a, why in r['axes'].items())}"
             for r in report["needs_review"]]
+    out += [f"  renamed tiers (no item) {r['competitor']}/{r['page']}: {'; '.join(r['tiers'])}"
+            for r in report["renamed_tiers"]]
     return "\n".join(out)
 
 

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from ci.changes import config
-from ci.changes.diff import normalize_value, same_field, section_diff, tier_changes, tokens
+from ci.changes.diff import normalize_value, renamed_only, same_field, section_diff, tier_changes, tokens
 from ci.changes.extract import (
     AxisField,
     Tier,
@@ -235,13 +235,44 @@ def test_tier_changes_lists_added_removed_and_repriced_tiers():
     new = [Tier(name="Team", price=90, currency="USD", period="month"), Tier(name="free"),
            Tier(name="PRO", price=150, currency="$", period="year", unit="user")]
     assert tier_changes(old, new) == [
-        {"tier": "Legacy", "change": "removed", "old": "$10/month", "new": ""},
         {"tier": "PRO", "change": "changed", "old": "$150/month", "new": "$150/user/year"},
+        {"tier": "Legacy", "change": "removed", "old": "$10/month", "new": ""},
         {"tier": "Team", "change": "added", "old": "", "new": "$90/month"},
     ]
     assert tier_changes(old, list(reversed(old))) == []
     assert tier_changes([Tier(name="Pro", price=150, currency="USD")],
                         [Tier(name="Pro", price=150, currency="USD", unit="user")]) == []  # unit is not compared
+
+
+SONATYPE_PRICES = (1200, 1950, 4800, 7500)
+SONATYPE_LEVELS = [Tier(name=f"Pro (level {i})", price=p, currency="USD", period="year")
+                   for i, p in enumerate(SONATYPE_PRICES, 1)]
+SONATYPE_LABELED = [Tier(name=n, price=p, currency="USD", period="year") for n, p in zip(
+    ["Pro - 1 user / 10k requests", "Pro (Cloud)", "Pro - 5 users", "Pro Edition (Self-Hosted)"], SONATYPE_PRICES,
+    strict=True)]
+
+
+def test_the_sonatype_levels_relabeled_at_the_same_prices_are_renames_not_changes():
+    changes = tier_changes(SONATYPE_LEVELS, SONATYPE_LABELED)
+    assert len(changes) == 4 and renamed_only(changes)  # was 4 removed + 4 added
+    assert changes[1] == {"tier": "Pro (Cloud)", "change": "renamed", "old_name": "Pro (level 2)",
+                          "old": "$1,950/year", "new": "$1,950/year"}
+    assert same_field(priced(*SONATYPE_LEVELS), priced(*SONATYPE_LABELED))
+
+
+def test_a_rename_with_a_price_change_is_still_a_change():
+    new = [t.model_copy(update={"price": 2100}) if t.price == 1950 else t for t in SONATYPE_LABELED]
+    changes = tier_changes(SONATYPE_LEVELS, new)
+    assert not same_field(priced(*SONATYPE_LEVELS), priced(*new))
+    assert {c["change"] for c in changes} == {"renamed", "removed", "added"}
+    assert [c["new"] for c in changes if c["change"] == "added"] == ["$2,100/year"]
+
+
+def test_a_same_name_price_change_is_changed_not_renamed():
+    old = [Tier(name="Pro", price=150, currency="USD", period="month")]
+    new = [Tier(name="Pro", price=180, currency="USD", period="month")]
+    assert tier_changes(old, new) == [{"tier": "Pro", "change": "changed", "old": "$150/month", "new": "$180/month"}]
+    assert not same_field(priced(*old), priced(*new))
 
 
 def test_section_diff_keeps_only_the_hunk_around_the_evidence():

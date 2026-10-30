@@ -558,3 +558,22 @@ def test_a_change_detection_run_holds_the_lock_while_it_runs(tmp_path, monkeypat
     with run_lock("changes", tmp_path):  # released afterwards
         pass
 
+
+def test_renamed_tiers_at_the_same_prices_give_no_item_but_are_reported(env):
+    site, _, go, tmp = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_article_date_edit")
+
+    def relabeled(prompt, schema):
+        out = answer(prompt, schema)
+        if "pricing_model" in out:
+            out["pricing_model"]["tiers"][1]["name"] = "Pro plan"
+        return out
+
+    res = go(T2, llm=FakeLLM(relabeled))
+    assert res.items == [] and statuses(res)["pricing"] == "same_fields"
+    assert res.report["renamed_tiers"] == [{"competitor": "acme", "page": "pricing", "tiers": ["Pro -> Pro plan"]}]
+    store = cells(tmp)
+    assert "Pro plan $150/month" in store.get("acme", "pricing_model").value
+    store.close()
+

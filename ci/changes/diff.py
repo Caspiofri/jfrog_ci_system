@@ -78,27 +78,45 @@ def _tier_name(t: Tier) -> str:
 
 def tier_changes(old: list[Tier], new: list[Tier]) -> list[dict]:
     """Per tier, matched by normalized name: added, removed, or changed price/currency/period (the optional unit is
-    not compared). Order and rendering never count. Each entry: {tier, change, old, new} with the price as shown."""
+    not compared). Order and rendering never count. Each entry: {tier, change, old, new} with the price as shown.
+
+    A removed and an added tier with the same (price, currency, period) are one tier renamed ("Pro (level 2)" ->
+    "Pro - 1 user / 10k requests"): {tier, change: "renamed", old_name, old, new}. Several at one price pair up in
+    name order."""
     before = {_tier_name(t): t for t in old}
     after = {_tier_name(t): t for t in new}
-    out = []
+    out, removed, added = [], [], []
     for key in sorted(before.keys() | after.keys()):
         o, n = before.get(key), after.get(key)
         if o is None:
-            out.append({"tier": n.name, "change": "added", "old": "", "new": price_text(n).strip()})
+            added.append(n)
         elif n is None:
-            out.append({"tier": o.name, "change": "removed", "old": price_text(o).strip(), "new": ""})
+            removed.append(o)
         elif _tier_key(o)[1:] != _tier_key(n)[1:]:
             out.append({"tier": n.name, "change": "changed", "old": price_text(o).strip(),
                         "new": price_text(n).strip()})
+    for o in removed:
+        n = next((n for n in added if _tier_key(n)[1:] == _tier_key(o)[1:]), None)
+        if n is None:
+            out.append({"tier": o.name, "change": "removed", "old": price_text(o).strip(), "new": ""})
+        else:
+            added.remove(n)
+            out.append({"tier": n.name, "change": "renamed", "old_name": o.name, "old": price_text(o).strip(),
+                        "new": price_text(n).strip()})
+    out += [{"tier": n.name, "change": "added", "old": "", "new": price_text(n).strip()} for n in added]
     return out
 
 
+def renamed_only(changes: list[dict]) -> bool:
+    return bool(changes) and all(c["change"] == "renamed" for c in changes)
+
+
 def same_field(old: "Cell | AxisField", new: AxisField) -> bool:
-    """Pricing with tiers on both sides: no tier added, removed or re-priced (see tier_changes); the value is not
-    compared. Otherwise: the same token set (see tokens)."""
+    """Pricing with tiers on both sides: no tier added, removed or re-priced (see tier_changes; renamed tiers at an
+    unchanged price do not count); the value is not compared. Otherwise: the same token set (see tokens)."""
     if new.axis == "pricing_model" and old.tiers and new.tiers:
-        return not tier_changes(old.tiers, new.tiers)
+        changes = tier_changes(old.tiers, new.tiers)
+        return not changes or renamed_only(changes)  # a pure rename is no change (the run reports it)
     return tokens(old.value) == tokens(new.value)
 
 
@@ -188,7 +206,8 @@ def change_id(competitor: str, axis: str, new_as_of: datetime) -> str:
 
 def _describe(changes: list[dict]) -> str:
     words = {"added": lambda c: f"{c['tier']} added at {c['new']}", "removed": lambda c: f"{c['tier']} removed",
-             "changed": lambda c: f"{c['tier']} {c['old']} -> {c['new']}"}
+             "changed": lambda c: f"{c['tier']} {c['old']} -> {c['new']}",
+             "renamed": lambda c: f"{c['old_name']} renamed {c['tier']} ({c['new']})"}
     return "; ".join(words[c["change"]](c) for c in changes)
 
 
