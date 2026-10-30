@@ -69,6 +69,17 @@ def _usable(f: AxisField) -> bool:
     return f.stated and f.confidence > 0
 
 
+def _unconfirmed_reason(new: AxisField, old: Cell | None) -> str:
+    """Why the new value cannot be trusted, or "". A value the page does not state is a legitimate answer, unless
+    the cell had a usable value (then the model may have missed it)."""
+    if new.stated and new.confidence <= 0:
+        return new.unverified_reason or "confidence 0"
+    if not new.stated and old is not None and _usable(AxisField(axis=old.axis, value=old.value,
+                                                                 confidence=old.confidence)):
+        return "not stated on the page any more"
+    return ""
+
+
 def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, llm: JsonLLM | None,
                snapshots: SnapshotStore, cells: CellStore, run_id: str, now: datetime) -> PageResult:
     """Fills in `res` (status "failed" until it succeeds); raises on a fetch, extraction or store failure."""
@@ -100,12 +111,17 @@ def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, l
     for axis in page.axes:
         new, old = fields[axis], cells.get(competitor, axis)
         cell = _cell(competitor, page, new, now)
-        if old is None:  # first value for this cell, also when the axis was added to the page later
+        reason = _unconfirmed_reason(new, old)
+        if reason:  # never overwrites a cell; the snapshot is not stored, so the next run re-extracts
+            res.unconfirmed.append(axis)
+            res.reasons[axis] = reason
+            if old is None:
+                cells.put(cell.model_copy(update={"stale": True, "stale_reason": reason}), run_id, "baseline")
+            else:
+                cells.mark_stale(competitor, axis, reason)
+        elif old is None:  # first value for this cell, also when the axis was added to the page later
             cells.put(cell, run_id, "baseline")
             res.cells += 1
-        elif not _usable(new):  # an unstated or unverified value never overwrites a cell
-            res.unconfirmed.append(axis)
-            res.reasons[axis] = new.unverified_reason or "not stated on the page"
         elif same_field(old, new):
             cells.put(cell, run_id, "")
             res.cells += 1
@@ -118,7 +134,8 @@ def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, l
             cells.put(cell, run_id, "changed", item.id)
             res.items.append(item)
             res.cells += 1
-    snapshots.add(competitor, page.key, page.url, text, now)
+    if not res.unconfirmed:
+        snapshots.add(competitor, page.key, page.url, text, now)
     res.status = "baseline" if baseline else "changed" if res.items else "same_fields"
     return res
 

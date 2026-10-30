@@ -12,7 +12,7 @@ import pytest
 
 from ci.changes.__main__ import main
 from ci.changes.config import TrackedPage, TrackedPages
-from ci.changes.diff import CellStore
+from ci.changes.diff import Cell, CellStore
 from ci.changes.run import DB_NAME, run
 from ci.changes.snapshot import FetchError
 from ci.llm import FakeLLM, LLMError
@@ -229,6 +229,66 @@ def test_a_quote_missing_from_the_page_sets_confidence_zero_and_changes_nothing(
                                           "reasons": {"pricing_model": "evidence quote not on the page"}}]
     store = cells(tmp)
     assert "$150" in store.get("acme", "pricing_model").value
+    store.close()
+
+
+def test_an_unconfirmed_extraction_marks_the_cell_stale_and_is_retried_next_run(env):
+    site, llm, go, tmp = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_price_edit")
+
+    def misquoting(prompt, schema):
+        out = answer(prompt, schema)
+        if "pricing_model" in out:
+            out["pricing_model"]["evidence"] = "Pro now costs $180 a month"
+        return out
+
+    go(T2, llm=FakeLLM(misquoting))
+    store = cells(tmp)
+    cell = store.get("acme", "pricing_model")
+    assert cell.stale and cell.stale_reason == "evidence quote not on the page"
+    assert cell.checked_at == T1  # the stale value is not re-confirmed
+    assert not store.get("acme", "deployment").stale
+    store.close()
+    # no snapshot was stored for the price-edited page, so the next run re-extracts it instead of matching the hash
+    assert len(list((tmp / "data" / "snapshots" / "acme" / "pricing").glob("*.txt"))) == 1
+    calls = len(llm.calls)
+    res = go(T3)
+    assert len(llm.calls) == calls + 1
+    [item] = res.items
+    assert "$150" in item.old_value and "$180" in item.new_value
+    store = cells(tmp)
+    assert not store.get("acme", "pricing_model").stale
+    store.close()
+    assert statuses(go(T3 + timedelta(days=1)))["pricing"] == "unchanged"
+
+
+def test_a_value_no_longer_stated_is_unconfirmed_not_a_change(env):
+    site, _, go, tmp = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_article_date_edit")
+
+    def forgetful(prompt, schema):
+        out = answer(prompt, schema)
+        out.pop("deployment", None)
+        return out
+
+    res = go(T2, llm=FakeLLM(forgetful))
+    assert res.items == []
+    assert res.report["unconfirmed"][0]["reasons"] == {"deployment": "not stated on the page any more"}
+    store = cells(tmp)
+    assert store.get("acme", "deployment").stale
+    store.close()
+
+
+def test_touch_skips_stale_cells(tmp_path):
+    store = CellStore(tmp_path / "c.sqlite")
+    for axis, stale in (("deployment", False), ("pricing_model", True)):
+        store.put(Cell(competitor="acme", axis=axis, value="v", source_url=PRICING_URL, page_key="pricing",
+                       as_of=T1, checked_at=T1, stale=stale, stale_reason="r" if stale else ""), "run", "baseline")
+    store.touch("acme", ["deployment", "pricing_model"], T2)
+    assert store.get("acme", "deployment").checked_at == T2
+    assert store.get("acme", "pricing_model").checked_at == T1
     store.close()
 
 

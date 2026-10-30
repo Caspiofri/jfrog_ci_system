@@ -117,6 +117,10 @@ class Cell(BaseModel):
     as_of: datetime  # when the page this value was extracted from was fetched
     checked_at: datetime  # last time the page was fetched and still supported the value
     note: str = ""  # from the source page's config, e.g. "prices rendered client-side; pricing model only"
+    # the latest extraction of the source page could not confirm this value (quote or number not on the page, or
+    # the value no longer stated): it is kept, but not re-confirmed by later runs until an extraction confirms it
+    stale: bool = False
+    stale_reason: str = ""
 
 
 class ChangeItem(BaseModel):
@@ -169,7 +173,8 @@ class CellStore:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         cols = ("competitor TEXT, axis TEXT, value TEXT, evidence TEXT, confidence REAL, tiers TEXT, "
-                "source_url TEXT, page_key TEXT, as_of TEXT, checked_at TEXT, note TEXT")
+                "source_url TEXT, page_key TEXT, as_of TEXT, checked_at TEXT, note TEXT, stale INTEGER, "
+                "stale_reason TEXT")
         self._db.execute(f"CREATE TABLE IF NOT EXISTS cells ({cols}, PRIMARY KEY (competitor, axis))")
         self._db.execute(f"CREATE TABLE IF NOT EXISTS cell_history ({cols}, run_id TEXT, event TEXT, change_id TEXT)")
 
@@ -177,13 +182,14 @@ class CellStore:
     def _values(c: Cell) -> tuple:
         return (c.competitor, c.axis, c.value, c.evidence, c.confidence,
                 json.dumps([t.model_dump() for t in c.tiers]), c.source_url, c.page_key, c.as_of.isoformat(),
-                c.checked_at.isoformat(), c.note)
+                c.checked_at.isoformat(), c.note, int(c.stale), c.stale_reason)
 
     @staticmethod
     def _cell(row) -> Cell:
         return Cell(competitor=row[0], axis=row[1], value=row[2], evidence=row[3], confidence=row[4],
                     tiers=json.loads(row[5] or "[]"), source_url=row[6], page_key=row[7],
-                    as_of=datetime.fromisoformat(row[8]), checked_at=datetime.fromisoformat(row[9]), note=row[10] or "")
+                    as_of=datetime.fromisoformat(row[8]), checked_at=datetime.fromisoformat(row[9]), note=row[10] or "",
+                    stale=bool(row[11]), stale_reason=row[12] or "")
 
     def get(self, competitor: str, axis: str) -> Cell | None:
         row = self._db.execute("SELECT * FROM cells WHERE competitor = ? AND axis = ?", (competitor, axis)).fetchone()
@@ -201,8 +207,8 @@ class CellStore:
             row = self._values(cell)
             self._db.execute(f"INSERT OR REPLACE INTO cells VALUES ({', '.join('?' * len(row))})", row)
             if event:
-                self._db.execute("INSERT INTO cell_history VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                 (*self._values(cell), run_id, event, change))
+                self._db.execute(f"INSERT INTO cell_history VALUES ({', '.join('?' * (len(row) + 3))})",
+                                 (*row, run_id, event, change))
 
     def history(self, competitor: str, axis: str) -> list[dict]:
         rows = self._db.execute("SELECT value, as_of, confidence, source_url, run_id, event, change_id "
@@ -212,10 +218,16 @@ class CellStore:
         return [dict(zip(keys, r, strict=True)) for r in rows]
 
     def touch(self, competitor: str, axes: list[str], checked_at: datetime) -> None:
-        """The page was fetched again with the same text: its cells still hold as of now."""
+        """The page was fetched again with the same text: its cells still hold as of now. A stale cell is not
+        re-confirmed: its latest extraction did not support it."""
         with self._db:
-            self._db.executemany("UPDATE cells SET checked_at = ? WHERE competitor = ? AND axis = ?",
+            self._db.executemany("UPDATE cells SET checked_at = ? WHERE competitor = ? AND axis = ? AND stale = 0",
                                  [(checked_at.isoformat(), competitor, a) for a in axes])
+
+    def mark_stale(self, competitor: str, axis: str, reason: str) -> None:
+        with self._db:
+            self._db.execute("UPDATE cells SET stale = 1, stale_reason = ? WHERE competitor = ? AND axis = ?",
+                             (reason, competitor, axis))
 
     def close(self) -> None:
         self._db.close()
