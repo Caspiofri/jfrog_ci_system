@@ -1,0 +1,90 @@
+# Tracked pages for change detection and the head-to-head cells (PRD D13, D20). Per competitor (jfrog included, as
+# the head-to-head baseline): the pages read daily, each with its type and the D13 axes it informs. Within one
+# competitor an axis is informed by exactly one page, so each competitor x axis cell has a single source.
+#
+# Axes: deployment, package_coverage, security_scanning, curation_gating, ai_mcp, cicd_integration, pricing_model.
+# Every URL was fetched live on Oct 30 2026 (200, text extracted by modules.reader.extract_main_text).
+# Known extraction gaps: prices that a page renders with JavaScript or inside <table> do not reach the text, so the
+# pricing_model cell for those pages is the model (tiers, usage-based, credits), not the numbers.
+
+competitors:
+  jfrog:
+    - key: pricing
+      url: https://jfrog.com/pricing/
+      page_type: pricing
+      axes: [pricing_model, deployment]
+    - key: artifactory
+      url: https://jfrog.com/artifactory/
+      page_type: product
+      axes: [package_coverage, security_scanning, curation_gating, ai_mcp, cicd_integration]
+
+  cloudsmith:
+    # dropped: https://cloudsmith.com/pricing (and /pricing/, /plans, /platform, /features) answer 429 with a
+    # Cloudflare "verifying your browser" JavaScript challenge, so no pricing page and no pricing_model cell.
+    # /product redirects to the home page, which is the product overview kept here.
+    - key: product
+      url: https://cloudsmith.com/
+      page_type: product
+      axes: [deployment, security_scanning, ai_mcp, cicd_integration]
+    - key: formats
+      url: https://docs.cloudsmith.com/formats
+      page_type: docs
+      axes: [package_coverage]
+    - key: policy_management
+      url: https://docs.cloudsmith.com/policy-management
+      page_type: docs
+      axes: [curation_gating]
+
+  sonatype:
+    # https://www.sonatype.com/pricing redirects here
+    - key: pricing
+      url: https://www.sonatype.com/products/pricing
+      page_type: pricing
+      axes: [pricing_model, deployment]
+    - key: nexus_repository
+      url: https://www.sonatype.com/products/sonatype-nexus-repository
+      page_type: product
+      axes: [package_coverage, security_scanning, curation_gating, ai_mcp, cicd_integration]
+
+  github:
+    - key: pricing
+      url: https://github.com/pricing
+      page_type: pricing
+      axes: [pricing_model, deployment, cicd_integration]
+    - key: advanced_security
+      url: https://github.com/security/advanced-security
+      page_type: product
+      axes: [security_scanning, ai_mcp]
+
+  gitlab:
+    # the tier prices are rendered by JavaScript; the text keeps the tiers and the GitLab Credits model
+    - key: pricing
+      url: https://about.gitlab.com/pricing/
+      page_type: pricing
+      axes: [pricing_model, deployment]
+    - key: platform
+      url: https://about.gitlab.com/platform/
+      page_type: product
+      axes: [security_scanning, ai_mcp, cicd_integration]
+
+  snyk:
+    # the Team plan price is rendered by JavaScript; the text keeps the plans and the credit model (1 credit = $1)
+    - key: plans
+      url: https://snyk.io/plans/
+      page_type: pricing
+      axes: [pricing_model]
+    - key: open_source
+      url: https://snyk.io/product/open-source-security-management/
+      page_type: product
+      axes: [security_scanning, package_coverage, ai_mcp, cicd_integration]
+
+  aws_codeartifact:
+    # the rate tables are loaded by JavaScript; the text keeps the pay-per-use model and the free tier
+    - key: pricing
+      url: https://aws.amazon.com/codeartifact/pricing/
+      page_type: pricing
+      axes: [pricing_model]
+    - key: features
+      url: https://aws.amazon.com/codeartifact/features/
+      page_type: product
+      axes: [deployment, package_coverage, curation_gating, cicd_integration]
