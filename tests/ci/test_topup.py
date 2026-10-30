@@ -89,8 +89,8 @@ def no_models(monkeypatch):
     monkeypatch.setattr(ci.rank.Ranker, "__init__", boom)
 
 
-def _build(labeled=(), target=30):
-    return topup.build_topup(RUN, _items(), list(labeled), CFG, EVENTS, _keys, target)
+def _build(labeled=(), target=30, unflagged=4):
+    return topup.build_topup(RUN, _items(), list(labeled), CFG, EVENTS, _keys, target, unflagged)
 
 
 def _by_bucket(q):
@@ -105,7 +105,7 @@ def test_buckets_from_model_independent_signals(no_models):
     b = _by_bucket(q)
     assert set(b["extraction_check"]) >= {"i30", "i31"} and "i32" not in b["extraction_check"]  # one per story
     sample = [i for i in b["extraction_check"] if i not in ("i30", "i31")]
-    assert len(sample) == topup.UNFLAGGED_SAMPLE
+    assert len(sample) == 4
     assert b["pricing"] == ["i20"] and b["funding_ma"] == ["i21"]
     assert len(b["snyk"]) == 4 and "i2" not in b["snyk"]
     assert b["aws"][0] in ("i10", "i12")  # title names an AWS product: first
@@ -143,9 +143,12 @@ def test_cli_dry_run_writes_nothing_then_writes_once(tmp_path, monkeypatch, no_m
     labels.write_text("", encoding="utf-8")
     monkeypatch.setattr(topup.ci_config, "load", lambda: CFG)
     monkeypatch.setattr(topup.coverage, "load_events", lambda: EVENTS)
-    monkeypatch.setattr(topup.eval_golden, "story_keys", lambda items, runs_dir: _keys(items))
+    cache_paths = []
+    monkeypatch.setattr(topup.eval_golden, "story_keys",
+                        lambda items, runs_dir, cache_path=None: cache_paths.append(cache_path) or _keys(items))
     args = [RUN, "--runs-dir", str(runs), "--labels", str(labels)]
     assert topup.main([*args, "--dry-run"]) == 0 and not stratified.queue_path(runs, RUN).exists()
+    assert cache_paths[-1] == eval_golden.EMBED_CACHE_PATH  # the eval's embedding cache, not a re-embed
     assert topup.main(args) == 0
     q = json.loads(stratified.queue_path(runs, RUN).read_text(encoding="utf-8"))
     assert q["mode"] == "topup" and q["require_bad_extraction"] and q["version"] == stratified.QUEUE_VERSION
@@ -202,3 +205,39 @@ def test_page_shows_a_required_yes_no_and_blocks_save_until_answered(tmp_path):
 
 def test_story_grouping_is_the_evals():
     assert topup.eval_golden.story_keys is eval_golden.story_keys
+
+
+def test_unflagged_sample_defaults_to_10_and_has_a_cli_flag(tmp_path, monkeypatch, no_models):
+    assert topup.UNFLAGGED_SAMPLE == 10
+    many = [_it(100 + n, f"Plain page story number {n} about registries") for n in range(15)]
+    q = topup.build_topup(RUN, many, [], CFG, [], _keys)
+    assert q["buckets"][0]["unflagged_sample"] == 10
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    (runs / f"{RUN}.jsonl").write_text("".join(json.dumps(i) + "\n" for i in many), encoding="utf-8")
+    (tmp_path / "g.jsonl").write_text("", encoding="utf-8")
+    monkeypatch.setattr(topup.ci_config, "load", lambda: CFG)
+    monkeypatch.setattr(topup.coverage, "load_events", lambda: [])
+    monkeypatch.setattr(topup.eval_golden, "story_keys", lambda items, runs_dir, cache_path=None: _keys(items))
+    topup.main([RUN, "--runs-dir", str(runs), "--labels", str(tmp_path / "g.jsonl"), "--unflagged", "3"])
+    q = json.loads(stratified.queue_path(runs, RUN).read_text(encoding="utf-8"))
+    assert q["buckets"][0]["unflagged_sample"] == 3
+
+
+def test_a_coverage_event_moves_the_whole_story(no_models):
+    """Reproduction: i1 and i2 are one story; only i1 matches the event that i3 (another story) also matches.
+    Moving i1 alone left i2 behind as its own story, so two items of one story could be picked."""
+    items = [_it(1, "Workflow lockfiles land in Actions", competitor="github"),
+             _it(2, "Actions gets a new dependency pinning feature", competitor="github"),
+             _it(3, "GitHub lockfiles: what changes for CI", competitor="github")]
+    keys = {"i3": "s-a", "i1": "s-b", "i2": "s-b"}  # the event is first seen in s-a; s-b must move whole
+    q = topup.build_topup(RUN, items, [], CFG, EVENTS, lambda its: {it["id"]: keys[it["id"]] for it in its}, 30, 0)
+    assert len([e for e in q["entries"] if e["id"] in {"i1", "i2", "i3"}]) == 1
+    assert q["summary"]["stories"] == 1
+
+
+def test_a_story_member_without_a_title_does_not_break_pricing(no_models):
+    items = [_it(1, "Snyk pricing per seat changes", competitor="snyk"), {**_it(2, "x", competitor="snyk")}]
+    del items[1]["title"]
+    q = topup.build_topup(RUN, items, [], CFG, [], lambda its: {it["id"]: "s" for it in its}, 30, 0)
+    assert [e["id"] for e in q["entries"] if e["bucket"] == "pricing"] == ["i1"]

@@ -1,6 +1,7 @@
 """Top-up labeling queue: ~30 more items from a run, picked only by model-independent signals.
 
-    python -m ci.labeling.topup <run_id> [--target 30] [--runs-dir DIR] [--labels PATH] [--dry-run] [--force]
+    python -m ci.labeling.topup <run_id> [--target 30] [--unflagged 10] [--runs-dir DIR] [--labels PATH]
+                                         [--dry-run] [--force]
 
 No classifier, ranker or LLM decides what gets labeled: selecting by a model's own output would hide exactly the
 items it gets wrong. The signals are:
@@ -41,7 +42,7 @@ TARGET = 30
 COMPETITOR_MIN = 4
 FOCUS_COMPETITORS = ("aws", "snyk")
 IMPORTANT_TARGET = 10
-UNFLAGGED_SAMPLE = 4
+UNFLAGGED_SAMPLE = 10  # Ofri raised it from 4
 EXTRACTION, PRICING, FUNDING, IMPORTANT = "extraction_check", "pricing", "funding_ma", "likely_important"
 
 EVENT_RE = re.compile(r"\b(?:launch(?:es|ed)?|generally available|ga|acquir(?:es|ed|e)|acquisition|pricing|prices?|"
@@ -76,25 +77,45 @@ def junk_flagged(item: dict) -> bool:
 
 def build_topup(run_id: str, items: list[dict], labeled_items: list[dict], cfg: ci_config.CIConfig,
                 events: list[coverage.Event], keys_fn: Callable[[list[dict]], dict[str, str]],
-                target: int = TARGET) -> dict:
+                target: int = TARGET, unflagged: int = UNFLAGGED_SAMPLE) -> dict:
     labeled_ids = {it["id"] for it in labeled_items}
     candidates = [it for it in items if it["id"] not in labeled_ids]
     keys = keys_fn([*labeled_items, *candidates])
     def event_of(it: dict) -> str | None:
         return next((ev.id for ev in events if coverage.match_item(ev, it)), None)
 
-    # a coverage event is one story too, even when the headlines are worded too differently to group
+    # a coverage event is one story too, even when the headlines are worded too differently to group: stories that
+    # share an event merge whole (every member moves, not only the one that matched)
     done_stories = {keys[it["id"]] for it in labeled_items}
     done_events = {e for e in map(event_of, labeled_items) if e}
+    groups: dict[str, list[dict]] = {}
+    for it in candidates:
+        groups.setdefault(keys[it["id"]], []).append(it)
+    parent = {k: k for k in groups}
+
+    def root(k: str) -> str:
+        while parent[k] != k:
+            parent[k] = parent[parent[k]]
+            k = parent[k]
+        return k
+
+    events_of = {k: {e for e in map(event_of, g) if e} for k, g in groups.items()}
+    first_story: dict[str, str] = {}
+    for k in sorted(groups):
+        for ev in sorted(events_of[k]):
+            if ev in first_story:
+                a, b = root(k), root(first_story[ev])
+                parent[max(a, b)] = min(a, b)
+            else:
+                first_story[ev] = k
+    merged: dict[str, list[str]] = {}
+    for k in sorted(groups):
+        merged.setdefault(root(k), []).append(k)
     stories: dict[str, list[dict]] = {}
-    story_of_event: dict[str, str] = {}
-    for it in sorted(candidates, key=lambda it: keys[it["id"]]):
-        k, ev = keys[it["id"]], event_of(it)
-        if k in done_stories or ev in done_events:
-            continue
-        if ev:
-            k = story_of_event.setdefault(ev, k)
-        stories.setdefault(k, []).append(it)
+    for r, members in merged.items():
+        if any(k in done_stories or events_of[k] & done_events for k in members):
+            continue  # already in the golden set, by story or by coverage event
+        stories[r] = [it for k in members for it in groups[k]]
 
     own = {c.key: own_sources(c) for c in cfg.competitors}
     names = {c.key: _alias_re(aliases(c)) for c in cfg.competitors if c.key != INDUSTRY}
@@ -144,13 +165,14 @@ def build_topup(run_id: str, items: list[dict], labeled_items: list[dict], cfg: 
     order = sorted(stories)  # deterministic base order; buckets shuffle with a seed where they sample
     flagged = [k for k in order if any(junk_flagged(it) for it in stories[k])]
     n_flagged = take(EXTRACTION, flagged, why("extraction check"), pick=junk_flagged)
-    extraction = {"name": EXTRACTION, "nominal": n_flagged + UNFLAGGED_SAMPLE, "target": n_flagged,
+    extraction = {"name": EXTRACTION, "nominal": n_flagged + unflagged, "target": n_flagged,
                   "flagged": n_flagged, "unflagged_sample": 0}
     buckets.append(extraction)
 
     for bucket, rx in ((PRICING, PRICING_RE), (FUNDING, FUNDING_RE)):
         hits = [k for k in order if any(rx.search(it.get("title") or "") for it in stories[k])]
-        n = take(bucket, hits, why(f"{bucket} words in the title"), pick=lambda it, rx=rx: rx.search(it["title"]))
+        n = take(bucket, hits, why(f"{bucket} words in the title"),
+                 pick=lambda it, rx=rx: rx.search(it.get("title") or ""))
         buckets.append({"name": bucket, "nominal": n, "target": n})
         if not n:
             notes.append(f"{bucket}: no candidate found")
@@ -180,10 +202,10 @@ def build_topup(run_id: str, items: list[dict], labeled_items: list[dict], cfg: 
     page_ok = [k for k in _seeded(order, f"{run_id}:sample") if k not in taken
                and any(it.get("text_source") == "page" and not junk_flagged(it) for it in stories[k])]
     n_sample = take(EXTRACTION, page_ok, why("extraction check"),
-                    pick=lambda it: it.get("text_source") == "page" and not junk_flagged(it), cap=UNFLAGGED_SAMPLE)
+                    pick=lambda it: it.get("text_source") == "page" and not junk_flagged(it), cap=unflagged)
     extraction.update(target=n_flagged + n_sample, unflagged_sample=n_sample)
-    if n_sample < UNFLAGGED_SAMPLE:
-        notes.append(f"{EXTRACTION}: unflagged sample {n_sample} of {UNFLAGGED_SAMPLE}")
+    if n_sample < unflagged:
+        notes.append(f"{EXTRACTION}: unflagged sample {n_sample} of {unflagged}")
 
     total = len(entries)
     if total > target:
@@ -217,6 +239,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m ci.labeling.topup", description=__doc__.split("\n")[0])
     ap.add_argument("run_id")
     ap.add_argument("--target", type=int, default=TARGET)
+    ap.add_argument("--unflagged", type=int, default=UNFLAGGED_SAMPLE,
+                    help=f"unflagged page texts sampled into extraction_check (default {UNFLAGGED_SAMPLE})")
     ap.add_argument("--runs-dir", type=Path, default=RUNS_DIR)
     ap.add_argument("--labels", type=Path, default=LABELS_PATH)
     ap.add_argument("--dry-run", action="store_true", help="print the queue, write nothing")
@@ -232,7 +256,8 @@ def main(argv: list[str] | None = None) -> int:
     cache: dict = {}
     labeled = [eval_golden.rebuild_item(lab, args.runs_dir, cache)[0] for lab in labels.values()]
     queue = build_topup(args.run_id, items, labeled, cfg, coverage.load_events(),
-                        lambda its: eval_golden.story_keys(its, args.runs_dir), args.target)
+                        lambda its: eval_golden.story_keys(its, args.runs_dir, cache_path=eval_golden.EMBED_CACHE_PATH),
+                        args.target, args.unflagged)
     print(format_summary(queue, {it["id"]: it.get("title") or "" for it in items}))
     if args.dry_run:
         return 0
