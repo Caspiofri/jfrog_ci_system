@@ -20,7 +20,8 @@ TITLE_MIN_COVERAGE = 0.25  # below this share of the title's content words, the 
 TITLE_CHECK_MIN_WORDS = 40  # shorter texts (release notes, teasers) are not judged on title coverage
 TITLE_MIN_CONTENT_WORDS = 2  # a title with fewer content words gives no signal
 BOILERPLATE_MAX_RATIO = 0.5  # above this share of characters on boilerplate lines, the text is junk
-NAV_LINE_MAX_WORDS = 3  # a short line with no sentence punctuation reads as a menu entry
+NAV_LINE_MAX_WORDS = 3  # a short line with no sentence punctuation reads as a menu entry...
+NAV_LINE_MAX_CHARS = 40  # ...if it is also short in characters
 STEM_CHARS = 5  # "launches" matches "launched": words are compared on their first 5 letters
 
 STOPWORDS = frozenset("""
@@ -61,7 +62,8 @@ def title_coverage(title: str, text: str) -> float | None:
 
 def _is_nav_line(line: str) -> bool:
     words = line.split()
-    return 0 < len(words) <= NAV_LINE_MAX_WORDS and not re.search(r"[.!?:;,]$", line) and not line.endswith(")")
+    return (0 < len(words) <= NAV_LINE_MAX_WORDS and len(line) <= NAV_LINE_MAX_CHARS
+            and not re.search(r"[.!?:;,)]$", line))
 
 
 def boilerplate_ratio(text: str) -> float:
