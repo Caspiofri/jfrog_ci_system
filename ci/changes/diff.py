@@ -1,7 +1,8 @@
 """Old vs new head-to-head fields -> Changes items, and the head-to-head cell store (PRD D9, D13, D20).
 
 A cell is one competitor x one axis: current value, evidence, source url, as-of date and confidence, with its history.
-Values are compared normalized, so whitespace, case and number formatting ("$1,950.00" vs "$1950") do not count.
+Values are compared as normalized token sets, and pricing as a set of tiers, so whitespace, case, list order, plurals
+and number or currency formatting ("$1,950.00/mo" vs "1950 USD per month") do not count.
 """
 import difflib
 import hashlib
@@ -29,19 +30,50 @@ def normalize_value(s: str) -> str:
     return s
 
 
+_CURRENCY = {"$": "usd", "€": "eur", "£": "gbp"}
+_SYNONYMS = {"mo": "month", "monthly": "month", "yr": "year", "annual": "year", "annually": "year",
+             "yearly": "year"}
+_STOPWORDS = {"a", "an", "and", "or", "the", "per", "of", "for", "with", "to", "in", "on", "at", "by", "is", "are",
+              "plus", "also", "via"}
+
+
+def _word(w: str) -> str:
+    if len(w) > 3 and w.endswith("s") and not w.endswith("ss") and not w[0].isdigit():
+        w = w[:-1]  # users -> user, charts -> chart
+    return _SYNONYMS.get(w, w)
+
+
+def tokens(s: str) -> frozenset[str]:
+    """The value as a set of words and numbers: order, case, plurals, stopwords, $ vs USD, /mo vs /month and number
+    formatting do not count ("npm, Maven" == "Maven and npm"; "$150/mo" == "150 USD per month")."""
+    s = normalize_value(s)
+    for sym, code in _CURRENCY.items():
+        s = s.replace(sym, f" {code} ")
+    words = (_word(w) for w in re.findall(r"\d+(?:\.\d+)?|[a-z][a-z0-9+#]*", s))
+    return frozenset(w for w in words if w not in _STOPWORDS)
+
+
+def _period(p: str) -> str:
+    return " ".join(sorted(tokens(p)))
+
+
 def _tier_key(t: Tier) -> tuple:
-    """Currency, period and unit only count next to a price ("Enterprise: contact sales" has none to qualify)."""
-    if t.price is None:
-        return (normalize_value(t.name), None)
-    return (normalize_value(t.name), round(float(t.price), 2), t.currency.strip().upper(), normalize_value(t.period),
-            normalize_value(t.unit))
+    """(tier name, price, currency, period). A Free tier without a price is $0; currency and period only count next
+    to a non-zero price ("Enterprise: contact sales" has none to qualify)."""
+    name = tokens(t.name)
+    price = t.price if t.price is not None else (0.0 if "free" in name else None)
+    if not price:
+        return (name, price)
+    currency = _CURRENCY.get(t.currency.strip(), t.currency.strip().casefold()) or "usd"
+    return (name, round(float(price), 2), currency, _period(t.period))
 
 
 def same_field(old: "Cell | AxisField", new: AxisField) -> bool:
-    """Equal value after normalization, and (for pricing) the same set of tiers."""
-    if normalize_value(old.value) != normalize_value(new.value):
-        return False
-    return {_tier_key(t) for t in old.tiers} == {_tier_key(t) for t in new.tiers}
+    """Pricing with tiers on both sides: the same set of (tier, price, currency, period); the prose value is not
+    compared, so a reworded summary of the same prices is no change. Otherwise: the same token set (see tokens)."""
+    if new.axis == "pricing_model" and old.tiers and new.tiers:
+        return {_tier_key(t) for t in old.tiers} == {_tier_key(t) for t in new.tiers}
+    return tokens(old.value) == tokens(new.value)
 
 
 def section_diff(old_text: str, new_text: str, anchors: list[str]) -> str:

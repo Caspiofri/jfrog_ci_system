@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from ci.changes import config
-from ci.changes.diff import normalize_value, same_field, section_diff
+from ci.changes.diff import normalize_value, same_field, section_diff, tokens
 from ci.changes.extract import AxisField, Tier, extract_fields, parse_fields, quote_in_text, schema_for
 from ci.changes.snapshot import SnapshotStore, content_hash, normalize_text
 from ci.llm import FakeLLM
@@ -101,17 +101,57 @@ def test_value_normalization_keeps_real_differences():
     assert normalize_value("Pro $1.5k") != normalize_value("Pro $15k")
 
 
-def test_same_field_compares_tiers_too():
-    old = AxisField(axis="pricing_model", value="Pro", tiers=[Tier(name="Pro", price=150, currency="usd")])
-    assert same_field(old, AxisField(axis="pricing_model", value="pro",
-                                     tiers=[Tier(name="PRO", price=150.0, currency="USD")]))
-    assert not same_field(old, AxisField(axis="pricing_model", value="Pro",
-                                         tiers=[Tier(name="Pro", price=180, currency="USD")]))
+def prose(value: str, axis: str = "package_coverage") -> AxisField:
+    return AxisField(axis=axis, value=value)
 
 
-def test_an_unpriced_tier_ignores_currency_and_period():
-    old = AxisField(axis="pricing_model", value="x", tiers=[Tier(name="Enterprise", currency="USD", period="year")])
-    assert same_field(old, AxisField(axis="pricing_model", value="x", tiers=[Tier(name="Enterprise")]))
+def priced(*tiers: Tier) -> AxisField:
+    return AxisField(axis="pricing_model", value="summary", tiers=list(tiers))
+
+
+@pytest.mark.parametrize(("a", "b"), [
+    ("npm, Maven, PyPI", "PyPI, maven and npm"),  # list order
+    ("Pro 150 USD/month", "Pro $150/month"),  # $ vs USD
+    ("$5 per user per month", "$5 / users / month"),  # user vs users
+    ("Pro $150/mo", "Pro $150 per month"),  # /mo vs /month
+    ("Team $1,200 annually", "team $1200.00/yr"),
+    ("SaaS, self-hosted and air-gapped", "air-gapped; SaaS; self-hosted"),
+])
+def test_prose_values_compare_as_token_sets(a, b):
+    assert tokens(a) == tokens(b)
+    assert same_field(prose(a), prose(b))
+
+
+@pytest.mark.parametrize(("a", "b"), [
+    ("npm, Maven", "npm, Maven, Go"),
+    ("Pro $150/month", "Pro $180/month"),
+    ("Pro $150/month", "Pro $150/year"),
+    ("SaaS", "SaaS and self-hosted"),
+])
+def test_prose_values_keep_real_differences(a, b):
+    assert not same_field(prose(a), prose(b))
+
+
+def test_pricing_compares_the_tier_set_not_the_wording():
+    old = priced(Tier(name="Pro", price=150, currency="usd", period="month"), Tier(name="Enterprise"))
+    assert same_field(old, AxisField(axis="pricing_model", value="Enterprise on request, Pro is 150 dollars monthly",
+                                     tiers=[Tier(name="Enterprise", currency="USD", period="year"),
+                                            Tier(name="PRO", price=150.0, currency="$", period="monthly")]))
+    assert not same_field(old, priced(Tier(name="Pro", price=180, currency="USD", period="month"),
+                                      Tier(name="Enterprise")))
+    assert not same_field(old, priced(Tier(name="Pro", price=150, currency="EUR", period="month"),
+                                      Tier(name="Enterprise")))
+
+
+def test_a_free_tier_with_price_zero_equals_one_without_a_price():
+    assert same_field(priced(Tier(name="Free", price=0, currency="USD", period="month")), priced(Tier(name="Free")))
+    assert not same_field(priced(Tier(name="Starter", price=0)), priced(Tier(name="Starter")))
+
+
+def test_swapped_tier_prices_are_a_change():
+    a = priced(Tier(name="Pro", price=50, period="month"), Tier(name="Enterprise", price=950, period="month"))
+    b = priced(Tier(name="Pro", price=950, period="month"), Tier(name="Enterprise", price=50, period="month"))
+    assert not same_field(a, b)
 
 
 def test_section_diff_keeps_only_the_hunk_around_the_evidence():
