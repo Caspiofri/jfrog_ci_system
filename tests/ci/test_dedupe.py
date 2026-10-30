@@ -2,8 +2,9 @@
 import hashlib
 
 import numpy as np
+import pytest
 
-from ci.dedupe import EmbeddingDeduper, SeenUrls, normalize_url, resolve_duplicates, url_dedupe
+from ci.dedupe import EmbeddingDeduper, SeenUrls, normalize_url, resolve_duplicates, richness, url_dedupe
 from ci.packet import Packet, packet_id
 
 
@@ -106,3 +107,21 @@ def test_resolve_duplicates_follows_chain_to_survivor():
     drops = [(a, "url", b.id), (b, "emb", c.id), (pkt("https://d.com"), "history", "old-run-id")]
     resolved = resolve_duplicates(drops, kept_ids={c.id})
     assert [dup for _, _, dup in resolved] == [c.id, c.id, "old-run-id"]
+
+
+@pytest.mark.parametrize("better", ["snippet", "full"])
+def test_a_junk_copy_loses_to_a_snippet_or_full_copy(tmp_path, better):
+    d = EmbeddingDeduper(tmp_path / "chroma", fake_embed)
+    junk = pkt("https://a.com/1", title="Breach at Snyk", text="Please enable JavaScript", status="junk")
+    good = pkt("https://b.com/1", title="Breach at Snyk", text="text", status=better)
+    other = pkt("https://c.com/1", title="Unrelated news", status="junk")
+    kept, dropped = d.dedupe([junk, good, other])  # a run with junk items still dedupes
+    assert {p.url for p in kept} == {good.url, other.url}
+    assert [(p.url, dup) for p, _, dup in dropped] == [(junk.url, good.id)]
+
+
+def test_an_unknown_text_status_ranks_lowest_with_a_warning(caplog):
+    odd = pkt("https://a.com/1").model_copy(update={"text_status": "mystery"})
+    assert richness(odd) > richness(pkt("https://b.com/1", status="junk"))
+    assert "unknown text_status 'mystery'" in caplog.text
+

@@ -1,4 +1,5 @@
 """Dedupe for the CI run: normalized-URL matching (sqlite seen-URL store) and embedding similarity (ChromaDB)."""
+import logging
 import sqlite3
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -13,6 +14,12 @@ MAX_DISTANCE = 1 - SIMILARITY_THRESHOLD
 EMBED_TEXT_CHARS = 300
 COLLECTION = "ci_items"
 _DROP_PARAMS = {"ref", "source"}  # plus every utm_* param
+
+# which copy of a story is kept: full text first; junk (the fetched page was not the article) holds less than a
+# teaser, so it ranks below snippet
+STATUS_RANK = {"full": 0, "partial": 1, "snippet": 2, "junk": 3}
+UNKNOWN_STATUS_RANK = max(STATUS_RANK.values()) + 1
+log = logging.getLogger(__name__)
 
 EmbedFn = Callable[[list[str]], list]
 Drop = tuple[Packet, str, str]  # (packet, reason, duplicate_of id)
@@ -34,7 +41,11 @@ def url_keys(p: Packet) -> set[str]:
 
 def richness(p: Packet) -> tuple[int, int]:
     """Sort key: full text first, then resolved URL."""
-    return ({"full": 0, "partial": 1, "snippet": 2}[p.text_status], 0 if p.url_resolved else 1)
+    rank = STATUS_RANK.get(p.text_status)
+    if rank is None:  # a status added later must never disable dedupe (a KeyError here once kept every item)
+        log.warning("unknown text_status %r on %s; ranked lowest for dedupe", p.text_status, p.id or p.url)
+        rank = UNKNOWN_STATUS_RANK
+    return (rank, 0 if p.url_resolved else 1)
 
 
 class SeenUrls:
