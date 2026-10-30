@@ -147,8 +147,11 @@ TITLE_LEAD = r"(?:[^:\s][^:]{0,24}:\s+)?(?:the\s+)?"
 SUBJECT_VERBS = (r"launch(?:es|ed)?|adds?|added|introduc(?:es|ed)|unveil(?:s|ed)?|announc(?:es|ed)|releas(?:es|ed)|"
                  r"acquir(?:es|ed)|preview(?:s|ed)?|debut(?:s|ed)?|expand(?:s|ed)?|updat(?:es|ed)|ship(?:s|ped)?|"
                  r"roll(?:s|ed)?\s+out|patch(?:es|ed)|fix(?:es|ed)")
-PRODUCT_WORDS = ["Copilot", "Actions", "Advanced Security", "Dependabot", "CodeQL", "Packages", "npm", "registry",
-                 "firewall", "MCP", "agent", "agents", "Duo", "Orbit", "Nexus", "CLI", "scanner", "AI"]
+# specific product names only: a generic word (npm, registry, AI, agent, scanner, MCP, CLI) would let a venue settle
+# by rule again ("GitHub's npm registry hit by worm"); multi-word product phrases are fine
+PRODUCT_WORDS = ["Copilot", "Dependabot", "CodeQL", "Advanced Security", "Actions", "Duo", "Orbit", "Nexus",
+                 "CodeArtifact", "Amazon ECR", "Amazon Inspector",
+                 "npm firewall", "npm package firewall", "package firewall"]
 
 
 def _subject_re(names: Iterable[str]) -> re.Pattern:

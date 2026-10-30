@@ -455,6 +455,10 @@ HINT = "Competitor named in title: github — company or platform?"
     ("GitHub updates: attackers abuse workflow triggers", "hint"),  # a heading, not a verb
     ("GitHub's users targeted by phishing", "hint"),
     ("GitHub's new policy angers maintainers", "hint"),  # anything else after 's never settles by default
+    ("GitHub’s npm registry hit by worm", "hint"),  # a generic word (npm, registry) is a venue, not a product
+    ("GitHub's AI agents leak tokens", "hint"),
+    ("GitHub's MCP server exposed", "hint"),
+    ("GitHub's Dependabot gets reachability", "github"),
     ("GitHub's npm firewall can block brand-new versions", "github"),
     ("GitHub’s Copilot gets a security review mode", "github"),
     ("GitHub's Advanced Security adds AI autofix", "github"),
