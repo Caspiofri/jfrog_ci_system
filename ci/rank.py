@@ -40,7 +40,8 @@ RUBRIC = """Importance (D14). 1–5, answering "how much does this change JFrog'
 
 The score is the competitive impact on JFrog, not the size of the improvement: a large upgrade to something the
 competitor already offered is still a 3; a small change that closes a gap with JFrog or shifts a buyer comparison
-is a 4.
+is a 4. Keywords such as "enterprise", "data residency", "AI" or "security" do not raise a score by themselves;
+only the impact on JFrog's competitive picture does.
 
 Anchor examples:
 - "Amazon ECR now supports replication backfill for existing container images" = 3 (improves an existing capability)

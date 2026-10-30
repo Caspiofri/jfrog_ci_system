@@ -37,6 +37,8 @@ def test_rubric_states_impact_not_size_with_ofris_anchors():
     Ranker(llm).rank([_item(1)], [_cls(1)])
     prompt = llm.calls[0][0]
     assert "competitive impact on JFrog, not the size of the improvement" in prompt
+    assert 'Keywords such as "enterprise", "data residency"' in prompt
+    assert "do not raise a score by themselves" in prompt
     assert "| 4 | Closes or opens a gap against JFrog, or changes what buyers compare" in prompt
     assert "| 3 | A competitor improves a capability it already had" in prompt
     assert "vendor marketing with no event" in prompt
