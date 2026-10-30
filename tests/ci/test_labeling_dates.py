@@ -8,13 +8,14 @@ from pathlib import Path
 import pytest
 
 PAGE = Path(__file__).parents[2] / "ci" / "labeling" / "page.html"
-pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+NODE = shutil.which("node")  # resolved once, from the caller's PATH (nvm installs it outside /usr/bin)
+pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
 
 
 def fmt_date(value, day_only: bool, tz: str = "America/Los_Angeles") -> str:
     source = re.search(r"^function fmtDate\(.*?^}", PAGE.read_text(encoding="utf-8"), re.S | re.M).group(0)
     script = f"{source}\nprocess.stdout.write(fmtDate({json.dumps(value)}, {json.dumps(day_only)}));"
-    out = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True, timeout=30,
+    out = subprocess.run([NODE, "-e", script], capture_output=True, text=True, check=True, timeout=30,
                          env={"TZ": tz, "LANG": "en_US.UTF-8", "PATH": "/usr/bin:/bin"})
     return out.stdout
 
