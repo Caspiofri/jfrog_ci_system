@@ -80,10 +80,13 @@ def test_metrics_on_a_mini_golden_set_with_known_answers():
         "snyk": {"n": 1, "correct": 1, "accuracy": 1.0}}
     assert m["competitor"]["on_noise"] == {"n": 1, "correct": 1, "accuracy": 1.0}
     assert (m["category"]["correct"], m["category"]["n"]) == (2, 3)  # noise label c is not scored on category
-    assert m["noise"] == {"tp": 1, "fp": 1, "fn": 0, "tn": 2, "precision": 0.5, "recall": 1.0}
+    assert m["noise"] == {"tp": 1, "fp": 1, "fn": 0, "tn": 2, "precision": 0.5, "precision_n": 2, "recall": 1.0,
+                          "recall_n": 1}
     assert m["score"] == {"n": 4, "exact": 0.5, "within_1": 0.75, "missing": 0}  # noise label counts as score 1
-    assert m["important_total"] == 2
-    assert m["precision_at_k"] == {"10": {"k": 4, "hits": 2, "precision": 0.5}}  # k shrinks to the set size
+    # important = score >= 4: a (5 vs 5) is a hit, d (predicted 1, labeled 4) a miss
+    assert m["important"] == {"min": 4, "n": 4, "missing": 0, "tp": 1, "fp": 0, "fn": 1, "precision": 1.0,
+                              "precision_n": 1, "recall": 0.5, "recall_n": 2}
+    assert "precision_at_k" not in m  # P@k is not an eval metric any more
     assert m["by_method"]["rules"] == {"n": 1, "competitor": {"n": 1, "correct": 1, "accuracy": 1.0},
                                        "category": {"n": 1, "correct": 1, "accuracy": 1.0},
                                        "noise": {"n": 1, "correct": 1, "accuracy": 1.0}}
@@ -95,20 +98,19 @@ def test_metrics_on_a_mini_golden_set_with_known_answers():
     assert m["confusion"]["category"] == [{"label": "Security", "pred": "Product & Features", "n": 1}]
 
 
-def test_precision_at_k_follows_the_ranked_order():
+def test_precision_at_k_is_kept_for_daily_run_reports():
     labels = [_label(str(i), "snyk", "Security", 5 if i < 3 else 2) for i in range(12)]
-    cls = [_cls(str(i), "snyk", "Security") for i in range(12)]
     good_first = [_ranked(str(i), 5 - i // 3) for i in range(12)]
-    m = evaluate(labels, cls, good_first)
-    assert m["precision_at_k"]["10"]["precision"] == 3 / 10
+    assert eval_golden.precision_at_k(labels, good_first)["10"] == {"k": 10, "hits": 3, "precision": 0.3, "n": 10}
     bad_first = list(reversed(good_first))
-    assert evaluate(labels, cls, bad_first)["precision_at_k"]["10"]["precision"] == 1 / 10
+    assert eval_golden.precision_at_k(labels, bad_first)["10"]["precision"] == 1 / 10
 
 
 def test_undefined_metrics_are_none_not_zero():
     m = evaluate([_label("a", "snyk", "Security", 3)], [_cls("a", "snyk", "Security")], [_ranked("a", 3)])
     assert m["noise"]["precision"] is None and m["noise"]["recall"] is None
-    assert m["precision_at_k"]["10"]["precision"] == 0.0
+    assert (m["noise"]["precision_n"], m["noise"]["recall_n"]) == (0, 0)
+    assert m["important"]["precision"] is None and m["important"]["recall"] is None
 
 
 def test_split_is_deterministic_and_about_a_quarter():
@@ -165,7 +167,8 @@ def test_run_end_to_end_with_a_fake_llm(golden):
     written = json.loads((out / report["path"].split("/")[-1]).read_text(encoding="utf-8"))
     assert written["metrics"] == json.loads(json.dumps(m))
     table = format_report(report)
-    assert "Competitor accuracy" in table and "Precision@10" in table and "Precision@5" not in table
+    assert "Competitor accuracy" in table and "Precision@" not in table
+    assert "Important (score >= 4) precision" in table and "(n=" in table
 
 
 def test_offline_default_runs_without_an_api_key(golden, monkeypatch):
@@ -310,15 +313,16 @@ def test_mentions_jfrog_precision_and_recall():
     cls = [_cls(i, "snyk", "Security") for i in "abc"]
     cls[0].mentions_jfrog = cls[2].mentions_jfrog = True
     m = evaluate(labels, cls, [_ranked(i, 3) for i in "abc"])
-    assert m["mentions_jfrog"] == {"tp": 1, "fp": 1, "fn": 1, "precision": 0.5, "recall": 0.5}
+    assert m["mentions_jfrog"] == {"tp": 1, "fp": 1, "fn": 1, "precision": 0.5, "precision_n": 2, "recall": 0.5,
+                                   "recall_n": 2}
 
 
-def test_offline_run_reports_no_precision_at_k(golden):
+def test_offline_run_shows_unscored_rates_as_na_with_n(golden):
     labels, runs, _ = golden
     report = run(split="all", labels_path=labels, runs_dir=runs, out_dir=None, cfg=CFG)
-    assert report["metrics"]["precision_at_k"] is None
+    assert report["metrics"]["important"]["n"] == 0  # the abstaining LLM scores nothing
     table = format_report(report)
-    assert "rules-only baseline, P@k not meaningful" in table and "Precision@10" not in table
+    assert "Precision@" not in table and "n/a (n=0)" in table
 
 
 def test_reworded_copies_join_by_embedding_similarity(tmp_path):
@@ -458,17 +462,21 @@ def test_errors_are_broken_down_by_label_basis():
     cls = [_cls("a", "snyk", "Security"), _cls("b", "snyk", "Security"),
            _cls("c", "snyk", "Security", noise=False), _cls("d", "industry", "Security")]
     m = evaluate(labels, cls, [_ranked("a", 5), _ranked("b", 1), _ranked("c", 3), _ranked("d", 4)])
-    assert m["by_basis"]["full"] == {"n": 2, "competitor": {"n": 2, "errors": 1}, "category": {"n": 2, "errors": 1},
-                                     "noise": {"n": 2, "errors": 0},
-                                     "score": {"n": 2, "errors": 1, "off_by_2_plus": 1, "missing": 0}}
-    assert m["by_basis"]["partial"] == {"n": 1, "competitor": {"n": 0, "errors": 0},
-                                        "category": {"n": 0, "errors": 0}, "noise": {"n": 1, "errors": 1},
-                                        "score": {"n": 1, "errors": 1, "off_by_2_plus": 1, "missing": 0}}
+    assert m["by_basis"]["full"] == {
+        "n": 2, "competitor": {"n": 2, "errors": 1, "error_rate": 0.5},
+        "category": {"n": 2, "errors": 1, "error_rate": 0.5}, "noise": {"n": 2, "errors": 0, "error_rate": 0.0},
+        "score": {"n": 2, "errors": 1, "error_rate": 0.5, "off_by_2_plus": 1, "off_by_2_plus_rate": 0.5,
+                  "missing": 0}}
+    assert m["by_basis"]["partial"] == {
+        "n": 1, "competitor": {"n": 0, "errors": 0, "error_rate": None},
+        "category": {"n": 0, "errors": 0, "error_rate": None}, "noise": {"n": 1, "errors": 1, "error_rate": 1.0},
+        "score": {"n": 1, "errors": 1, "error_rate": 1.0, "off_by_2_plus": 1, "off_by_2_plus_rate": 1.0,
+                  "missing": 0}}
     assert m["by_basis"]["unknown"]["n"] == 1 and m["by_basis"]["unknown"]["score"]["errors"] == 0
     report = {"split": "all", "live": True, "model": "m", "fingerprint": "f", "n": 4, "labels_total": 4,
               "stories": 4, "split_counts": {}, "aborted": False, "fallbacks": {"classify": 0, "rank": 0},
               "metrics": m}
-    assert "Errors by label basis" in format_report(report)
+    assert "Error rate by label basis" in format_report(report)
 
 
 def test_eval_uses_the_mentions_side_file(golden):
@@ -516,7 +524,7 @@ def test_degraded_ranker_items_are_missing_not_a_midpoint_score():
                                        needs_review=True, review_reasons=["ranker unavailable: LLMError"])]
     m = evaluate(labels, cls, ranked)
     assert m["score"] == {"n": 1, "exact": 1.0, "within_1": 1.0, "missing": 1}
-    assert m["precision_at_k"]["10"] == {"k": 1, "hits": 0, "precision": 0.0}  # the unscored item is not ranked
+    assert m["important"]["n"] == 1 and m["important"]["missing"] == 1  # the unscored item is left out
 
 
 GOOD_TEXT = ("Sonatype launched Nexus Repository Pro+ with AI model screening on Tuesday, adding checks for "
@@ -566,4 +574,34 @@ def test_detector_thresholds_are_in_the_fingerprint(monkeypatch):
 
     base = eval_golden.fingerprint(CFG)
     monkeypatch.setattr(extraction_quality, "TITLE_MIN_COVERAGE", 0.5)
+    assert eval_golden.fingerprint(CFG) != base
+
+
+def test_every_rate_in_the_table_carries_its_n():
+    import re
+
+    labels = [_label("a", "snyk", "Security", 5), _label("b", "gitlab", "AI & Agents", 3),
+              _label("c", "snyk", noise=True), _label("d", "industry", "Security", 4)]
+    labels[0]["basis"] = "full"
+    labels[1]["bad_extraction"] = True
+    cls = [_cls("a", "snyk", "Security", method="rules"), _cls("b", "snyk", "AI & Agents"),
+           _cls("c", "snyk", "Security", noise=True), _cls("d", "industry", "Product & Features", noise=True)]
+    m = evaluate(labels, cls, [_ranked("a", 5), _ranked("b", 2), _ranked("c", 1), _ranked("d", 1)])
+    report = {"split": "all", "live": True, "model": "m", "fingerprint": "f", "n": 4, "labels_total": 4,
+              "stories": 4, "split_counts": {}, "aborted": False, "fallbacks": {"classify": 0, "rank": 0},
+              "metrics": m}
+    table = format_report(report)
+    rates = re.findall(r"(?<![\w.])(?:\d\.\d\d|n/a)(?: \(n=\d+\))?", table)
+    assert rates and all("(n=" in r for r in rates), [r for r in rates if "(n=" not in r]
+    assert "0.67 (n=3)" in table  # competitor accuracy, non-noise
+    assert "%" not in table
+    for row in (m["by_basis"]["full"], m["by_bad_extraction"]["true"]):
+        assert all("error_rate" in row[k] and "n" in row[k] for k in ("competitor", "category", "noise", "score"))
+
+
+def test_metric_code_is_in_the_fingerprint(monkeypatch):
+    base = eval_golden.fingerprint(CFG)
+    real = eval_golden.inspect.getsource
+    monkeypatch.setattr(eval_golden.inspect, "getsource",
+                        lambda obj: real(obj) + "#" if obj is eval_golden.evaluate else real(obj))
     assert eval_golden.fingerprint(CFG) != base

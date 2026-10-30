@@ -245,6 +245,7 @@ def fingerprint(cfg: ci_config.CIConfig | None = None, side_hashes: dict[str, st
         "eval.EMBED_TEXT_CHARS": EMBED_TEXT_CHARS,
         "eval.TEST_PERCENT": TEST_PERCENT,
         "eval.IMPORTANT_MIN": IMPORTANT_MIN,
+        "eval.metrics": inspect.getsource(evaluate) + inspect.getsource(detector_vs_flags),
         "classify.source": inspect.getsource(classify_mod),
         "rank.source": inspect.getsource(rank_mod),
         "extraction_quality.source": inspect.getsource(extraction_quality),
@@ -281,8 +282,7 @@ def detector_vs_flags(labels: list[dict], items: list[dict]) -> dict:
         fn, tn = fn + (actual and not flagged), tn + (not flagged and not actual)
         if flagged != actual:
             misses.append({"id": row["id"], "labeled_bad": actual, "detected_junk": flagged})
-    return {"n": tp + fp + fn + tn, "tp": tp, "fp": fp, "fn": fn, "tn": tn, "precision": _ratio(tp, tp + fp),
-            "recall": _ratio(tp, tp + fn), "misses": misses}
+    return {"n": tp + fp + fn + tn, "tn": tn, **_pr(tp, fp, fn), "misses": misses}
 
 
 def label_basis(label: dict) -> str:
@@ -325,7 +325,6 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
     """Metrics of predictions against labels (pure; ranked is in the ranker's order)."""
     cls = {c.id: c for c in classifications}
     final = {r.id: r for r in ranked}
-    lab = {row["id"]: row for row in labels}
 
     # competitor is scored on relevant items; on noise the tag hardly matters, so it is reported apart
     comp_pairs = [(row["competitor"], cls[row["id"]].competitor) for row in labels if not row["noise"]]
@@ -350,12 +349,11 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
     # degraded items (no score: the ranker failed) are missing, counted apart, never scored as anything
     scored = [row for row in labels if final[row["id"]].score is not None]
     diffs = [abs(final[row["id"]].score - label_score(row)) for row in scored]
-    precision_at = {}
-    important = sum(label_score(row) >= IMPORTANT_MIN for row in labels)
-    for k in K_VALUES:
-        top = [r.id for r in ranked if r.id in lab and r.score is not None][:k]
-        hits = sum(label_score(lab[i]) >= IMPORTANT_MIN for i in top)
-        precision_at[str(k)] = {"k": len(top), "hits": hits, "precision": _ratio(hits, len(top))}
+    # "important": predicted final score >= IMPORTANT_MIN vs labeled score >= IMPORTANT_MIN (noise counts as 1),
+    # over the scored items; this replaces P@k, which needs a full daily run to mean anything
+    i_tp = sum(final[row["id"]].score >= IMPORTANT_MIN and label_score(row) >= IMPORTANT_MIN for row in scored)
+    i_fp = sum(final[row["id"]].score >= IMPORTANT_MIN and label_score(row) < IMPORTANT_MIN for row in scored)
+    i_fn = sum(final[row["id"]].score < IMPORTANT_MIN and label_score(row) >= IMPORTANT_MIN for row in scored)
 
     # accuracy split by who settled the item: competitor and category on non-noise labels, noise on all
     by_method = {}
@@ -377,16 +375,17 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
         relevant = [row for row in rows if not row["noise"]]
         cat_rows = [row for row in relevant if row.get("category")]
         rows_scored = [r for r in rows if final[r["id"]].score is not None]
+        def err(n: int, errors: int) -> dict:
+            return {"n": n, "errors": errors, "error_rate": _ratio(errors, n)}
+
+        off2 = sum(abs(final[row["id"]].score - label_score(row)) > 1 for row in rows_scored)
         return {
             "n": len(rows),
-            "competitor": {"n": len(relevant),
-                           "errors": sum(row["competitor"] != cls[row["id"]].competitor for row in relevant)},
-            "category": {"n": len(cat_rows), "errors": sum(row["category"] != cls[row["id"]].category
-                                                           for row in cat_rows)},
-            "noise": {"n": len(rows), "errors": sum(row["noise"] != cls[row["id"]].noise for row in rows)},
-            "score": {"n": len(rows_scored),
-                      "errors": sum(final[row["id"]].score != label_score(row) for row in rows_scored),
-                      "off_by_2_plus": sum(abs(final[row["id"]].score - label_score(row)) > 1 for row in rows_scored),
+            "competitor": err(len(relevant), sum(row["competitor"] != cls[row["id"]].competitor for row in relevant)),
+            "category": err(len(cat_rows), sum(row["category"] != cls[row["id"]].category for row in cat_rows)),
+            "noise": err(len(rows), sum(row["noise"] != cls[row["id"]].noise for row in rows)),
+            "score": {**err(len(rows_scored), sum(final[row["id"]].score != label_score(row) for row in rows_scored)),
+                      "off_by_2_plus": off2, "off_by_2_plus_rate": _ratio(off2, len(rows_scored)),
                       "missing": len(rows) - len(rows_scored)},
         }
 
@@ -405,19 +404,34 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
                        "on_noise": {"n": len(noise_comp), "correct": sum(noise_comp),
                                     "accuracy": _ratio(sum(noise_comp), len(noise_comp))}},
         "category": {"correct": cat_correct, "n": len(cat_pairs), "accuracy": _ratio(cat_correct, len(cat_pairs))},
-        "noise": {"tp": tp, "fp": fp, "fn": fn, "tn": tn, "precision": _ratio(tp, tp + fp),
-                  "recall": _ratio(tp, tp + fn)},
-        "mentions_jfrog": {"tp": j_tp, "fp": j_fp, "fn": j_fn, "precision": _ratio(j_tp, j_tp + j_fp),
-                           "recall": _ratio(j_tp, j_tp + j_fn)},
+        "noise": _pr(tp, fp, fn) | {"tn": tn},
+        "mentions_jfrog": _pr(j_tp, j_fp, j_fn),
         "score": {"n": len(diffs), "exact": _ratio(sum(d == 0 for d in diffs), len(diffs)),
                   "within_1": _ratio(sum(d <= 1 for d in diffs), len(diffs)), "missing": len(labels) - len(scored)},
-        "precision_at_k": precision_at,
-        "important_min": IMPORTANT_MIN,
-        "important_total": important,
+        "important": {"min": IMPORTANT_MIN, "n": len(scored), "missing": len(labels) - len(scored),
+                      **_pr(i_tp, i_fp, i_fn)},
         "by_method": by_method,
         "confusion": {"competitor": _confusions(comp_pairs), "category": _confusions(cat_pairs),
                       "noise": {"tp": tp, "fp": fp, "fn": fn, "tn": tn}},
     }
+
+
+def _pr(tp: int, fp: int, fn: int) -> dict:
+    """Precision and recall, each with the n it is computed over."""
+    return {"tp": tp, "fp": fp, "fn": fn, "precision": _ratio(tp, tp + fp), "precision_n": tp + fp,
+            "recall": _ratio(tp, tp + fn), "recall_n": tp + fn}
+
+
+def precision_at_k(labels: list[dict], ranked: list[Ranked], k_values=K_VALUES) -> dict:
+    """Share of labeled-important items in the ranker's top k. Kept for full daily-run reports; the golden-set eval
+    does not show it (its items are a sample, not a day's ranking)."""
+    lab = {row["id"]: row for row in labels}
+    out = {}
+    for k in k_values:
+        top = [r.id for r in ranked if r.id in lab and r.score is not None][:k]
+        hits = sum(label_score(lab[i]) >= IMPORTANT_MIN for i in top)
+        out[str(k)] = {"k": len(top), "hits": hits, "precision": _ratio(hits, len(top)), "n": len(top)}
+    return out
 
 
 def abstaining_llm() -> JsonLLM:
@@ -478,8 +492,6 @@ def run(split: str = "train", live: bool = False, labels_path: Path | None = Non
         return report
     report["metrics"] = evaluate(labels, classifications, ranked)
     report["metrics"]["extraction_detector"] = detector_vs_flags(labels, items)
-    if not live:  # the abstaining LLM scores every ranked item the same midpoint: the order is not a ranking
-        report["metrics"]["precision_at_k"] = None
     cls, fin = {c.id: c for c in classifications}, {r.id: r for r in ranked}
     for row, item in zip(labels, items, strict=True):
         report["items"].append({
@@ -514,8 +526,9 @@ def _log_test_run(report: dict, out_dir: Path | None) -> None:
     report["test_log"] = str(out_dir / TEST_LOG_NAME)
 
 
-def _pct(value: float | None) -> str:
-    return "  n/a" if value is None else f"{value * 100:4.0f}%"
+def _rate(value: float | None, n: int) -> str:
+    """A rate with the n it is computed over: "0.67 (n=12)", or "n/a (n=0)" when there is nothing to divide."""
+    return f"n/a (n={n})" if value is None or not n else f"{value:.2f} (n={n})"
 
 
 def fallback_warning(report: dict) -> str | None:
@@ -551,46 +564,39 @@ def format_report(report: dict) -> str:
         lines.append(f"  note: {report['snapshot_text_used']} items had no run file; classified on the 2000-char"
                      " label snapshot, not production text")
     lines.append("")
-    row = "  {:<28} {:>6}  {}"
-    comp, cat, nz, jf, sc = m["competitor"], m["category"], m["noise"], m["mentions_jfrog"], m["score"]
-    lines.append(row.format("Competitor accuracy", _pct(comp["accuracy"]),
-                            f"{comp['correct']}/{comp['n']} non-noise"))
+    row = "  {:<28} {:>14}  {}"
+    comp, cat, nz, jf, sc, imp = (m[k] for k in ("competitor", "category", "noise", "mentions_jfrog", "score",
+                                                 "important"))
+    lines.append(row.format("Competitor accuracy", _rate(comp["accuracy"], comp["n"]), "non-noise"))
     for key, v in comp["per_competitor"].items():
-        lines.append(row.format(f"  {key}", _pct(v["accuracy"]), f"{v['correct']}/{v['n']}"))
+        lines.append(row.format(f"  {key}", _rate(v["accuracy"], v["n"]), ""))
     on_noise = comp["on_noise"]
-    lines.append(row.format("  (on noise items)", _pct(on_noise["accuracy"]),
-                            f"{on_noise['correct']}/{on_noise['n']}"))
-    lines.append(row.format("Category accuracy", _pct(cat["accuracy"]), f"{cat['correct']}/{cat['n']} non-noise"))
-    lines.append(row.format("Noise precision", _pct(nz["precision"]), f"{nz['tp']}/{nz['tp'] + nz['fp']} flagged"))
-    lines.append(row.format("Noise recall", _pct(nz["recall"]), f"{nz['tp']}/{nz['tp'] + nz['fn']} labeled noise"))
-    lines.append(row.format("Mentions JFrog precision", _pct(jf["precision"]),
-                            f"{jf['tp']}/{jf['tp'] + jf['fp']} flagged"))
-    lines.append(row.format("Mentions JFrog recall", _pct(jf["recall"]), f"{jf['tp']}/{jf['tp'] + jf['fn']} labeled"))
-    lines.append(row.format("Score exact", _pct(sc["exact"]), f"n {sc['n']}, {sc['missing']} unscored (degraded)"))
-    lines.append(row.format("Score within ±1", _pct(sc["within_1"]), f"n {sc['n']}"))
-    if m["precision_at_k"] is None:
-        lines.append(row.format("Precision@k", "  -", "rules-only baseline, P@k not meaningful"))
-    else:
-        for k, v in m["precision_at_k"].items():
-            lines.append(row.format(f"Precision@{k}", _pct(v["precision"]),
-                                    f"{v['hits']}/{v['k']} labeled >= {m['important_min']}"
-                                    f" ({m['important_total']} in split)"))
-    lines.append("\n  Settled by        items   competitor        category          noise")
+    lines.append(row.format("  (on noise items)", _rate(on_noise["accuracy"], on_noise["n"]), ""))
+    lines.append(row.format("Category accuracy", _rate(cat["accuracy"], cat["n"]), "non-noise"))
+    for name, pr in (("Noise", nz), ("Mentions JFrog", jf), (f"Important (score >= {imp['min']})", imp)):
+        lines.append(row.format(f"{name} precision", _rate(pr["precision"], pr["precision_n"]), "predicted"))
+        lines.append(row.format(f"{name} recall", _rate(pr["recall"], pr["recall_n"]), "labeled"))
+    lines.append(row.format("Score exact", _rate(sc["exact"], sc["n"]), f"{sc['missing']} unscored (degraded)"))
+    lines.append(row.format("Score within ±1", _rate(sc["within_1"], sc["n"]), ""))
+    lines.append("\n  Settled by        items       competitor          category             noise")
     for method, v in m["by_method"].items():
-        cells = [f"{_pct(v[k]['accuracy'])} {v[k]['correct']:>3}/{v[k]['n']:<4}" for k in ("competitor", "category",
-                                                                                         "noise")]
-        lines.append(f"  {method:<16} {v['n']:>6}   " + "   ".join(cells))
+        cells = [f"{_rate(v[k]['accuracy'], v[k]['n']):>16}" for k in ("competitor", "category", "noise")]
+        lines.append(f"  {method:<16} {v['n']:>6}  " + "  ".join(cells))
     for title, key in (("label basis", "by_basis"), ("bad extraction", "by_bad_extraction")):
-        lines.append(f"\n  Errors by {title:<14}  items   competitor   category     noise        score (off by 2+)")
+        lines.append(f"\n  Error rate by {title:<14} items       competitor          category             noise"
+                     "             score    off by 2+")
         for group, v in m[key].items():
             if not v["n"]:
                 continue
-            cells = [f"{v[k]['errors']:>3}/{v[k]['n']:<4}" for k in ("competitor", "category", "noise", "score")]
-            lines.append(f"  {group:<23} {v['n']:>6}   " + "     ".join(cells) + f" ({v['score']['off_by_2_plus']})")
+            cells = [f"{_rate(v[k]['error_rate'], v[k]['n']):>16}" for k in ("competitor", "category", "noise",
+                                                                              "score")]
+            cells.append(f"{_rate(v['score']['off_by_2_plus_rate'], v['score']['n']):>16}")
+            lines.append(f"  {group:<27} {v['n']:>6}  " + "  ".join(cells))
     det = m.get("extraction_detector")
     if det and det["n"]:
-        lines.append(f"\n  Junk detector vs Bad extraction flags (n {det['n']}): precision {_pct(det['precision'])}"
-                     f" recall {_pct(det['recall'])}  tp {det['tp']} fp {det['fp']} fn {det['fn']} tn {det['tn']}")
+        lines.append("\n  Junk detector vs Bad extraction flags: "
+                     f"precision {_rate(det['precision'], det['precision_n'])}, "
+                     f"recall {_rate(det['recall'], det['recall_n'])} (flagged labels n={det['n']})")
     for name in ("competitor", "category"):
         conf = m["confusion"][name]
         if conf:
