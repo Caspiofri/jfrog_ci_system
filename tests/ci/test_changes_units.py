@@ -42,10 +42,13 @@ def test_snapshot_store_keeps_the_last_n_per_page(tmp_path):
 def test_quote_matching_ignores_case_whitespace_and_typography():
     text = "Every plan runs as a managed cloud service.\nEnterprise customers can also self‑host it — today."
     assert quote_in_text("every plan  runs as a managed\ncloud service", text)
-    assert quote_in_text("Every plan runs ... cloud service", text)
+    assert quote_in_text("Every plan runs as a managed ... can also self-host it - today", text)
+    assert not quote_in_text("Every plan runs ... cloud service", text)  # elided parts under 20 chars
+    assert not quote_in_text("Every plan runs as a managed ... it", text)
     assert not quote_in_text("Every plan runs on premises", text)
     assert not quote_in_text("", text)
-    assert not quote_in_text("cloud service ... Every plan", text)  # elided parts must appear in order
+    # elided parts must appear in order
+    assert not quote_in_text("Enterprise customers can also ... Every plan runs as a managed", text)
 
 
 def test_a_quote_not_on_the_page_sets_confidence_zero():

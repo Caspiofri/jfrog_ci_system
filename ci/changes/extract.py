@@ -13,6 +13,7 @@ from ci.llm import JsonLLM
 
 PROMPT_TEXT_CHARS = 30000  # the longest tracked page (jfrog.com/pricing) extracts to ~23k chars
 NOT_STATED = "not stated"
+ELIDED_PART_MIN_CHARS = 20  # each part of a quote elided with "..." must be at least this long
 
 AXIS_GUIDE = {
     "deployment": "how it can be run: SaaS/cloud, self-hosted, hybrid, air-gapped, which clouds",
@@ -108,7 +109,7 @@ Page text:
 >>>"""
 
 
-_TRANSLATE = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "–": "-",
+_TRANSLATE = str.maketrans({"\u2011": "-", "\u2010": "-", "‘": "'", "’": "'", "“": '"', "”": '"', "–": "-",
                             "—": "-", " ": " ", "…": "..."})
 
 
@@ -118,9 +119,10 @@ def _norm(s: str) -> str:
 
 def quote_in_text(quote: str, text: str) -> bool:
     """The quote appears in the text, ignoring case, whitespace and typographic quotes/dashes. A quote elided with
-    "..." matches when each part appears, in order."""
+    "..." matches when each part appears, in order and each part is at least ELIDED_PART_MIN_CHARS long (short
+    fragments such as "Pro ... $150" would match almost any pricing page)."""
     parts = [p.strip() for p in _norm(quote).split("...") if p.strip()]
-    if not parts:
+    if not parts or (len(parts) > 1 and any(len(p) < ELIDED_PART_MIN_CHARS for p in parts)):
         return False
     hay, pos = _norm(text), 0
     for part in parts:
