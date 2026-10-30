@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CI Labeling</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --ink: #1d2330; --muted: #667085; --line: #e3e6eb;
+    --accent: #2f6fdf; --accent-soft: #e8f0fd; --green: #1f8a4c; --green-soft: #e5f5ec;
+    --amber: #a86400; --amber-soft: #fdf1dc; --red: #c23934; --red-soft: #fbe9e8; --gray-soft: #eef0f3;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 20px; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  h1 span { color: var(--muted); font-weight: 500; }
+  select, input[type=text] { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .progress { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; }
+  .chip { background: var(--gray-soft); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+  .chip b { font-weight: 650; }
+  .chip.main { background: var(--accent-soft); color: var(--accent); }
+  .chip.noise { background: var(--red-soft); color: var(--red); }
+  .meter { width: 120px; height: 6px; background: var(--gray-soft); border-radius: 3px; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .legend { font-size: 12px; color: var(--muted); max-width: 1280px; margin: 6px auto 0; }
+  kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--gray-soft); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--ink); }
+  main { max-width: 1280px; margin: 14px auto 60px; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-left: 4px solid transparent; border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) 430px; gap: 16px; }
+  .card.active { border-left-color: var(--accent); box-shadow: 0 1px 8px rgba(47, 111, 223, .12); }
+  .card.labeled { border-left-color: var(--green); }
+  .card.labeled.is-noise { border-left-color: var(--red); }
+  .card.active.labeled { border-left-color: var(--accent); }
+  .title { font-size: 15px; font-weight: 620; margin: 0 0 3px; }
+  .title a { color: var(--ink); text-decoration: none; }
+  .title a:hover { color: var(--accent); text-decoration: underline; }
+  .meta { color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-bottom: 6px; }
+  .badge { font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 6px; }
+  .b24 { background: var(--green-soft); color: var(--green); }
+  .bold { background: var(--gray-soft); color: var(--muted); }
+  .bfull { background: var(--accent-soft); color: var(--accent); }
+  .rs { font-size: 11.5px; font-weight: 700; border-radius: 4px; padding: 1px 7px; text-transform: uppercase; letter-spacing: .03em; }
+  .rs-full { background: var(--green-soft); color: var(--green); }
+  .rs-partial { background: var(--amber-soft); color: var(--amber); }
+  .rs-snippet { background: var(--red-soft); color: var(--red); }
+  .openbtn { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; text-decoration: none;
+    font-size: 12.5px; border-radius: 5px; padding: 3px 10px; display: inline-block; }
+  .openbtn:hover { filter: brightness(1.08); }
+  .openbtn kbd { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.35); color: #fff; margin-left: 4px; }
+  .mentions { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .mentions b { color: var(--ink); font-weight: 600; }
+  .bwarn { background: var(--amber-soft); color: var(--amber); }
+  .bdone { background: var(--green-soft); color: var(--green); }
+  .text { white-space: pre-wrap; color: #384152; font-size: 13px; margin: 0; }
+  .more { background: none; border: 0; color: var(--accent); padding: 0; font: inherit; font-size: 12.5px; cursor: pointer; }
+  .origin { font-size: 11.5px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+  .ctl { display: flex; flex-direction: column; gap: 7px; }
+  .row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); width: 66px; flex: none; }
+  button { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+  button:hover { border-color: #b8c0cc; }
+  button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.noise.on { background: var(--red); border-color: var(--red); }
+  button.jf.on { background: var(--green); border-color: var(--green); }
+  .cat { font-size: 12px; padding: 2px 7px; }
+  .cat u { text-decoration: underline; text-underline-offset: 2px; }
+  .score { width: 28px; padding: 3px 0; font-weight: 600; }
+  .row input[type=text] { flex: 1; min-width: 0; font-size: 12.5px; }
+  .save { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; padding: 3px 14px; }
+  .status { font-size: 12px; color: var(--muted); }
+  .status.err { color: var(--red); }
+  .status.ok { color: var(--green); }
+  .buckets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 1280px; margin: 8px auto 0; font-size: 12.5px; }
+  .bk { display: inline-flex; align-items: center; gap: 6px; background: var(--gray-soft); border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
+  .bk .meter { width: 44px; height: 5px; }
+  .bk.done { background: var(--green-soft); color: var(--green); }
+  .bk.done .meter i { background: var(--green); }
+  .bk.total { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .bk.warn { background: var(--amber-soft); color: var(--amber); }
+  .bbadge { background: #efeafd; color: #5b3fc4; }
+  .empty { text-align: center; color: var(--muted); padding: 40px; }
+  @media (max-width: 900px) { .card { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>JFrog CI <span>· labeling</span></h1>
+    <label>Run <select id="run"></select></label>
+    <span class="seg"><button id="v-q" class="on" title="Stratified queue: 6 per competitor, 8 industry, 16 likely noise">Queue</button><button id="v-all">All items</button></span>
+    <span class="seg"><button id="f-un" class="on">Unlabeled</button><button id="f-all">All</button></span>
+    <div class="progress">
+      <span class="meter"><i id="meter"></i></span>
+      <span class="chip main" id="p-run"></span>
+      <span class="chip noise" id="p-noise"></span>
+      <span class="chip" id="p-basis" title="What the labels in this run were based on: the full article or part of it"></span>
+      <span id="p-cats" class="progress"></span>
+      <span class="chip" id="p-gold" title="Whole golden set, all runs. Target: ~40 competitor items + ~20 noise"></span>
+    </div>
+  </div>
+  <div class="buckets" id="buckets"></div>
+  <div class="legend">
+    <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>1</kbd>–<kbd>5</kbd> score · <kbd>n</kbd> noise ·
+    category <kbd>p</kbd> Product <kbd>r</kbd> Pricing <kbd>a</kbd> AI <kbd>s</kbd> Security <kbd>f</kbd> Funding/M&amp;A <kbd>c</kbd> Customers <kbd>l</kbd> Leadership ·
+    <kbd>m</kbd> mentions JFrog · <kbd>e</kbd> expand · <kbd>o</kbd> open article (sets read: full) · <kbd>b</kbd> read full/partial · <kbd>/</kbd> note · <kbd>Enter</kbd> save &amp; next
+  </div>
+</header>
+<main id="list"><div class="empty">Loading…</div></main>
+
+<script>
+const CAT_KEYS = { p: 0, r: 1, a: 2, s: 3, f: 4, c: 5, l: 6 };
+const CAT_SHORT = ["Product", "Pricing", "AI & Agents", "Security", "Funding/M&A", "Customers", "Leadership"];
+const RUBRIC = {
+  5: "5 · Direct threat",
+  4: "4 · Change on a head-to-head axis (pricing, AI/MCP)",
+  3: "3 · Routine product update or relevant industry news",
+  2: "2 · Related, no competitive impact",
+  1: "1 · Noise-level relevance",
+};
+const TEASER = 400;
+let META = null, items = [], cards = [], active = -1, filter = "unlabeled", saving = false;
+let view = "queue", QUEUE = null, inQueue = new Map(), order = [];  // order: item indices shown, in view order
+const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : null);  // only http(s) links
+
+const $ = (id) => document.getElementById(id);
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k.startsWith("on")) n[k] = v; else n.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+}
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail || r.status));
+  return body;
+}
+function fmtDate(s) {
+  if (!s) return "no date";
+  const d = new Date(s);
+  return isNaN(d) ? s : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// ---- per-item draft state, seeded from the saved label or the packet
+function draftFrom(item) {
+  const l = item.label;
+  return {
+    competitor: l ? l.competitor : item.competitor,
+    category: l ? l.category : null,
+    score: l ? l.score : null,
+    noise: l ? l.noise : false,
+    mentions_jfrog: l ? l.mentions_jfrog : false,
+    // new: "partial" until the article is opened from the card; saved: keep what was stored (null on lines
+    // from before basis existed, so the analyst picks one rather than the page claiming "partial")
+    basis: l ? l.basis || null : "partial",
+    note: l ? l.note || "" : "",
+  };
+}
+
+function renderCard(item, idx) {
+  const d = item.draft;
+  const text = item.text || "";
+  const long = text.length > TEASER;
+  const body = el("p", { class: "text" }, long ? text.slice(0, TEASER) + "…" : text || "(no text)");
+  const more = long ? el("button", { class: "more", onclick: () => toggleText(idx) }, "show full text") : null;
+
+  const meta = el("div", { class: "meta" },
+    el("span", {}, item.source + (item.publisher ? " · " + item.publisher : "")),
+    el("span", {}, fmtDate(item.published_at)),
+    el("span", { class: "badge " + (item.in_24h ? "b24" : "bold") }, item.in_24h ? "24h" : "7d"),
+    el("span", { class: "rs rs-" + (["full", "partial", "snippet"].includes(item.text_status) ? item.text_status : "snippet"),
+      title: "How much of the article the pipeline read" }, "text: " + (item.text_status || "unknown")),
+    item.url_resolved === false ? el("span", { class: "badge bwarn", title: item.original_url }, "⚠ URL not resolved") : null,
+    inQueue.has(item.id) ? el("span", { class: "badge bbadge", title: inQueue.get(item.id).why },
+      "queue · " + inQueue.get(item.id).bucket) : null,
+    item.label ? el("span", { class: "badge bdone" }, "saved " + fmtDate(item.label.labeled_at)) : null,
+  );
+  const left = el("div", {},
+    el("h2", { class: "title" }, safeUrl(item.url)
+      ? el("a", { href: safeUrl(item.url), target: "_blank", rel: "noopener",
+        onclick: (e) => { e.preventDefault(); openArticle(idx); } }, item.title) : item.title),
+    meta, body, more, mentionsLine(item),
+    el("div", { class: "origin" }, "origin: " + item.origin),
+  );
+
+  const comp = el("select", { onchange: (e) => { d.competitor = e.target.value; } });
+  const comps = META.competitors.includes(d.competitor) ? META.competitors : [d.competitor, ...META.competitors];
+  for (const c of comps) comp.append(el("option", { value: c }, c === "none" ? "none (not a tracked competitor)" : c));
+  comp.value = d.competitor;
+
+  const cats = el("div", { class: "row" }, el("span", { class: "lbl" }, "Category"));
+  META.categories.forEach((c, i) => {
+    const key = Object.keys(CAT_KEYS).find((k) => CAT_KEYS[k] === i);
+    const b = el("button", { class: "cat" + (d.category === c ? " on" : ""), title: c + "  [" + key + "]",
+      onclick: () => setCategory(idx, i) }, CAT_SHORT[i]);
+    cats.append(b);
+  });
+  const scores = el("div", { class: "row" }, el("span", { class: "lbl" }, "Score"));
+  for (let s = 1; s <= 5; s++) {
+    scores.append(el("button", { class: "score" + (d.score === s && !d.noise ? " on" : ""), title: RUBRIC[s],
+      onclick: () => setScore(idx, s) }, String(s)));
+  }
+  scores.append(el("button", { class: "noise" + (d.noise ? " on" : ""), title: "Not relevant at all  [n]",
+    onclick: () => toggleNoise(idx) }, "Noise"));
+  scores.append(el("button", { class: "jf" + (d.mentions_jfrog ? " on" : ""), title: "Mentions JFrog  [m]",
+    onclick: () => toggleJfrog(idx) }, "Mentions JFrog"));
+
+  const note = el("input", { type: "text", placeholder: "note (optional)", value: d.note });
+  note.oninput = (e) => { d.note = e.target.value; };
+  note.onkeydown = (e) => { if (e.key === "Enter" && !e.repeat) { e.preventDefault(); save(idx); } if (e.key === "Escape") note.blur(); };
+  const status = el("span", { class: "status" });
+  const right = el("div", { class: "ctl" },
+    el("div", { class: "row" }, el("span", { class: "lbl" }, "Competitor"), comp),
+    cats, scores,
+    el("div", { class: "row" }, el("span", { class: "lbl" }, "Read"),
+      el("span", { class: "seg", title: "Did you read the full article or only part of it?  [b]" },
+        el("button", { class: d.basis === "partial" ? "on" : "", onclick: () => setBasis(idx, "partial") }, "Partial"),
+        el("button", { class: d.basis === "full" ? "on" : "", onclick: () => setBasis(idx, "full") }, "Full")),
+      safeUrl(item.url) ? el("a", { class: "openbtn", href: safeUrl(item.url), target: "_blank", rel: "noopener",
+        onclick: (e) => { e.preventDefault(); openArticle(idx); } }, "Open article ↗", el("kbd", {}, "o")) : null),
+    el("div", { class: "row" }, el("span", { class: "lbl" }, "Note"), note,
+      el("button", { class: "save", onclick: () => save(idx) }, "Save")),
+    el("div", { class: "row" }, el("span", { class: "lbl" }), status),
+  );
+
+  const card = el("article", { class: "card" }, left, right);
+  card.onclick = () => setActive(idx, false);
+  card._status = status; card._note = note; card._body = body; card._more = more; card._expanded = false;
+  return card;
+}
+
+function refreshCard(idx) {
+  const old = cards[idx];
+  const card = renderCard(items[idx], idx);
+  card._expanded = old._expanded;
+  if (old._expanded) { card._body.textContent = items[idx].text; card._more.textContent = "show less"; }
+  card._status.textContent = old._status.textContent; card._status.className = old._status.className;
+  old.replaceWith(card); cards[idx] = card;
+  paintCard(idx);
+}
+function paintCard(idx) {
+  const c = cards[idx], it = items[idx];
+  c.classList.toggle("active", idx === active);
+  c.classList.toggle("labeled", !!it.label);
+  c.classList.toggle("is-noise", !!(it.label && it.label.noise));
+  c.style.display = visible(idx) ? "" : "none";
+}
+function visible(idx) {
+  return (view === "all" || inQueue.has(items[idx].id)) && (filter === "all" || !items[idx].label);
+}
+
+// ---- actions
+function setCategory(idx, i) { const d = items[idx].draft; d.category = META.categories[i]; d.noise = false; refreshCard(idx); }
+function setScore(idx, s) { const d = items[idx].draft; d.score = s; d.noise = false; refreshCard(idx); }
+function toggleNoise(idx) { const d = items[idx].draft; d.noise = !d.noise; if (d.noise) { d.score = null; d.category = null; } refreshCard(idx); }
+function setBasis(idx, b) { items[idx].draft.basis = b; refreshCard(idx); }
+function markOpened(idx) { items[idx].draft.basis = "full"; refreshCard(idx); }
+function openArticle(idx) {
+  const u = safeUrl(items[idx].url);
+  if (!u) return;
+  window.open(u, "_blank", "noopener");
+  markOpened(idx);
+}
+function mentionsLine(item) {
+  const m = item.mentions;
+  if (!m || typeof m !== "object" || Array.isArray(m)) return null;
+  const parts = Object.entries(m).filter(([, n]) => typeof n === "number" && n > 0).sort((a, b) => b[1] - a[1]);
+  if (!parts.length) return null;
+  const line = el("div", { class: "mentions" }, "named in full text: ");
+  parts.forEach(([k, n], i) => line.append(i ? ", " : "", el("b", {}, k), "×" + n));
+  return line;
+}
+function toggleJfrog(idx) { const d = items[idx].draft; d.mentions_jfrog = !d.mentions_jfrog; refreshCard(idx); }
+function toggleText(idx) {
+  const c = cards[idx], text = items[idx].text || "";
+  if (!c._more) return;
+  c._expanded = !c._expanded;
+  c._body.textContent = c._expanded ? text : text.slice(0, TEASER) + "…";
+  c._more.textContent = c._expanded ? "show less" : "show full text";
+}
+
+async function save(idx) {
+  const it = items[idx], d = it.draft;
+  const body = { id: it.id, run_id: it.run_id || $("run").value, ...d };
+  if (!d.noise && (!d.category || !d.score)) { setStatus(idx, "Pick a category and a score, or mark Noise", "err"); return; }
+  if (!d.basis) { setStatus(idx, "Pick Read: Partial or Full  [b]", "err"); return; }
+  if (saving) return;  // no double submit
+  saving = true;
+  try {
+    it.label = await api("/api/labels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    refreshCard(idx); setStatus(idx, "Saved ✓", "ok");
+    updateProgress(); updateBuckets(); loadStats();
+    // next visible card, wrapping around; none when everything is labeled in the Unlabeled view
+    let next = nextVisible(idx, 1);
+    if (next < 0) next = nextVisible(-1, 1);
+    setActive(next, true);
+  } catch (e) { setStatus(idx, "Error: " + e.message, "err"); }
+  finally { saving = false; }
+}
+function setStatus(idx, msg, cls) { const s = cards[idx]._status; s.textContent = msg; s.className = "status " + (cls || ""); }
+
+// next visible item index after item `from` in view order (from = -1: from the start)
+function nextVisible(from, dir) {
+  const start = from < 0 ? -1 : order.indexOf(from);
+  for (let p = start + dir; p >= 0 && p < order.length; p += dir) if (visible(order[p])) return order[p];
+  return -1;
+}
+function setActive(idx, scroll) {
+  const prev = active; active = idx;
+  if (prev >= 0 && cards[prev]) paintCard(prev);
+  if (idx >= 0 && cards[idx]) { paintCard(idx); if (scroll) cards[idx].scrollIntoView({ block: "center", behavior: "smooth" }); }
+}
+
+// ---- progress
+function updateProgress() {
+  const total = items.length, labeled = items.filter((i) => i.label);
+  const noise = labeled.filter((i) => i.label.noise).length;
+  $("p-run").innerHTML = "<b>" + labeled.length + "</b> / " + total + " labeled";
+  $("p-noise").innerHTML = "noise <b>" + noise + "</b>";
+  const full = labeled.filter((i) => i.label.basis === "full").length;
+  const partial = labeled.filter((i) => i.label.basis === "partial").length;
+  const unknown = labeled.length - full - partial;
+  $("p-basis").innerHTML = "read full <b>" + full + "</b> · partial <b>" + partial + "</b>"
+    + (unknown ? " · unknown <b>" + unknown + "</b>" : "");
+  $("meter").style.width = total ? (100 * labeled.length / total) + "%" : "0";
+  const cats = $("p-cats"); cats.textContent = "";
+  META.categories.forEach((c, i) => {
+    const n = labeled.filter((it) => !it.label.noise && it.label.category === c).length;
+    cats.append(el("span", { class: "chip", title: c + " (this run)" }, CAT_SHORT[i] + " ", el("b", {}, String(n))));
+  });
+}
+function updateBuckets(error) {
+  const box = $("buckets"); box.textContent = "";
+  if (error) {
+    box.style.display = "";
+    box.append(el("span", { class: "bk warn" }, "Queue unavailable (" + error + "), showing all items"));
+    return;
+  }
+  box.style.display = view === "queue" && QUEUE ? "" : "none";
+  if (!QUEUE) return;
+  if (QUEUE.stale) box.append(el("span", { class: "bk warn", title: "The classifier rules, competitors config or "
+    + "quotas changed since this queue was built. It is kept as is; rebuild with --rebuild-queue." },
+    "queue built with older rules"));
+  const labeledIds = new Set(items.filter((i) => i.label).map((i) => i.id));
+  let done = 0;
+  for (const b of QUEUE.buckets) {
+    const ids = QUEUE.entries.filter((e) => e.bucket === b.name).map((e) => e.id);
+    const n = ids.filter((i) => labeledIds.has(i)).length;
+    done += n;
+    if (!b.target && !b.nominal) continue;
+    const meter = el("span", { class: "meter" }, el("i"));
+    meter.firstChild.style.width = b.target ? (100 * n / b.target) + "%" : "0";
+    const short = b.target < b.nominal ? " (of " + b.nominal + ", short)" : b.target > b.nominal ? " (gap fill)" : "";
+    box.append(el("span", { class: "bk" + (b.target && n >= b.target ? " done" : ""), title: b.name + ": target " + b.target + short },
+      b.name + " ", el("b", {}, n + "/" + b.target), meter));
+  }
+  box.prepend(el("span", { class: "bk total" }, "queue " + done + "/" + QUEUE.entries.length));
+}
+async function loadStats() {
+  try {
+    const s = await api("/api/stats");
+    $("p-gold").innerHTML = "golden set: <b>" + s.relevant + "</b>/40 items · <b>" + s.noise + "</b>/20 noise";
+  } catch (e) { /* stats are a nicety */ }
+}
+
+async function loadRun(runId) {
+  const list = $("list");
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  const base = "/api/runs/" + encodeURIComponent(runId);
+  let queueError = null;
+  [items, QUEUE] = await Promise.all([api(base + "/items"),
+    api(base + "/queue").catch((e) => { queueError = e.message; return null; })]);
+  inQueue = new Map((QUEUE ? QUEUE.entries : []).map((e, pos) => [e.id, { ...e, pos }]));
+  items.forEach((it) => { it.draft = draftFrom(it); });
+  list.textContent = "";
+  cards = items.map((it, i) => renderCard(it, i));
+  if (!items.length) list.append(el("div", { class: "empty" }, "This run has no items."));
+  if (!QUEUE && view === "queue") {  // no queue: show every item rather than an empty page
+    view = "all";
+    $("v-q").classList.remove("on"); $("v-all").classList.add("on");
+  }
+  layout();
+  updateProgress(); updateBuckets(queueError);
+}
+// queue view: queue order; all items: run file order
+function layout() {
+  const idx = items.map((_, i) => i);
+  order = view === "queue" ? idx.filter((i) => inQueue.has(items[i].id))
+    .sort((a, b) => inQueue.get(items[a].id).pos - inQueue.get(items[b].id).pos) : idx;
+  const list = $("list");
+  for (const i of order) list.append(cards[i]);  // append moves the node, so the DOM follows the view order
+  for (let i = 0; i < cards.length; i++) if (!order.includes(i)) list.append(cards[i]);
+  active = -1; cards.forEach((_, i) => paintCard(i));
+  setActive(nextVisible(-1, 1), false);
+}
+function setView(v) {
+  if (v === "queue" && !QUEUE) return;  // the queue failed to load; the error is shown in the bar
+  view = v;
+  $("v-q").classList.toggle("on", v === "queue"); $("v-all").classList.toggle("on", v === "all");
+  layout(); updateBuckets();
+}
+function setFilter(f) {
+  filter = f;
+  $("f-un").classList.toggle("on", f === "unlabeled"); $("f-all").classList.toggle("on", f === "all");
+  cards.forEach((_, i) => paintCard(i));
+  if (active < 0 || !visible(active)) setActive(nextVisible(-1, 1), false);
+}
+
+// ---- keyboard
+document.addEventListener("keydown", (e) => {
+  if (e.repeat) return;  // a held key must not fire twice
+  const t = e.target;
+  if (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
+  if (e.metaKey || e.ctrlKey || e.altKey || active < 0) return;
+  const k = e.key.toLowerCase();
+  let handled = true;
+  if (k === "j") { const n = nextVisible(active, 1); if (n >= 0) setActive(n, true); }
+  else if (k === "k") { const n = nextVisible(active, -1); if (n >= 0) setActive(n, true); }
+  else if (k >= "1" && k <= "5") setScore(active, Number(k));
+  else if (k === "n") toggleNoise(active);
+  else if (k === "m") toggleJfrog(active);
+  else if (k in CAT_KEYS) setCategory(active, CAT_KEYS[k]);
+  else if (k === "e") toggleText(active);
+  else if (k === "o") openArticle(active);
+  else if (k === "b") setBasis(active, items[active].draft.basis === "partial" ? "full" : "partial");
+  else if (k === "/") cards[active]._note.focus();
+  else if (k === "enter") save(active);
+  else handled = false;
+  if (handled) e.preventDefault();
+});
+
+(async function init() {
+  try {
+    META = await api("/api/meta");
+    const sel = $("run");
+    for (const r of META.runs) {
+      const st = (META.run_status || {})[r];
+      sel.append(el("option", { value: r }, st && st !== "ok" ? r + " (" + st + ")" : r));
+    }
+    sel.onchange = () => loadRun(sel.value);
+    $("v-q").onclick = () => setView("queue");
+    $("v-all").onclick = () => setView("all");
+    $("f-un").onclick = () => setFilter("unlabeled");
+    $("f-all").onclick = () => setFilter("all");
+    loadStats();
+    if (!META.default_run) { $("list").innerHTML = '<div class="empty">No runs in output/runs/ yet.</div>'; return; }
+    sel.value = META.default_run;
+    await loadRun(META.default_run);
+  } catch (e) { $("list").innerHTML = ""; $("list").append(el("div", { class: "empty" }, "Error: " + e.message)); }
+})();
+</script>
+</body>
+</html>

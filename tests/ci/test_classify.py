@@ -43,6 +43,11 @@ def _answer_all(**fields):
     return respond
 
 
+def test_categories_match_the_labeling_page():
+    from ci.labeling.app import CATEGORIES as LABEL_CATEGORIES
+    assert CATEGORIES == LABEL_CATEGORIES
+
+
 def test_aliases_are_derived_from_name_and_key():
     assert set(aliases(CFG.by_key()["aws_codeartifact"])) == {"aws codeartifact", "codeartifact"}
     assert set(aliases(CFG.by_key()["snyk"])) == {"snyk"}
