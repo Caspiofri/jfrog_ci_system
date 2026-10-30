@@ -351,13 +351,15 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         if item is None:
             raise HTTPException(404, f"item {label.id} not in run {label.run_id}")
         in_relabel = bool(relabel.queues_holding(relabel_dir, label.id))
-        if in_relabel:  # the relabel queue saves to the current standard: every field answered
+        topup_required = label.id in stratified.requires_bad_extraction(runs_dir, label.run_id)
+        # the relabel and top-up queues both save to the current standard: every field answered, stamped rubric-v2
+        strict = in_relabel or topup_required
+        if strict:
             missing = [f for f, ok in (("basis", label.basis in ("full", "partial")),
                                        ("bad_extraction", label.bad_extraction is not None),
                                        ("note", bool(label.note.strip()))) if not ok]
             if missing:
-                raise HTTPException(422, f"the relabel queue requires {', '.join(missing)}")
-        topup_required = label.id in stratified.requires_bad_extraction(runs_dir, label.run_id)
+                raise HTTPException(422, f"this queue requires {', '.join(missing)}")
         if label.bad_extraction is None:
             if topup_required:
                 raise HTTPException(422, "this queue requires an explicit bad_extraction answer (true or false)")
@@ -376,7 +378,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
                 if changed and not label.revision_reason.strip():
                     raise HTTPException(422, f"changed {', '.join(changed)}: say why in revision_reason")
                 row["relabel"] = {"queue_id": queues[0]["queue_id"], "changed": changed}
-            if in_relabel:  # reviewed under the current standard, a confirmation included
+            if strict:  # reviewed under the current standard (a confirmation included)
                 row["standard"] = audit.STANDARD
                 row["reviewed_at"] = now
             if previous is not None:  # a relabel: keep what it was, so the reason has context

@@ -352,7 +352,7 @@ async function save(idx) {
   if (requiresBad(it) && typeof d.bad_extraction !== "boolean") {
     setStatus(idx, "Answer Bad extraction: Yes or No  [x]", "err"); return;
   }
-  if (relabeling() && !(d.note || "").trim()) { setStatus(idx, "Add a note (required in the relabel queue)  [/]", "err"); return; }
+  if (requiresBad(it) && !(d.note || "").trim()) { setStatus(idx, "Add a note (required in this queue)  [/]", "err"); return; }
   const changed = relabeling() ? changedFields(it.prefill, d) : [];
   if (changed.length && !d.revision_reason.trim()) {
     setStatus(idx, "You changed " + changed.join(", ") + ": say why in Why changed", "err"); return;

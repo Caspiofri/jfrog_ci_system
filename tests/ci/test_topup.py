@@ -177,7 +177,7 @@ TOPUP_QUEUE = {"version": stratified.QUEUE_VERSION, "mode": "topup", "run_id": R
 
 def _label(item_id, run_id=RUN, **kw):
     return {"id": item_id, "run_id": run_id, "competitor": "snyk", "category": "Security", "score": 3,
-            "basis": "full", **kw}
+            "basis": "full", "note": "checked", **kw}
 
 
 def test_server_requires_an_explicit_bad_extraction_answer_in_a_topup_queue(tmp_path):
