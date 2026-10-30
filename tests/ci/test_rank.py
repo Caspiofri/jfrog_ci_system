@@ -56,7 +56,6 @@ def test_prompt_carries_the_v2_anchors_and_lines():
     (5, "snippet", False, False, SNIPPET_SCORE_CAP),  # snippet cap
     (4, "snippet", True, False, 4),  # bonus then cap
     (2, "snippet", True, False, 3),  # bonus below the cap survives
-    (5, "full", True, True, 1),     # noise wins over everything
     (2, "partial", False, False, 2),  # partial text is not capped
 ])
 def test_adjustments(raw, status, jfrog, noise, expected):
@@ -71,14 +70,31 @@ def test_output_has_raw_and_final_score_and_reason():
     assert r.adjustments == ["+1 Mentions JFrog", "snippet cap 4"]
 
 
-def test_noise_items_are_forced_to_1_without_an_llm_call():
+def test_noise_has_no_score_and_no_llm_call():
+    from ci.rank import NOISE_WHY
+
     llm = FakeLLM(_scores({}))
-    out = Ranker(llm).rank([_item(1), _item(2)], [_cls(1, noise=True, jfrog=True), _cls(2)])
+    out = Ranker(llm).rank([_item(1, text_status="snippet"), _item(2)], [_cls(1, noise=True, jfrog=True), _cls(2)])
     assert len(llm.calls) == 1
     ids = llm.calls[0][1]["properties"]["items"]["items"]["properties"]["id"]["enum"]
     assert ids == ["id2"]
     noise = next(r for r in out if r.id == "id1")
-    assert (noise.raw_score, noise.score) == (None, 1)
+    assert (noise.raw_score, noise.score, noise.noise, noise.degraded) == (None, None, True, False)
+    assert noise.adjustments == [] and noise.why_it_matters == NOISE_WHY  # no JFrog bonus, no snippet cap
+    assert not noise.needs_review and not noise.auto_publishable
+
+
+def test_adjust_refuses_noise():
+    with pytest.raises(ValueError):
+        adjust(3, {"text_status": "full"}, _cls(1, noise=True, jfrog=True))
+
+
+def test_noise_sorts_after_scored_and_degraded_items():
+    answer = {"items": [{"id": "id1", "score": 1, "reason": "routine"}]}  # id2 is left out: degraded
+    out = Ranker(FakeLLM([answer])).rank([_item(3), _item(2), _item(1)],
+                                         [_cls(3, noise=True, confidence=0.99), _cls(2, confidence=0.9), _cls(1)])
+    assert [(r.id, r.score, r.degraded, r.noise) for r in out] == [
+        ("id1", 1, False, False), ("id2", None, True, False), ("id3", None, False, True)]
 
 
 def test_order_by_score_then_confidence_then_date():

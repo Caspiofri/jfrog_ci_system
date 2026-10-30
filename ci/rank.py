@@ -1,8 +1,9 @@
-"""Ranker (PRD D14): the LLM scores importance 1-5 on the written rubric, then code adjusts and orders.
+"""Ranker: the LLM scores importance 1-5 on rubric v2 (config/rubric_v2.md), then code adjusts and orders.
 
-Adjustments, in order: +1 when the item mentions JFrog (capped at 5), a cap for items we only have a snippet of,
-and noise forced to 1. Ties are broken by classifier confidence, then by date (newest first).
-Noise items are never sent to the LLM: their score is 1 whatever it would say.
+Adjustments, in order: +1 when the item mentions JFrog (capped at 5), then a cap for items we only have a snippet
+of. Ties are broken by classifier confidence, then by date (newest first).
+Noise has no score on rubric v2: noise items are never sent to the LLM and get score None with noise=True (no
+bonus, no cap); they sort after everything else.
 When the LLM fails for an item, it gets no score at all (score None, degraded, sent to review): a failure must never
 look like a normal score. Degraded items sort after every scored one and are never auto-publishable.
 """
@@ -24,7 +25,6 @@ MIN_SCORE, MAX_SCORE = 1, 5
 JFROG_BONUS = 1
 SNIPPET_SCORE_CAP = 4  # an item we could only read a snippet of cannot score above this (Ofri, Oct 30: was 3)
 SNIPPET_REVIEW_MIN = 4  # ...and at or above this it goes to review: a high score resting on a teaser needs a human
-NOISE_SCORE = 1
 WHY_MAX_CHARS = 160
 NOISE_WHY = "Not relevant to JFrog's competitive picture."
 
@@ -38,7 +38,8 @@ class Ranked(BaseModel):
     id: str
     raw_score: int | None  # the LLM's score; None for noise (not asked) or an unusable answer
     degraded: bool = False  # the LLM gave no usable score: score is None and the item is in review
-    score: int | None  # after the code adjustments; None when degraded
+    noise: bool = False  # classified as noise: no score at all (rubric v2), never sent to the LLM
+    score: int | None  # after the code adjustments; None when degraded or noise
     reason: str  # one line
     why_it_matters: str = ""  # one line, to JFrog, <= WHY_MAX_CHARS; NOISE_WHY for noise, "" when degraded
     adjustments: list[str] = []
@@ -50,7 +51,7 @@ class Ranked(BaseModel):
     @property
     def auto_publishable(self) -> bool:
         """Scored and not held for review (the autonomy threshold applies on top of this, later)."""
-        return self.score is not None and not self.degraded and not self.needs_review
+        return self.score is not None and not self.degraded and not self.noise and not self.needs_review
 
 
 def _as_datetime(value) -> datetime | None:
@@ -67,9 +68,10 @@ def _as_datetime(value) -> datetime | None:
 
 
 def adjust(raw: int, item: dict, cls: Classification) -> tuple[int, list[str]]:
-    """The code side of D14: bonus, snippet cap, noise. Returns the final score and what was applied."""
+    """The ranker-layer adjustments: JFrog bonus, then snippet cap. Returns the final score and what was applied.
+    Only ever called for scored items: noise has no score to adjust."""
     if cls.noise:
-        return NOISE_SCORE, [] if raw == NOISE_SCORE else [f"noise -> {NOISE_SCORE}"]
+        raise ValueError("noise has no score to adjust (rubric v2)")
     score, notes = raw, []
     if cls.mentions_jfrog and score < MAX_SCORE:
         score = min(MAX_SCORE, score + JFROG_BONUS)
@@ -90,9 +92,12 @@ REVIEW_RULES = [
 ]
 
 
-def review_reasons(item: dict, cls: Classification, score: int) -> list[str]:
-    """The REVIEW_RULES that apply, plus the classifier's own reason when it sent the item to review."""
+def review_reasons(item: dict, cls: Classification, score: int | None) -> list[str]:
+    """The REVIEW_RULES that apply (to a scored item), plus the classifier's own reason when it sent the item to
+    review."""
     held = [cls.review_reason] if cls.needs_review and cls.review_reason else []
+    if score is None:
+        return held
     return [reason for reason, applies in REVIEW_RULES if applies(item, cls, score)] + held
 
 
@@ -108,12 +113,13 @@ def why_line(value, reason: str) -> str:
 
 def sort_key(r: Ranked):
     ts = r.published_at.timestamp() if r.published_at else float("-inf")
-    return (r.score is None, -(r.score or 0), -r.confidence, -ts, r.id)
+    group = 2 if r.noise else 1 if r.score is None else 0  # scored, then degraded, then noise
+    return (group, -(r.score or 0), -r.confidence, -ts, r.id)
 
 
 def order(ranked: list[Ranked]) -> list[Ranked]:
-    """Highest score first, degraded (unscored) items last; ties by classifier confidence, then newest; then id so
-    the order is stable."""
+    """Highest score first, then degraded (unscored) items, then noise; ties by classifier confidence, then newest;
+    then id so the order is stable."""
     return sorted(ranked, key=sort_key)
 
 
@@ -207,8 +213,13 @@ Items (JSON):
                 ranked.append(Ranked(**common, raw_score=None, degraded=True, score=None, needs_review=True,
                                      review_reasons=reasons, reason=""))
                 continue
-            raw, reason, why = (None, "classified as noise", NOISE_WHY) if c.noise else scores[it["id"]]
-            score, notes = adjust(NOISE_SCORE if raw is None else raw, it, c)
+            if c.noise:  # no score on rubric v2: no bonus, no cap, no LLM
+                reasons = review_reasons(it, c, None)
+                ranked.append(Ranked(**common, raw_score=None, noise=True, score=None, needs_review=bool(reasons),
+                                     review_reasons=reasons, reason="classified as noise", why_it_matters=NOISE_WHY))
+                continue
+            raw, reason, why = scores[it["id"]]
+            score, notes = adjust(raw, it, c)
             reasons = review_reasons(it, c, score)
             ranked.append(Ranked(**common, raw_score=raw, score=score, needs_review=bool(reasons),
                                  review_reasons=reasons, reason=reason or "(no reason given)", adjustments=notes,
