@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Acme Changelog</title>
+  <id>urn:acme:changelog</id>
+  <updated>2026-10-29T10:00:00Z</updated>
+  <entry>
+    <title>Supply chain policies GA</title>
+    <id>urn:acme:1</id>
+    <link href="https://acme.example/changelog/policies"/>
+    <updated>2026-10-29T10:00:00Z</updated>
+    <summary type="html">&lt;p&gt;Policies are now generally available.&lt;/p&gt;</summary>
+  </entry>
+</feed>

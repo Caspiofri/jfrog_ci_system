@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel>
+<title>"Snyk" when:7d - Google News</title>
+<item>
+<title>PHP fixes two critical unauthenticated RCE flaws - Snyk</title>
+<link>https://news.google.com/rss/articles/AAA?oc=5</link>
+<guid isPermaLink="false">AAA</guid>
+<pubDate>Mon, 26 Oct 2026 07:00:00 GMT</pubDate>
+<description>&lt;a href="https://news.google.com/rss/articles/AAA?oc=5" target="_blank"&gt;PHP fixes two critical unauthenticated RCE flaws&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font color="#6f6f6f"&gt;Snyk&lt;/font&gt;</description>
+<source url="https://snyk.io">Snyk</source>
+</item>
+<item>
+<title>Snyk - Acme - partners with Snyk - The Register</title>
+<link>https://news.google.com/rss/articles/BBB?oc=5</link>
+<guid isPermaLink="false">BBB</guid>
+<pubDate>Wed, 28 Oct 2026 12:30:00 GMT</pubDate>
+<description>&lt;a href="https://news.google.com/rss/articles/BBB?oc=5"&gt;Acme partners with Snyk&lt;/a&gt;</description>
+<source url="https://www.theregister.com">The Register</source>
+</item>
+<item>
+<title>Entry without a link - Nowhere</title>
+<guid isPermaLink="false">NOLINK</guid>
+<pubDate>Tue, 27 Oct 2026 10:00:00 GMT</pubDate>
+<description>no link</description>
+<source url="https://nowhere.example">Nowhere</source>
+</item>
+<item>
+<title>Old Snyk story - Old News</title>
+<link>https://news.google.com/rss/articles/CCC?oc=5</link>
+<guid isPermaLink="false">CCC</guid>
+<pubDate>Mon, 12 Oct 2026 09:00:00 GMT</pubDate>
+<description>old</description>
+<source url="https://old.example">Old News</source>
+</item>
+</channel></rss>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>Acme Blog</title>
+  <link>https://acme.example/blog</link>
+  <item>
+    <title>Acme launches package firewall</title>
+    <link>https://acme.example/blog/firewall</link>
+    <pubDate>Wed, 28 Oct 2026 12:00:00 +0200</pubDate>
+    <description><![CDATA[<p>Blocks <b>malicious</b> packages &amp; more.</p>]]></description>
+  </item>
+  <item>
+    <title>Office party recap</title>
+    <link>https://acme.example/blog/party</link>
+    <pubDate>Tue, 27 Oct 2026 09:00:00 GMT</pubDate>
+    <description>Cake was had.</description>
+  </item>
+  <item>
+    <title>Old SBOM post</title>
+    <link>https://acme.example/blog/old</link>
+    <pubDate>Mon, 01 Sep 2025 09:00:00 GMT</pubDate>
+    <description>Ancient history about SBOM.</description>
+  </item>
+  <item>
+    <title>Undated post</title>
+    <link>https://acme.example/blog/undated</link>
+    <description>No date here.</description>
+  </item>
+</channel>
+</rss>
