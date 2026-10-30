@@ -471,7 +471,8 @@ Items (JSON):
             tagged.append(item)
         out: dict[str, Classification] = {}
         ambiguous, why = [], {}
-        flagged = {it["id"]: r for it in items if (r := prefilter.check(it, content_text(it)))}
+        flagged = {} if self.prefilter_mode == "off" else \
+            {it["id"]: r for it in items if (r := prefilter.check(it, content_text(it)))}
         for item in items:  # mode "on": stock chatter and review sites are noise without the model
             if self.prefilter_mode == "on" and item["id"] in flagged:
                 out[item["id"]] = Classification(

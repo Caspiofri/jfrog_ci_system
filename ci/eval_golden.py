@@ -359,7 +359,7 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
 
     # accuracy split by who settled the item: competitor and category on non-noise labels, noise on all
     by_method = {}
-    for method in ("rules", "llm", "fallback"):
+    for method in ("rules", "llm", "fallback", "prefilter"):
         rows = [row for row in labels if cls[row["id"]].method == method]
         relevant = [row for row in rows if not row["noise"]]
         comp_ok = sum(row["competitor"] == cls[row["id"]].competitor for row in relevant)

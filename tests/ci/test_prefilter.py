@@ -34,15 +34,23 @@ def test_each_chatter_pattern_flags_the_title(title, pattern):
     assert prefilter.check(_item(1, title), BODY) == f"stock chatter: {pattern}"
 
 
-@pytest.mark.parametrize("url,publisher", [
-    ("https://www.g2.com/products/snyk/reviews", "News"),
-    ("https://reviews.capterra.com/x", "News"),
-    ("https://news.example/x", "Software Advice"),
-    ("https://news.example/x", "G2"),
-])
-def test_review_sites_are_flagged(url, publisher):
-    assert prefilter.check(_item(1, "Snyk reviews and ratings", url=url, publisher=publisher), BODY).startswith(
-        "review site")
+@pytest.mark.parametrize("url", ["https://www.g2.com/products/snyk/reviews", "https://reviews.capterra.com/x",
+                                 "https://www.softwareadvice.com/devops/gitlab-vs-sonarqube/"])
+def test_review_sites_are_flagged_by_url_host(url):
+    assert prefilter.check(_item(1, "Snyk reviews and ratings", url=url), BODY).startswith("review site")
+
+
+@pytest.mark.parametrize("publisher", ["G2", "Software Advice", "capterra.com"])
+def test_a_review_site_name_as_publisher_alone_is_not_enough(publisher):
+    item = _item(1, "Snyk reviews and ratings", url="https://news.google.com/rss/articles/x", publisher=publisher,
+                 original_url="https://news.google.com/rss/articles/x")
+    assert prefilter.check(item, BODY) is None
+
+
+@pytest.mark.parametrize("title", ["Acme Holdings Inc. reports Q3 numbers", "Price targeting for DevOps teams",
+                                   "Is the GitLab stock a buyer's market now?"])
+def test_patterns_end_on_a_word_boundary(title):
+    assert prefilter.check(_item(1, title), BODY) is None
 
 
 @pytest.mark.parametrize("title", [
@@ -65,6 +73,8 @@ def test_protection_found_only_in_the_full_text():
 
 def test_a_patterns_own_words_do_not_protect_it():
     assert prefilter.check(_item(1, "1,000 GitLab shares acquired by Example Capital"), BODY) is not None
+    text = BODY + " Example Capital acquired 5,000 shares of the company in the second quarter."
+    assert prefilter.check(_item(1, "Example Capital lowers its stake in GitLab", text=text), text) is not None
 
 
 def test_a_plain_story_is_never_flagged():
@@ -82,15 +92,15 @@ ITEMS = [_item(1, "BofA Securities Adjusts Gitlab Price Target to $64 From $54")
          _item(3, "Snyk shares jump after $300M funding round", competitor="snyk")]
 
 
-def test_shadow_mode_changes_nothing_but_records_the_decision():
-    llm_plain, llm_shadow = _llm(), _llm()
-    plain = Classifier(llm_plain, CFG, runs_dir=None, prefilter_mode="shadow").classify(ITEMS)
-    assert [c.shadow_prefilter for c in plain] == ["stock chatter: price target", "", ""]
-    stripped = [c.model_copy(update={"shadow_prefilter": ""}) for c in plain]
-    again = Classifier(llm_shadow, CFG, runs_dir=None, prefilter_mode="shadow").classify(ITEMS)
-    assert [c.model_copy(update={"shadow_prefilter": ""}) for c in again] == stripped
-    assert plain[0].method != "prefilter" and not plain[0].noise  # the LLM still decided
-    assert len(llm_plain.calls[0][1]["properties"]["items"]["items"]["properties"]["id"]["enum"]) == 3
+def test_shadow_mode_changes_nothing_compared_with_the_prefilter_off():
+    llm_off, llm_shadow = _llm(), _llm()
+    off = Classifier(llm_off, CFG, runs_dir=None, prefilter_mode="off").classify(ITEMS)
+    shadow = Classifier(llm_shadow, CFG, runs_dir=None, prefilter_mode="shadow").classify(ITEMS)
+    assert [c.shadow_prefilter for c in off] == ["", "", ""]
+    assert [c.shadow_prefilter for c in shadow] == ["stock chatter: price target", "", ""]
+    assert [c.model_copy(update={"shadow_prefilter": ""}) for c in shadow] == off  # identical classifications
+    assert llm_shadow.calls == llm_off.calls  # identical prompts and schemas: the LLM saw the same thing
+    assert shadow[0].method != "prefilter" and not shadow[0].noise
 
 
 def test_on_mode_marks_noise_and_skips_the_llm_for_that_item():
@@ -132,3 +142,13 @@ def test_eval_reports_the_prefilter_against_labels():
     m = eval_golden.evaluate(labels, cls, [_ranked("a", 1), _ranked("b", 4)])
     assert m["prefilter"] == {"flagged": 1, "noise_caught": 1, "labeled_noise": 1, "precision": 1.0,
                               "precision_n": 1, "recall": 1.0, "recall_n": 1, "relevant_flagged": []}
+
+
+def test_the_eval_by_method_table_has_a_prefilter_row():
+    from tests.ci.test_eval_golden import _label, _ranked
+
+    labels = [_label("a", "gitlab", noise=True), _label("b", "gitlab", "Security", 4)]
+    cls = Classifier(_llm(), CFG, runs_dir=None, prefilter_mode="on").classify(
+        [_item("x", "GitLab Price Target Raised to $70") | {"id": "a"}, _item("y", "GitLab ships") | {"id": "b"}])
+    m = eval_golden.evaluate(labels, cls, [_ranked("a", 1), _ranked("b", 4)])
+    assert m["by_method"]["prefilter"]["n"] == 1 and m["by_method"]["prefilter"]["noise"]["accuracy"] == 1.0
