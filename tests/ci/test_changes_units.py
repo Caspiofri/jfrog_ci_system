@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from ci.changes import config
-from ci.changes.diff import normalize_value, same_field, section_diff, tokens
+from ci.changes.diff import normalize_value, same_field, section_diff, tier_changes, tokens
 from ci.changes.extract import (
     AxisField,
     Tier,
@@ -227,6 +227,21 @@ def test_swapped_tier_prices_are_a_change():
     a = priced(Tier(name="Pro", price=50, period="month"), Tier(name="Enterprise", price=950, period="month"))
     b = priced(Tier(name="Pro", price=950, period="month"), Tier(name="Enterprise", price=50, period="month"))
     assert not same_field(a, b)
+
+
+def test_tier_changes_lists_added_removed_and_repriced_tiers():
+    old = [Tier(name="Free", price=0), Tier(name="Pro", price=150, currency="USD", period="month"),
+           Tier(name="Legacy", price=10, currency="USD", period="month")]
+    new = [Tier(name="Team", price=90, currency="USD", period="month"), Tier(name="free"),
+           Tier(name="PRO", price=150, currency="$", period="year", unit="user")]
+    assert tier_changes(old, new) == [
+        {"tier": "Legacy", "change": "removed", "old": "$10/month", "new": ""},
+        {"tier": "PRO", "change": "changed", "old": "$150/month", "new": "$150/user/year"},
+        {"tier": "Team", "change": "added", "old": "", "new": "$90/month"},
+    ]
+    assert tier_changes(old, list(reversed(old))) == []
+    assert tier_changes([Tier(name="Pro", price=150, currency="USD")],
+                        [Tier(name="Pro", price=150, currency="USD", unit="user")]) == []  # unit is not compared
 
 
 def test_section_diff_keeps_only_the_hunk_around_the_evidence():

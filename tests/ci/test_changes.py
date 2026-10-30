@@ -154,6 +154,8 @@ def test_real_change_emits_a_reviewed_changes_item_with_a_diff(env):
     assert item.needs_review is True and "reviewed" in item.reason
     assert "-The Pro plan costs $150 per month" in item.diff and "+The Pro plan costs $180 per month" in item.diff
     assert "Prices updated" not in item.diff  # only the section around the change
+    assert item.tier_changes == [{"tier": "Pro", "change": "changed", "old": "$150/month", "new": "$180/month"}]
+    assert "Pro $150/month -> $180/month" in item.reason
     assert res.report["changes"] == 1 and res.report["changed_pages"] == 1
 
     rows = [json.loads(line) for line in (tmp / "out" / f"{res.run_id}.jsonl").read_text().splitlines()]
@@ -483,4 +485,42 @@ def test_items_stored_by_a_crashed_run_are_published_by_the_next_run(env):
     rows = [json.loads(line) for line in (tmp / "out" / f"{res.run_id}.jsonl").read_text().splitlines()]
     assert [r["id"] for r in rows] == [lost.id]
     assert go(T3 + timedelta(days=1)).items == []  # published once only
+
+
+def test_a_tier_added_is_one_item_naming_the_tier(env):
+    site, _, go, _ = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_v1").replace(
+        "<h2>Enterprise</h2>", "<h2>Team</h2>\n<p>The Team plan costs $90 per month for up to 10 developers.</p>\n"
+        "<h2>Enterprise</h2>")
+
+    def with_team(prompt, schema):
+        out = answer(prompt, schema)
+        if "pricing_model" in out and "Team plan costs $90" in page_text(prompt):
+            out["pricing_model"]["tiers"].append({"name": "Team", "price": 90, "currency": "USD", "period": "month"})
+        return out
+
+    res = go(T2, llm=FakeLLM(with_team))
+    [item] = res.items
+    assert item.axis == "pricing_model"
+    assert item.tier_changes == [{"tier": "Team", "change": "added", "old": "", "new": "$90/month"}]
+    assert item.new_value == "Free $0/month; Team $90/month; Pro $150/month; Enterprise (no price listed)"
+
+
+def test_the_same_tiers_in_another_order_and_wording_are_no_change(env):
+    site, _, go, tmp = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_article_date_edit")
+
+    def shuffled(prompt, schema):
+        out = answer(prompt, schema)
+        if "pricing_model" in out:
+            p = out["pricing_model"]
+            p["value"] = "three plans, see tiers"
+            p["tiers"] = [{"name": "enterprise"}, {"name": "PRO", "price": 150.0, "currency": "$", "period": "monthly"},
+                          {"name": "Free"}]
+        return out
+
+    res = go(T2, llm=FakeLLM(shuffled))
+    assert res.items == [] and statuses(res)["pricing"] == "same_fields"
 

@@ -59,7 +59,7 @@ class Tier(BaseModel):
         return _PERIODS.get(v, v)
 
 
-def _price_text(t: Tier) -> str:
+def price_text(t: Tier) -> str:
     if t.price is None:
         return " (no price listed)"
     amount = f"{t.price:,.2f}".removesuffix(".00")
@@ -74,7 +74,7 @@ def _tier_order(t: Tier) -> tuple:
 def render_tiers(tiers: list[Tier]) -> str:
     """The pricing cell's value: every tier, sorted by price (unpriced last) then name, in one fixed format, so a
     re-ordering or a wording difference in the model's answer cannot show up as a change."""
-    return "; ".join(f"{t.name}{_price_text(t)}" for t in sorted(tiers, key=_tier_order))
+    return "; ".join(f"{t.name}{price_text(t)}" for t in sorted(tiers, key=_tier_order))
 
 
 def name_levels(tiers: list[Tier]) -> list[Tier]:

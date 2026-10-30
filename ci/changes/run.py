@@ -81,6 +81,8 @@ def _unconfirmed_reason(new: AxisField, old: Cell | None) -> str:
 
 
 def _reworded(old: Cell, new: AxisField, prev_text: str, text: str) -> bool:
+    if new.axis == "pricing_model" and old.tiers and new.tiers:
+        return False  # tiers are compared structurally; there is no wording to differ
     quotes = [old.evidence, new.evidence]
     return bool(prev_text) and all(quotes) and all(quote_in_text(q, t) for q in quotes for t in (prev_text, text))
 

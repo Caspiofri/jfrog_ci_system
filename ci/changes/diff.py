@@ -15,7 +15,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from ci.changes.config import AXES
-from ci.changes.extract import AxisField, Tier
+from ci.changes.extract import AxisField, Tier, price_text
 
 DIFF_CONTEXT_LINES = 2
 DIFF_MAX_LINES = 60
@@ -68,11 +68,33 @@ def _tier_key(t: Tier) -> tuple:
     return (name, round(float(price), 2), currency, _period(t.period))
 
 
+def _tier_name(t: Tier) -> str:
+    return " ".join(sorted(tokens(t.name)))
+
+
+def tier_changes(old: list[Tier], new: list[Tier]) -> list[dict]:
+    """Per tier, matched by normalized name: added, removed, or changed price/currency/period (the optional unit is
+    not compared). Order and rendering never count. Each entry: {tier, change, old, new} with the price as shown."""
+    before = {_tier_name(t): t for t in old}
+    after = {_tier_name(t): t for t in new}
+    out = []
+    for key in sorted(before.keys() | after.keys()):
+        o, n = before.get(key), after.get(key)
+        if o is None:
+            out.append({"tier": n.name, "change": "added", "old": "", "new": price_text(n).strip()})
+        elif n is None:
+            out.append({"tier": o.name, "change": "removed", "old": price_text(o).strip(), "new": ""})
+        elif _tier_key(o)[1:] != _tier_key(n)[1:]:
+            out.append({"tier": n.name, "change": "changed", "old": price_text(o).strip(),
+                        "new": price_text(n).strip()})
+    return out
+
+
 def same_field(old: "Cell | AxisField", new: AxisField) -> bool:
-    """Pricing with tiers on both sides: the same set of (tier, price, currency, period); the prose value is not
-    compared, so a reworded summary of the same prices is no change. Otherwise: the same token set (see tokens)."""
+    """Pricing with tiers on both sides: no tier added, removed or re-priced (see tier_changes); the value is not
+    compared. Otherwise: the same token set (see tokens)."""
     if new.axis == "pricing_model" and old.tiers and new.tiers:
-        return {_tier_key(t) for t in old.tiers} == {_tier_key(t) for t in new.tiers}
+        return not tier_changes(old.tiers, new.tiers)
     return tokens(old.value) == tokens(new.value)
 
 
@@ -145,6 +167,9 @@ class ChangeItem(BaseModel):
     new_confidence: float
     old_tiers: list[Tier] = []
     new_tiers: list[Tier] = []
+    # pricing: one entry per added, removed or re-priced tier, e.g. {"tier": "Pro", "change": "changed",
+    # "old": "$150/month", "new": "$180/month"}; empty for other axes
+    tier_changes: list[dict] = []
     old_as_of: datetime
     new_as_of: datetime
     diff: str
@@ -157,16 +182,25 @@ def change_id(competitor: str, axis: str, new_as_of: datetime) -> str:
     return hashlib.sha1(f"{competitor}|{axis}|{new_as_of.isoformat()}".encode()).hexdigest()[:16]
 
 
+def _describe(changes: list[dict]) -> str:
+    words = {"added": lambda c: f"{c['tier']} added at {c['new']}", "removed": lambda c: f"{c['tier']} removed",
+             "changed": lambda c: f"{c['tier']} {c['old']} -> {c['new']}"}
+    return "; ".join(words[c["change"]](c) for c in changes)
+
+
 def make_change(run_id: str, page_type: str, old: Cell, new: AxisField, new_url: str, new_as_of: datetime,
                 diff: str, note: str = "") -> ChangeItem:
     label = AXES[new.axis]
+    tiers = tier_changes(old.tiers, new.tiers) if new.axis == "pricing_model" and old.tiers and new.tiers else []
+    detail = f" ({_describe(tiers)})" if tiers else ""
     return ChangeItem(
         id=change_id(old.competitor, new.axis, new_as_of), run_id=run_id, competitor=old.competitor, axis=new.axis,
         axis_label=label, page_key=old.page_key, page_url=new_url, page_type=page_type,
         old_value=old.value, new_value=new.value, old_evidence=old.evidence, new_evidence=new.evidence,
         old_confidence=old.confidence, new_confidence=new.confidence, old_tiers=old.tiers, new_tiers=new.tiers,
         old_as_of=old.as_of, new_as_of=new_as_of, diff=diff, note=note,
-        reason=f"{label} changed on the tracked {page_type} page: every changed head-to-head cell is reviewed (D9)")
+        tier_changes=tiers, reason=f"{label} changed on the tracked {page_type} page{detail}: every changed "
+        "head-to-head cell is reviewed (D9)")
 
 
 class CellStore:
