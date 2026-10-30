@@ -4,10 +4,14 @@ import sys
 
 from ci import config
 from ci.pipeline import COLLECTORS, format_report, run
+from ci.runlock import RunLocked, run_lock
+
+LOCK_NAME = "collect"
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Exits 1 when every source failed (report.json status "failed", no <run_id>.jsonl)."""
+    """Exits 1 when every source failed (report.json status "failed", no <run_id>.jsonl), and 2 when another
+    collection run holds the "collect" lock."""
     ap = argparse.ArgumentParser(prog="python -m ci.run", description=__doc__)
     ap.add_argument("--sources", help=f"comma-separated subset of: {','.join(COLLECTORS)}")
     ap.add_argument("--fresh", action="store_true", help="ignore earlier runs when deduping (for re-testing)")
@@ -18,7 +22,12 @@ def main(argv: list[str] | None = None) -> None:
     if unknown:
         ap.error(f"unknown source(s): {', '.join(sorted(unknown))}")
 
-    result = run(config.load(), sources=sources, fresh=args.fresh, days=args.days)
+    try:
+        with run_lock(LOCK_NAME):
+            result = run(config.load(), sources=sources, fresh=args.fresh, days=args.days)
+    except RunLocked as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(2)
     print(format_report(result.report))
     for path in result.paths.values():
         print(f"wrote {path}")

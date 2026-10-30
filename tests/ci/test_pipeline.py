@@ -314,8 +314,10 @@ def test_a_partly_failing_or_quiet_run_is_ok(tmp_path, registry):
 
 
 def test_ci_run_exits_nonzero_and_prints_failed(tmp_path, registry, monkeypatch, capsys):
+    import ci.runlock
     from ci import run as run_cli
 
+    monkeypatch.setattr(ci.runlock, "LOCK_DIR", tmp_path / "locks")
     monkeypatch.setattr(run_cli, "run", lambda cfg, **kw: _run(tmp_path, registry, sources=["vendor_feed"]))
     monkeypatch.setattr(run_cli.config, "load", lambda: CFG)
     with pytest.raises(SystemExit) as exc:
