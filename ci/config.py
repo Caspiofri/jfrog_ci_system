@@ -76,6 +76,9 @@ class Feed(BaseModel):
     # empty keeps everything.
     # Needed for broad feeds such as AWS What's New, where CodeArtifact is a small fraction.
     keywords: list[str] = []
+    # the section of the site the feed covers, when the feed URL doesn't show it (cloudsmith.com/rss/blog.xml covers
+    # cloudsmith.com/blog/); by default the feed URL minus its feed file (snyk.io/blog/feed/ -> snyk.io/blog/)
+    site: str = ""
 
 
 class ListingPage(BaseModel):

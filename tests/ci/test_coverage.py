@@ -209,19 +209,32 @@ def test_curated_list_reflects_ofris_oct_30_review():
 
 
 def _sources_cfg():
-    from ci.config import CIConfig, Competitor, Feed
+    from ci.config import CIConfig, Competitor, Feed, ListingPage
 
     return CIConfig(competitors=[
-        Competitor(key="cloudsmith", name="Cloudsmith", feeds=[Feed(url="https://cloudsmith.com/rss/changelog.xml")],
+        Competitor(key="cloudsmith", name="Cloudsmith",
+                   feeds=[Feed(url="https://cloudsmith.com/rss/changelog.xml", site="https://cloudsmith.com/changelog/")],
                    github_repos=["cloudsmith-io/cloudsmith-cli"]),
-        Competitor(key="github", name="GitHub", feeds=[Feed(url="https://github.blog/changelog/feed/")]),
+        Competitor(key="github", name="GitHub", feeds=[Feed(url="https://github.blog/changelog/feed/")],
+                   listing_pages=[ListingPage(url="https://github.blog/changelog/")]),
+        Competitor(key="aws", name="AWS", feeds=[Feed(url="https://aws.amazon.com/blogs/security/feed/"),
+                                                 Feed(url="https://aws.amazon.com/about-aws/whats-new/recent/feed/",
+                                                      site="https://aws.amazon.com/about-aws/whats-new/")]),
+        Competitor(key="snyk", name="Snyk", feeds=[Feed(url="https://updates.snyk.io/rss/")]),
         Competitor(key="industry", name="Industry")])
 
 
 @pytest.mark.parametrize("url,kind", [
-    ("https://cloudsmith.com/changelog/verify-npm-provenance", "feed"),
-    ("https://www.cloudsmith.com/blog/x", "feed"),  # www. is ignored, as in the classifier
+    ("https://cloudsmith.com/changelog/verify-npm-provenance", "feed"),  # the feed's `site`, not its /rss/ URL
+    ("https://www.cloudsmith.com/changelog/x", "feed"),  # www. is ignored, as in the classifier
+    ("https://cloudsmith.com/blog/x", "external"),  # same host, a section no configured feed reads
     ("https://github.blog/changelog/workflow-lockfiles", "feed"),
+    ("https://github.blog/changelog", "feed"),
+    ("https://github.blog/news-insights/octoverse/", "external"),
+    ("https://aws.amazon.com/blogs/security/inspector-ecr/", "feed"),
+    ("https://aws.amazon.com/blogs/publicsector/nitro-supply-chain-attestation/", "external"),  # blog not read
+    ("https://aws.amazon.com/about-aws/whats-new/2026/10/ecr-cache/", "feed"),
+    ("https://updates.snyk.io/python-3-15-support-is-now-available/", "feed"),  # feed at the root: whole host
     ("https://github.com/cloudsmith-io/cloudsmith-cli/releases/tag/v1.30.1", "feed"),
     ("https://github.com/someone/else/releases", "external"),
     ("https://about.gitlab.com/blog/gitlab-orbit-ga/", "external"),

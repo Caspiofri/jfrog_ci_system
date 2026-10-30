@@ -10,8 +10,10 @@ competitors:
     feeds:
       # was https://cloudsmith.com/blog/rss.xml (404); this is the feed the blog page advertises
       - url: https://cloudsmith.com/rss/blog.xml
+        site: https://cloudsmith.com/blog/  # the posts' section (coverage's feed vs external split)
       # added: product changelog
       - url: https://cloudsmith.com/rss/changelog.xml
+        site: https://cloudsmith.com/changelog/
     github_repos: [cloudsmith-io/cloudsmith-cli]
 
   - key: sonatype
@@ -70,6 +72,7 @@ competitors:
     hn_queries: ["CodeArtifact", "Amazon ECR", "Amazon Inspector"]
     feeds:
       - url: https://aws.amazon.com/about-aws/whats-new/recent/feed/
+        site: https://aws.amazon.com/about-aws/whats-new/  # posts live under whats-new/<year>/, not recent/
         # whole words or phrases (ci.collectors.vendor_feeds.keyword_re)
         keywords: [codeartifact, inspector, amazon ecr, elastic container registry, codecatalyst, software supply chain]
       # added: AWS Security Blog, filtered to the supply-chain products

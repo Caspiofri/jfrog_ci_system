@@ -143,15 +143,37 @@ def _recall_rows(rows: list[dict], key) -> dict:
             for k, v in sorted(groups.items(), key=lambda kv: str(kv[0]))}
 
 
+FEED_FILE_RE = re.compile(r"^(?:feed|rss|atom)$|\.(?:xml|rss|atom)$", re.IGNORECASE)
+
+
+def _site_prefix(url: str) -> tuple[str, str]:
+    """(host, path prefix) of the pages a feed or listing covers: its URL minus a trailing feed file or feed dir."""
+    parts = [p for p in urlsplit(url).path.split("/") if p]
+    if parts and FEED_FILE_RE.search(parts[-1]):
+        parts = parts[:-1]
+    return _host(url), "/" + "".join(f"{p}/" for p in parts)
+
+
+def read_sites(cfg: ci_config.CIConfig) -> set[tuple[str, str]]:
+    """Every (host, path prefix) the tool reads: configured feeds (their `site` when set) and listing pages."""
+    sites = set()
+    for c in cfg.competitors:
+        sites |= {_site_prefix(f.site or f.url) for f in c.feeds}
+        sites |= {_site_prefix(page.url) for page in c.listing_pages}
+    return sites
+
+
 def source_kind(url: str, cfg: ci_config.CIConfig) -> str:
-    """"feed" when the event's official page is on a source the tool collects from (a configured feed's host, or
-    one of the configured GitHub repos; the same own-source logic as the classifier), else "external"."""
-    sources = set().union(*(own_sources(c) for c in cfg.competitors))
-    host = _host(url)
-    if host in sources:
+    """"feed" when the event's official page is in a section of a site the tool reads (a configured feed's or
+    listing page's host and path prefix: aws.amazon.com/blogs/security/ does not cover .../blogs/publicsector/), or
+    in one of the configured GitHub repos; else "external"."""
+    host, path = _host(url), urlsplit(url).path
+    path = path if path.endswith("/") else path + "/"
+    if any(host == h and path.startswith(prefix) for h, prefix in read_sites(cfg)):
         return "feed"
-    parts = urlsplit(url).path.strip("/").split("/")
-    if host == "github.com" and len(parts) >= 2 and f"repo:{parts[0]}/{parts[1]}".lower() in sources:
+    repos = set().union(*(own_sources(c) for c in cfg.competitors))
+    parts = path.strip("/").split("/")
+    if host == "github.com" and len(parts) >= 2 and f"repo:{parts[0]}/{parts[1]}".lower() in repos:
         return "feed"
     return "external"
 
