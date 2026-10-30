@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel
 
-from ci.classify import Classification
+from ci.classify import Classification, content_text
 from ci.llm import JsonLLM, LLMError
 
 log = logging.getLogger(__name__)
@@ -79,9 +79,10 @@ def adjust(raw: int, item: dict, cls: Classification) -> tuple[int, list[str]]:
     if cls.mentions_jfrog and score < MAX_SCORE:
         score = min(MAX_SCORE, score + JFROG_BONUS)
         notes.append(f"+{JFROG_BONUS} Mentions JFrog")
-    if item.get("text_status") == "snippet" and score > SNIPPET_SCORE_CAP:
+    status = item.get("text_status")
+    if status in ("snippet", "junk") and score > SNIPPET_SCORE_CAP:  # junk text is read like a snippet
         score = SNIPPET_SCORE_CAP
-        notes.append(f"snippet cap {SNIPPET_SCORE_CAP}")
+        notes.append(f"{status} cap {SNIPPET_SCORE_CAP}")
     return score, notes
 
 
@@ -89,6 +90,8 @@ def adjust(raw: int, item: dict, cls: Classification) -> tuple[int, list[str]]:
 REVIEW_RULES = [
     ("snippet-only item scored >= 4",
      lambda item, cls, score: item.get("text_status") == "snippet" and score >= SNIPPET_REVIEW_MIN),
+    ("junk extraction",
+     lambda item, cls, score: item.get("text_status") == "junk" and score >= SNIPPET_REVIEW_MIN),
 ]
 
 
@@ -145,7 +148,7 @@ class Ranker:
     def prompt(pairs: list[tuple[dict, Classification]]) -> str:
         payload = [{"id": it["id"], "competitor": c.competitor, "category": c.category, "source": it.get("source"),
                     "publisher": it.get("publisher") or "", "title": it.get("title") or "",
-                    "text": (it.get("text") or "")[:LLM_TEXT_CHARS]} for it, c in pairs]
+                    "text": content_text(it)[:LLM_TEXT_CHARS]} for it, c in pairs]
         return f"""You rank news items for JFrog's competitive-intelligence team.
 JFrog sells a software supply chain platform: Artifactory (artifact and package repositories), Xray (security
 scanning), Curation, and AI/MCP tooling. Score each item on this rubric:

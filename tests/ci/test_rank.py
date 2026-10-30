@@ -156,3 +156,17 @@ def test_why_it_matters_comes_from_the_same_call_and_falls_back_to_the_reason():
 def test_a_degraded_item_has_no_why_it_matters():
     (r,) = Ranker(FakeLLM([LLMError("down")])).rank([_item(1)], [_cls(1)])
     assert r.degraded and r.why_it_matters == ""
+
+
+def test_junk_text_is_capped_like_a_snippet_and_a_4_goes_to_review():
+    junk = {**_item(1, text_status="junk"), "text": "Menu Home Sign in Cookies", "teaser": "Snyk buys Invariant"}
+    (r,) = Ranker(FakeLLM(_scores({"id1": 5}))).rank([junk], [_cls(1)])
+    assert (r.raw_score, r.score) == (5, 4) and r.adjustments == ["junk cap 4"]
+    assert r.needs_review and r.review_reasons == ["junk extraction"]
+
+
+def test_the_ranker_prompt_gets_the_teaser_not_the_junk_text():
+    junk = {**_item(1, text_status="junk"), "text": "NAVMENU Home Sign in Cookies", "teaser": "Snyk buys Invariant"}
+    llm = FakeLLM(_scores({}))
+    Ranker(llm).rank([junk], [_cls(1)])
+    assert "NAVMENU" not in llm.calls[0][0] and "Snyk buys Invariant" in llm.calls[0][0]

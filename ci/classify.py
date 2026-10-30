@@ -155,9 +155,17 @@ def strip_urls(text: str) -> str:
     return URL_RE.sub(" ", text or "")
 
 
+def content_text(item: dict) -> str:
+    """The text that stands for the item: its stored text, or its teaser when the page text is junk (a nav menu or
+    a consent wall must never reach the LLM or the mention counts)."""
+    if item.get("text_status") == "junk":
+        return item.get("teaser") or ""
+    return item.get("text") or ""
+
+
 def mentions_jfrog(item: dict) -> bool:
     """The full-page flag when the item has one, or'd with the regex over the (possibly capped) stored text."""
-    stored = bool(JFROG_RE.search(strip_urls(f"{item.get('title') or ''}\n{item.get('text') or ''}")))
+    stored = bool(JFROG_RE.search(strip_urls(f"{item.get('title') or ''}\n{content_text(item)}")))
     return stored or (has_full_mentions(item) and bool(item.get("mentions_jfrog")))
 
 
@@ -240,7 +248,7 @@ class Classifier:
     def text_counts(self, item: dict) -> dict[str, int]:
         """Mentions in the text per tracked competitor: per key, the max of the stored full-page count and the count
         over the stored text, so a competitor or alias added after the counts were taken is never zeroed."""
-        stored = strip_urls(item.get("text") or "")
+        stored = strip_urls(content_text(item))
         full = item["mentions"] if has_full_mentions(item) else {}
         return {key: max(_as_count(full.get(key)), len(rx.findall(stored))) for key, rx in self.alias_res.items()}
 
@@ -298,7 +306,7 @@ class Classifier:
         cats = "\n".join(f"- {c}: {d}" for c, d in CATEGORY_DEFINITIONS.items())
         payload = [{"id": it["id"], "prefilled_competitor": it.get("competitor"), "source": it.get("source"),
                     "found_by": it.get("origin"), "publisher": it.get("publisher") or "",
-                    "title": it.get("title") or "", "text": (it.get("text") or "")[:LLM_TEXT_CHARS],
+                    "title": it.get("title") or "", "text": content_text(it)[:LLM_TEXT_CHARS],
                     **({"full_text_mentions": hint}
                        if has_full_mentions(it) and (hint := format_hint(self.text_counts(it))) else {})}
                    for it in items]

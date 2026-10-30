@@ -322,3 +322,16 @@ def test_mention_config_hash_tracks_the_name_rules():
 
     other = CIConfig(competitors=[*CFG.competitors, Competitor(key="cloudsmith", name="Cloudsmith")])
     assert MentionCounter(CFG).config_hash == MentionCounter(CFG).config_hash != MentionCounter(other).config_hash
+
+
+def test_junk_text_never_reaches_the_llm_or_the_mention_counts():
+    junk = {**_item(1, "Some story about tools", competitor="industry",
+                    text="NAVMENU GitLab GitLab GitLab JFrog Snyk Snyk"), "text_status": "junk",
+            "teaser": "A teaser naming Snyk once."}
+    llm = FakeLLM(_answer_all())
+    c = Classifier(llm, CFG)
+    assert c.text_counts(junk)["gitlab"] == 0 and c.text_counts(junk)["snyk"] == 1
+    (out,) = c.classify([junk])
+    prompt = llm.calls[0][0]
+    assert "NAVMENU" not in prompt and "A teaser naming Snyk once." in prompt
+    assert out.mentions_jfrog is False  # "JFrog" was only in the junk text
