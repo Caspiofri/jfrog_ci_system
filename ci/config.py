@@ -1,5 +1,6 @@
 """Loads config/competitors.yaml: who we track, and where each source looks for them (D10)."""
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel
@@ -58,12 +59,22 @@ class Feed(BaseModel):
     keywords: list[str] = []
 
 
+class ListingPage(BaseModel):
+    """An HTML listing of posts (a changelog index), read when the feed is too short: GitHub's changelog feed holds
+    only the newest 10 entries, fewer than it posts on a launch day."""
+    url: str  # the first page
+    page_url: str = ""  # later pages, "{n}" = page number 2, 3, ...; empty reads the first page only
+    format: Literal["github_changelog"] = "github_changelog"  # which parser reads the page layout
+    max_pages: int = 10  # hard cap, whatever the window
+
+
 class Competitor(BaseModel):
     key: str
     name: str
     news_queries: list[str] = []
     hn_queries: list[str] = []
     feeds: list[Feed] = []
+    listing_pages: list[ListingPage] = []  # entries already in a feed are dropped (ci.collectors.vendor_feeds)
     github_repos: list[str] = []  # "owner/repo"
     # extra names that mean this competitor (products: "Amazon ECR"), on top of the name and the key
     aliases: list[str] = []

@@ -145,8 +145,9 @@ def _host(url: str) -> str:
 
 
 def own_sources(comp: ci_config.Competitor) -> set[str]:
-    """The competitor's own feed hosts and GitHub repos, derived from its config block."""
-    return {_host(f.url) for f in comp.feeds} | {f"repo:{r.lower()}" for r in comp.github_repos}
+    """The competitor's own feed and listing-page hosts and GitHub repos, derived from its config block."""
+    hosts = {_host(f.url) for f in comp.feeds} | {_host(page.url) for page in comp.listing_pages}
+    return hosts | {f"repo:{r.lower()}" for r in comp.github_repos}
 
 
 def _as_count(value) -> int:

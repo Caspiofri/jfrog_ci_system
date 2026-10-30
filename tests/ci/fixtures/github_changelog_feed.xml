@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel>
+  <title>Changelog - The GitHub Blog</title>
+  <link>https://github.blog/changelog/</link>
+  <item>
+    <title>GitHub Actions workflow lockfiles are generally available</title>
+    <link>https://github.blog/changelog/2026-10-28-github-actions-workflow-lockfiles-are-generally-available/</link>
+    <pubDate>Wed, 28 Oct 2026 16:30:00 +0000</pubDate>
+    <description>Workflow lockfiles pin every action to a commit SHA.</description>
+  </item>
+</channel>
+</rss>

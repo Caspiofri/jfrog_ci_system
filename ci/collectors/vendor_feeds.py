@@ -1,9 +1,12 @@
-"""Vendor feeds collector: each competitor's official blog and changelog RSS/Atom feeds, from config."""
+"""Vendor feeds collector: each competitor's official blog and changelog RSS/Atom feeds, from config, plus the
+HTML listing pages configured where a feed is too short to cover the window (ci.collectors.listing_pages)."""
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import UTC, datetime, time
 
 from ci.collectors.feedutil import entry_date, feed_body, fetch_feed, html_to_text, short_error
-from ci.config import CIConfig, Competitor, Feed
+from ci.collectors.listing_pages import ListingEntry, read_listing
+from ci.config import CIConfig, Competitor, Feed, ListingPage
+from ci.dedupe import normalize_url
 from ci.packet import CollectorResult, Packet
 
 SOURCE = "vendor_feed"
@@ -42,21 +45,63 @@ def parse(feed, competitor: Competitor, cfg_feed: Feed, since: datetime) -> list
     return packets
 
 
+def listing_packet(entry: ListingEntry, competitor: Competitor, page: ListingPage) -> Packet:
+    """A listing entry has no body: text is its teaser if any, and the pipeline fetches the entry page."""
+    return Packet(
+        source=SOURCE,
+        origin=page.url,
+        competitor=competitor.key,
+        title=entry.title,
+        url=entry.url,
+        original_url=entry.url,
+        published_at=datetime.combine(entry.day, time.min, tzinfo=UTC),  # the listing gives the day only
+        text=entry.teaser,
+        text_status="snippet",
+        text_source="teaser",
+        publisher=competitor.name,
+    )
+
+
+def merge(feed_packets: list[Packet], listing_packets: list[Packet]) -> list[Packet]:
+    """Feed packets, plus the listing entries no feed carried (by normalized URL): a feed entry has an exact time
+    and often the complete body."""
+    seen = {normalize_url(p.url) for p in feed_packets}
+    extra = []
+    for p in listing_packets:
+        key = normalize_url(p.url)
+        if key not in seen:
+            seen.add(key)
+            extra.append(p)
+    return feed_packets + extra
+
+
 def collect(cfg: CIConfig, since: datetime) -> CollectorResult:
-    """Every configured feed, fetched in parallel. A failing feed becomes one entry in `errors`."""
-    jobs = [(c, f) for c in cfg.competitors for f in c.feeds]
+    """Every configured feed and listing page, fetched in parallel (a listing's own pages are read one at a time).
+    A failing feed or page becomes one entry in `errors`; what was read before it is kept."""
+    feed_jobs = [(c, f) for c in cfg.competitors for f in c.feeds]
+    listing_jobs = [(c, page) for c in cfg.competitors for page in c.listing_pages]
     result = CollectorResult(source=SOURCE)
 
-    def one(job):
+    def one_feed(job):
         competitor, cfg_feed = job
         try:
-            return parse(fetch_feed(cfg_feed.url), competitor, cfg_feed, since), None
+            return parse(fetch_feed(cfg_feed.url), competitor, cfg_feed, since), []
         except Exception as e:  # any failure stays inside its feed
-            return [], short_error(cfg_feed.url, e)
+            return [], [short_error(cfg_feed.url, e)]
+
+    def one_listing(job):
+        competitor, page = job
+        try:
+            entries, errors = read_listing(page, since)
+        except Exception as e:  # a parser crash stays inside its listing
+            return [], [short_error(page.url, e)]
+        return [listing_packet(e, competitor, page) for e in entries], errors
 
     with ThreadPoolExecutor(max_workers=8) as pool:
-        for packets, error in pool.map(one, jobs):
-            result.packets.extend(packets)
-            if error:
-                result.errors.append(error)
+        feed_runs, listing_runs = pool.map(one_feed, feed_jobs), pool.map(one_listing, listing_jobs)
+        feeds, listings = list(feed_runs), list(listing_runs)
+    feed_packets = [p for packets, _ in feeds for p in packets]
+    listing_packets = [p for packets, _ in listings for p in packets]
+    result.packets = merge(feed_packets, listing_packets)
+    result.errors = [e for _, errors in feeds + listings for e in errors]
     return result
