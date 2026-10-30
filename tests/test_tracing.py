@@ -1,4 +1,5 @@
 """Offline tests for LangSmith feedback and run summary. Run from the repo root: python -m tests.test_tracing"""
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from modules import tracing
@@ -60,14 +61,16 @@ def test_run_summary_reads_final_state_and_tolerates_missing_keys():
         "top_articles": [_Art("A"), _Art("B")],
         "dedupe_drops": [{"title": "x", "similarity": 0.9}],
         "rank_scores": [{"title": "A", "score": 8}],
+        "source_errors": [{"source": "hackernews", "stage": "collect", "error": "ConnectionError: boom"}],
         "email_status": "sent",
     }
     s = tracing.run_summary(result)
     assert s == {"stats": {"merged": 10, "picked": 2}, "picked": ["A", "B"],
                  "dedupe_drops": result["dedupe_drops"], "rank_scores": result["rank_scores"],
-                 "email_status": "sent"}
+                 "source_errors": result["source_errors"], "email_status": "sent"}
     empty = tracing.run_summary({})
-    assert empty == {"stats": {}, "picked": [], "dedupe_drops": [], "rank_scores": [], "email_status": ""}
+    assert empty == {"stats": {}, "picked": [], "dedupe_drops": [], "rank_scores": [], "source_errors": [],
+                     "email_status": ""}
 
 
 def test_summary_feedback_items_one_per_stat():
@@ -104,16 +107,16 @@ def test_every_run_stats_key_is_mapped():
     # Literal list of the keys modules/nodes.py writes into run_stats. A new run_stats key added in
     # nodes.py must be added here AND to tracing.FEEDBACK_KEY_NAMES; adding it only here fails this test.
     written = [
-        "merged",                                                         # merge_node
+        "merged", "collect_failures",                                     # merge_node
         "after_dedupe", "dedupe_dropped", "dedupe_matches",               # dedupe_node
         "dedupe_url_matches", "dedupe_near_misses", "dedupe_batch_duplicates", "dedupe_max_similarity",
-        "shortlisted",                                                    # shortlist node
+        "shortlisted", "shortlist_failures",                              # shortlist node
         "read_full", "read_partial", "read_snippet",                      # read node (f"read_{s}")
         "ranked", "picked",                                               # rank node
         "cards", "brief_items",                                           # summarize node
     ]
     assert set(written) == set(tracing.FEEDBACK_KEY_NAMES)
-    src = open("modules/nodes.py").read()
+    src = Path("modules/nodes.py").read_text()
     for key in written:
         assert f'"{key}"' in src or key.startswith("read_"), key
 
@@ -141,6 +144,7 @@ def test_judge_and_post_never_raises_when_summary_fails():
 
 def test_tests_package_disables_tracing():
     import os
+
     from langsmith.utils import get_env_var, tracing_is_enabled
     old = os.environ.get("LANGCHAIN_TRACING")
     os.environ["LANGCHAIN_TRACING"] = "true"
@@ -158,7 +162,9 @@ def test_tests_package_disables_tracing():
 
 def test_context_thread_pool_copies_context_to_workers():
     import contextvars
+
     from langsmith.utils import ContextThreadPoolExecutor
+
     from modules import nodes
     assert nodes.ThreadPoolExecutor is ContextThreadPoolExecutor
     var = contextvars.ContextVar("v", default=None)

@@ -1,13 +1,18 @@
 import asyncio
+import json
 import os
 import traceback
-from config import settings  # also loads .env
-from modules.graph import graph
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+
 import requests
 from langsmith import traceable
 from langsmith.run_helpers import get_current_run_tree
 
-from modules import article_store, tracing
+from config import settings  # also loads .env
+from modules import article_store, nodes, tracing
+from modules.graph import graph
 
 GRAPH_TIMEOUT = 600
 HEALTHCHECK_PING_URL = os.getenv("HEALTHCHECK_PING_URL")
@@ -28,19 +33,12 @@ def _env_list(name: str, default: list[str]) -> list[str]:
     return [x.strip() for x in raw.split(",") if x.strip()] if raw else list(default)
 
 
-@traceable(name="digest_run")
-async def run_profile(profile: str) -> str:
-    state = {
-        "gmail_label": os.getenv(f"{profile}_GMAIL_LABEL_ID"),
-        "subject": os.getenv(f"{profile}_SUBJECT"),
-        "target_audience": os.getenv(f"{profile}_AUDIENCE"),
-        "experience_level": os.getenv(f"{profile}_EXPERIENCE"),
-        "digest_name": os.getenv(f"{profile}_DIGEST_NAME"),
-        "recipient": os.getenv(f"{profile}_RECIPIENT"),
-        "sender": os.getenv("NO_REPLAY_EMAIL"),
-        "top_k": os.getenv("TOP_K"),
-        "medium_tags": _env_list(f"{profile}_MEDIUM_TAGS", settings.DEFAULT_MEDIUM_TAGS),
-        "hn_queries": _env_list(f"{profile}_HN_QUERIES", settings.DEFAULT_HN_QUERIES),
+def initial_state() -> dict:
+    return {
+        **settings.reader_profile(),
+        "digest_name": settings.STORE_PROFILE,
+        "top_k": int(os.getenv("TOP_K") or settings.DEFAULT_TOP_K),
+        "hn_queries": _env_list("HN_QUERIES", settings.DEFAULT_HN_QUERIES),
         "articles": [],
         "candidates": [],
         "extra_articles": [],
@@ -48,79 +46,86 @@ async def run_profile(profile: str) -> str:
         "run_stats": {},
         "dedupe_drops": [],
         "rank_scores": [],
+        "source_errors": [],
         "newsletter_data": None,
-        "summary": "",
         "email_status": "",
-        "tries": 0,
-        "max_tries": 3,
-        "days_back": 1,
-        "max_days_back": 7,
     }
+
+
+def new_thread_id() -> str:
+    """A fresh id per run, so runs never share LangGraph checkpointer state and each can be found again."""
+    return str(uuid.uuid4())
+
+
+def save_run(thread_id: str, started_at: str, result: dict, output_dir: Path | None = None) -> Path:
+    """Write the run's ranked items, stats and source failures to output/run_<thread_id>.json."""
+    out = (output_dir or settings.OUTPUT_DIR) / f"run_{thread_id}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "thread_id": thread_id,
+        "started_at": started_at,
+        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "status": result.get("email_status", ""),
+        "run_stats": result.get("run_stats", {}),
+        "source_errors": result.get("source_errors", []),
+        "picked": [{"title": a.name, "url": a.url, "origin": a.origin} for a in result.get("top_articles", [])],
+        "ranked": result.get("rank_scores", []),
+    }
+    out.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+
+@traceable(name="digest_run")
+async def run(thread_id: str | None = None) -> str:
+    thread_id = thread_id or new_thread_id()
+    started_at = datetime.now(UTC).isoformat(timespec="seconds")
+    print(f"Run {thread_id} started at {started_at}")
+    state = initial_state()
     rt = get_current_run_tree()  # None when LANGSMITH_TRACING is off
     if rt is not None:
         try:
-            rt.add_tags(["digest_run", profile])
+            rt.add_tags(["digest_run"])
+            rt.add_metadata({"thread_id": thread_id})
         except Exception as e:
             print(f"[warn] Failed to tag LangSmith run: {e}")
-    db_profile = os.getenv(f"{profile}_DIGEST_NAME", profile).lower().replace(" ", "_")
-    purged = article_store.purge_old(db_profile)
+    purged = article_store.purge_old(settings.STORE_PROFILE)
     if purged:
-        print(f"[{profile}] Purged {purged} article(s) older than {article_store.RETENTION_DAYS} days.")
+        print(f"Purged {purged} article(s) older than {article_store.RETENTION_DAYS} days.")
 
     try:
         result = await asyncio.wait_for(
-            graph.ainvoke(state, config={"configurable": {"thread_id": "1"}}),
+            graph.ainvoke(state, config={"configurable": {"thread_id": thread_id}}),
             timeout=GRAPH_TIMEOUT,
         )
-    except asyncio.TimeoutError:
-        print(f"\n[{profile}] Graph timed out after {GRAPH_TIMEOUT}s — no email sent.")
+    except TimeoutError:
+        print(f"\nRun {thread_id}: graph timed out after {GRAPH_TIMEOUT}s.")
         return "timeout"
 
-    data = result.get("newsletter_data")
-    if data:
-        print(f"\nEmail status: {result['email_status']}")
-        print(f"Articles fetched: {len(result['articles'])}")
-        print(f"Top articles: {[a.name for a in result['top_articles']]}")
-        print(f"Full cards ({len(data.cards)}):")
-        for c in data.cards:
-            print(f"  - {c.title}")
-        print(f"Brief items ({len(data.brief_items)}):")
-        for b in data.brief_items:
-            print(f"  - {b.summary[:80]}")
-        print(f"Actions:")
-        for a in data.actions:
-            print(f"  → {a}")
-    else:
-        print(f"\nNo articles found. Email status: {result['email_status']}")
+    if nodes.every_source_failed(result):
+        result = {**result, "email_status": "failed"}
+    print(f"\nRun {thread_id} status: {result['email_status']}")
+    print(f"Articles after dedupe: {len(result['articles'])}")
+    print(f"Top articles: {[a.name for a in result['top_articles']]}")
+    for err in result.get("source_errors", []):
+        print(f"Source failed ({err['stage']}): {err['source']}: {err['error']}")
+    print(f"Run {thread_id} saved to {save_run(thread_id, started_at, result)}")
 
-    tracing.judge_and_post(result, profile, rt)
+    tracing.judge_and_post(result, settings.STORE_PROFILE, rt)
     return result["email_status"]
 
 
 async def main():
-    failures = []
-    #for profile in ["AI", "MEDICAL"]:
-    for profile in ["AI"]:
-        try:
-            status = await run_profile(profile)
-        except Exception:
-            print(f"\n[{profile}] Crashed:\n{traceback.format_exc()}")
-            failures.append(f"[{profile}] crashed:\n{traceback.format_exc()}")
-            continue
-        if status in ("failed", "timeout"):
-            failures.append(f"[{profile}] email_status={status}")
-
-    if failures:
-        _ping_healthcheck(ok=False, message="\n\n".join(failures))
+    try:
+        status = await run()
+    except Exception:
+        print(f"\nRun crashed:\n{traceback.format_exc()}")
+        _ping_healthcheck(ok=False, message=f"crashed:\n{traceback.format_exc()}")
+        return
+    if status in ("failed", "timeout"):
+        _ping_healthcheck(ok=False, message=f"status={status}")
     else:
         _ping_healthcheck(ok=True)
 
-    # post today's articles to the Telegram rating bot; a bot failure never fails the digest or the healthcheck
-    try:
-        from evals import telegram_rater
-        telegram_rater.send_today()
-    except Exception as e:
-        print(f"[warn] Telegram rating bot: {e}")
 
-
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

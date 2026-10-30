@@ -1,30 +1,12 @@
-"""Offline tests for the Medium/HN collectors and the parallel fan-out wiring. Run: python -m tests.test_collectors"""
+"""Offline tests for the HN collector and the parallel fan-out wiring. Run: python -m tests.test_collectors"""
 import importlib
 from datetime import date
 from unittest.mock import patch
 
-from modules.collectors import hackernews, medium
+from modules.collectors import hackernews
 from modules.models import Article
 
 TODAY = date(2026, 10, 2)
-FEED = """<?xml version="1.0"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0"><channel>
-<item><title>Fresh post</title><description><![CDATA[<p>Teaser <b>text</b></p>]]></description>
-<link>https://a.medium.com/fresh-abc123?source=rss------llm-5</link><dc:creator>Ann</dc:creator>
-<pubDate>Fri, 02 Oct 2026 09:12:01 GMT</pubDate></item>
-<item><title>Old post</title><description>old</description><link>https://a.medium.com/old-def456?source=rss</link>
-<pubDate>Mon, 01 Jun 2026 09:12:01 GMT</pubDate></item>
-<item><title></title><link>https://a.medium.com/no-title</link><pubDate>Fri, 02 Oct 2026 09:12:01 GMT</pubDate></item>
-</channel></rss>"""
-
-
-def test_medium_parse_feed():
-    arts = medium.parse_feed(FEED, "AI", max_age_days=2, today=TODAY)
-    assert [a.name for a in arts] == ["Fresh post"]
-    a = arts[0]
-    assert a.url == "https://a.medium.com/fresh-abc123"  # tracking query stripped
-    assert a.content == "Teaser text" and a.author == "Ann" and a.origin == "medium"
-
-
 def test_hackernews_parse_hits():
     hits = [
         {"title": "Show HN: Thing", "url": "https://github.com/x/y", "points": 50, "num_comments": 7,
@@ -37,43 +19,6 @@ def test_hackernews_parse_hits():
     assert [a.name for a in arts] == ["Show HN: Thing", "Ask HN: text post"]
     assert arts[0].url == "https://github.com/x/y" and arts[0].origin == "hackernews"
     assert arts[1].url == "https://news.ycombinator.com/item?id=2" and "hello" in arts[1].content
-
-
-AUTHOR_FEED = """<?xml version="1.0"?><rss xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel>
-<item><title>Fresh post</title><link>https://a.medium.com/fresh-abc123?source=rss-1</link>
-<content:encoded><![CDATA[<h3>Intro</h3><p>""" + "word " * 400 + """</p>]]></content:encoded></item>
-<item><title>Member only</title><link>https://a.medium.com/paid-zzz?source=rss-1</link></item>
-</channel></rss>"""
-
-
-def test_medium_feed_url_for_article():
-    assert medium.feed_url_for("https://medium.com/@ann/fresh-abc123") == "https://medium.com/feed/@ann"
-    assert medium.feed_url_for("https://medium.com/illumination/post-1") == "https://medium.com/feed/illumination"
-    assert medium.feed_url_for("https://pub.towardsai.net/post-1") == "https://pub.towardsai.net/feed"
-
-
-def test_medium_parse_full_texts():
-    texts = medium.parse_full_texts(AUTHOR_FEED)
-    assert set(texts) == {"https://a.medium.com/fresh-abc123"}  # an item without content:encoded is left out
-    assert texts["https://a.medium.com/fresh-abc123"].startswith("Intro")
-
-
-def test_medium_with_full_text_upgrades_teasers():
-    arts = medium.parse_feed(FEED, "AI", max_age_days=2, today=TODAY)
-    paid = arts[0].model_copy(update={"name": "Member only", "url": "https://a.medium.com/paid-zzz"})
-    out = medium.with_full_text(arts + [paid], fetch=lambda url: AUTHOR_FEED)
-    assert out[0].read_status == "full" and out[0].content.startswith("Intro")
-    assert len(out[0].content) <= medium.FULL_TEXT_MAX_CHARS
-    assert out[1].read_status == "snippet" and out[1].content == "Teaser text"  # paywalled: teaser and link kept
-
-
-def test_medium_with_full_text_survives_failing_feed():
-    import requests
-    arts = medium.parse_feed(FEED, "AI", max_age_days=2, today=TODAY)
-
-    def boom(url):
-        raise requests.ConnectionError("boom")
-    assert medium.with_full_text(arts, fetch=boom) == arts
 
 
 def test_reader_keeps_full_text_from_feed():
@@ -89,8 +34,6 @@ def test_reader_keeps_full_text_from_feed():
 
 def test_failing_source_is_skipped_not_fatal():
     import requests
-    with patch("modules.collectors.medium._fetch_tag", side_effect=requests.ConnectionError("boom")):
-        assert medium.collect(["llm", "rag"], "AI") == []
     with patch("modules.collectors.hackernews._search", side_effect=requests.ConnectionError("boom")):
         assert hackernews.collect(["LLM"], "AI") == []
 
@@ -99,49 +42,47 @@ def _art(name, url, origin):
     return Article(subject="AI", name=name, published_at=TODAY, content="c", url=url, origin=origin)
 
 
-def _run_graph(inbox: list[Article]):
-    """Run the real graph with every node that touches Gmail/LLM/Chroma stubbed out."""
+def _run_graph(hn: list[Article]):
+    """Run the real graph with every node that touches the network, LLM or Chroma stubbed out."""
     from modules import nodes
-    medium_art, hn_art = _art("M", "https://m.example/1", "medium"), _art("H", "https://h.example/1", "hackernews")
+    stored = []
     stubs = dict(
-        fetch_articles=lambda s: {"articles": inbox},
-        extract_sub_articles=lambda s: {"articles": list(s["articles"])},
-        collect_medium=lambda s: {"extra_articles": [medium_art]},
-        collect_hackernews=lambda s: {"extra_articles": [hn_art]},
+        collect_hackernews=lambda s: {"extra_articles": hn},
         dedupe_articles=lambda s: {},
         shortlist_articles=lambda s: {"candidates": s["articles"]},
         read_articles=lambda s: {},
         rank_articles=lambda s: {"top_articles": s["candidates"]},
-        summraize=lambda s: {"summary": "html", "newsletter_data": None},
-        send_email=lambda s: {"email_status": "success"},
     )
     with patch.multiple(nodes, **stubs), \
+         patch("modules.article_store.store_articles", side_effect=lambda arts, profile: stored.extend(arts)), \
          patch("modules.link_utils.resolve_links", side_effect=lambda urls: {u: ("ok", u) for u in urls}):
         from modules import graph as graph_mod
         graph_mod = importlib.reload(graph_mod)
-        state = {"subject": "AI", "tries": 0, "max_tries": 3, "days_back": 1, "max_days_back": 2,
-                 "medium_tags": ["llm"], "hn_queries": ["LLM"], "articles": [], "extra_articles": [],
+        state = {"subject": "AI", "digest_name": "d", "hn_queries": ["LLM"], "articles": [], "extra_articles": [],
                  "top_articles": [], "candidates": []}
         import asyncio
-        return asyncio.run(graph_mod.graph.ainvoke(state, config={"configurable": {"thread_id": "t"}}))
+        out = asyncio.run(graph_mod.graph.ainvoke(state, config={"configurable": {"thread_id": "t"}}))
+    return out, stored
 
 
-def test_graph_joins_all_collectors():
-    out = _run_graph([_art("I", "https://i.example/1", "inbox")])
+def test_graph_runs_collect_to_rank_and_stores_the_picks():
+    out, stored = _run_graph([_art("H", "https://h.example/1", "hackernews")])
     assert out["email_status"] == "success"
-    assert sorted(a.origin for a in out["articles"]) == ["hackernews", "inbox", "medium"]
+    assert [a.name for a in out["top_articles"]] == ["H"]
+    assert [a.name for a in stored] == ["H"]  # remembered for the next run's dedupe
+    assert out.get("newsletter_data") is None  # summarize did not run
 
 
-def test_empty_inbox_does_not_stop_the_run():
-    out = _run_graph([])  # inbox finds nothing, window exhausts, other collectors still deliver
-    assert out["email_status"] == "success"
-    assert sorted(a.origin for a in out["articles"]) == ["hackernews", "medium"]
+def test_graph_without_articles_exits_early():
+    out, stored = _run_graph([])
+    assert out["email_status"] == "no_content" and stored == []
 
 
 def test_merge_dedupes_by_url():
     from modules import nodes
     pool = {"articles": [_art("A", "https://x.example/1", "inbox")],
-            "extra_articles": [_art("A again", "https://x.example/1", "medium"), _art("B", "https://x.example/2", "medium")]}
+            "extra_articles": [_art("A again", "https://x.example/1", "medium"),
+                               _art("B", "https://x.example/2", "medium")]}
     with patch("modules.link_utils.resolve_links", side_effect=lambda urls: {u: ("ok", u) for u in urls}):
         out = nodes.merge_sources(pool)["articles"]
     assert [a.url for a in out] == ["https://x.example/1", "https://x.example/2"]
@@ -160,7 +101,7 @@ def test_merge_collapses_two_redirects_to_one_article():
         out = nodes.merge_sources(pool)
     assert [a.url for a in out["articles"]] == [real, "https://x.example/2"]
     assert out["articles"][0].name == "A"  # first seen wins
-    assert out["run_stats"] == {"merged": 2}
+    assert out["run_stats"] == {"merged": 2, "collect_failures": 0}
 
 
 def test_merge_keeps_status_dead_with_canonical_url():
@@ -205,13 +146,13 @@ def test_shortlist_screens_each_source_with_its_own_quota():
         calls[origin] = state["top_k"]
         return {"top_articles": state["articles"][: state["top_k"]]}
 
-    arts = [_art(f"m{i}", f"https://m.example/{i}", "medium") for i in range(10)] + \
+    arts = [_art(f"v{i}", f"https://v.example/{i}", "vendor") for i in range(10)] + \
            [_art(f"h{i}", f"https://h.example/{i}", "hackernews") for i in range(10)] + \
-           [_art("i0", "https://i.example/0", "inbox")]
+           [_art("o0", "https://o.example/0", "other")]
     with patch.object(nodes, "fillter_articles", side_effect=fake_filter):
         out = nodes.shortlist_articles({"articles": arts})["candidates"]
-    assert calls == {"medium": 6, "hackernews": 6, "inbox": 10}
-    assert sorted({a.origin for a in out}) == ["hackernews", "inbox", "medium"] and len(out) == 13
+    assert calls == {"vendor": 5, "hackernews": 6, "other": 5}  # a source without a quota gets 5
+    assert sorted({a.origin for a in out}) == ["hackernews", "other", "vendor"] and len(out) == 12
 
 
 def test_snippet_only_articles_are_capped():
@@ -226,15 +167,19 @@ def test_snippet_only_articles_are_capped():
 
 
 def test_ranking_report_rows_and_html():
-    import json, re, tempfile
+    import json
+    import re
+    import tempfile
     from pathlib import Path
+
     from modules import ranking_report
     cands = [_art("top", "https://x.example/1", "inbox"), _art("mid", "https://x.example/2", "medium")]
     pool = cands + [_art(f"other{i}", f"https://o.example/{i}", "inbox") for i in range(30)]
     rows = ranking_report.build_rows(cands, {0: 9, 1: 5}, {0: "great"}, [cands[0]], pool, sample_size=10, seed="s")
     assert [r["group"] for r in rows] == ["shortlisted"] * 2 + ["sample"] * 10
     assert rows[0]["picked"] and rows[0]["score"] == 9 and rows[0]["reason"] == "great" and not rows[1]["picked"]
-    assert not {r["url"] for r in rows[2:]} & {"https://x.example/1", "https://x.example/2"}  # sample never repeats shortlisted
+    # the sample never repeats a shortlisted article
+    assert not {r["url"] for r in rows[2:]} & {"https://x.example/1", "https://x.example/2"}
     again = ranking_report.build_rows(cands, {}, {}, [], pool, sample_size=10, seed="s")
     assert [r["url"] for r in again[2:]] == [r["url"] for r in rows[2:]]  # seeded, so reproducible
     rows[0]["title"] = "evil </script><b>x"
@@ -243,7 +188,8 @@ def test_ranking_report_rows_and_html():
         html = path.read_text(encoding="utf-8")
         assert path.with_suffix(".json").exists()
     assert html.count("</script>") == 2  # data block + code block; the injected one was escaped
-    data = json.loads(re.search(r'<script id="data" type="application/json">(.*?)</script>', html, re.S).group(1).replace("<\\/", "</"))
+    raw = re.search(r'<script id="data" type="application/json">(.*?)</script>', html, re.S).group(1)
+    data = json.loads(raw.replace("<\\/", "</"))
     assert len(data["items"]) == 12 and data["items"][0]["title"].startswith("evil")
 
 
@@ -259,9 +205,11 @@ def _fake_read(arts):
 def test_sample_rows_get_read_text():
     from modules import ranking_report
     cands, pool = _sample_pool()
-    rows = ranking_report.build_rows(cands, {0: 9, 1: 5}, {}, [cands[0]], pool, sample_size=10, seed="s", read_sample=_fake_read)
+    rows = ranking_report.build_rows(cands, {0: 9, 1: 5}, {}, [cands[0]], pool, sample_size=10, seed="s",
+                                     read_sample=_fake_read)
     sample = [r for r in rows if r["group"] == "sample"]
-    assert len(sample) == 10 and all(r["read_status"] == "full" and r["content"].startswith("full article") for r in sample)
+    assert len(sample) == 10
+    assert all(r["read_status"] == "full" and r["content"].startswith("full article") for r in sample)
     short = [r for r in rows if r["group"] == "shortlisted"]
     assert all(r["read_status"] == "snippet" and r["content"] == "c" for r in short)
 

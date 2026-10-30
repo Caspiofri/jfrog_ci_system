@@ -1,31 +1,18 @@
-import os
-import re
-import base64
 import json
-from concurrent.futures import as_completed
-
-from langsmith.utils import ContextThreadPoolExecutor as ThreadPoolExecutor  # copies trace context into workers
+import re
 from datetime import date
-from email.utils import parsedate_to_datetime
-from googleapiclient.errors import HttpError
-import google.auth
-from google import genai
-from langsmith import run_helpers, traceable
-from tenacity import retry, stop_after_attempt, wait_exponential
 
-from modules.state import DigestState
+from langsmith import run_helpers, traceable
+from langsmith.utils import ContextThreadPoolExecutor as ThreadPoolExecutor  # copies trace context into workers
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
+
 from config import settings
-from modules.collectors import hackernews, medium
-from modules.models import Article, NewsletterData
+from modules import article_store, link_utils, llm_clients, ranking_report, reader
 from modules.article_text import article_text
 from modules.card_resolver import resolve_cards
-from modules import gmail_client, article_store, link_utils, ranking_report, reader
-
-
-_credentials, _project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-client = genai.Client(vertexai=True, project=_project, location="us-central1", credentials=_credentials)
-gmail = gmail_client.GmailClient()
-GEMINI_MODEL = "gemini-2.5-flash"  # recorded in evals.rank_eval results
+from modules.collectors import hackernews
+from modules.models import Article, NewsletterData
+from modules.state import DigestState
 
 
 def _gemini_usage(response) -> dict | None:
@@ -41,59 +28,22 @@ def _gemini_usage(response) -> dict | None:
 
 
 @traceable(run_type="llm", name="gemini")
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+# a missing key is not transient: no retry; reraise=True surfaces the original error, not tenacity's RetryError
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10),
+       retry=retry_if_not_exception_type(llm_clients.MissingCredentials), reraise=True)
 def _call_gemini(contents: str, config: dict | None = None) -> str:
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
+    response = llm_clients.gemini_client().models.generate_content(
+        model=settings.GEMINI_MODEL,
         contents=contents,
         config=config or {},
     )
     rt = run_helpers.get_current_run_tree()  # None when LANGSMITH_TRACING is off
     usage = _gemini_usage(response)
     if rt is not None:
-        rt.add_metadata({"ls_provider": "google_genai", "ls_model_name": GEMINI_MODEL})
+        rt.add_metadata({"ls_provider": "google_genai", "ls_model_name": settings.GEMINI_MODEL})
         if usage:
             rt.set(usage_metadata=usage)
     return response.text
-
-def fetch_articles(state: DigestState) -> dict:
-    label = state["gmail_label"]
-    messages = gmail.gmail_read_messages(label, days_back=state.get("days_back", 1))
-    articles = []
-    for message in messages:
-        payload = message['payload']
-        subject = next((h['value'] for h in payload['headers'] if h['name'] == 'Subject'), '')
-        author = next((h['value'] for h in payload['headers'] if h['name'] == 'From'), '')
-        date_str = next((h['value'] for h in payload['headers'] if h['name'] == 'Date'), '')
-        url = next((h['value'] for h in payload['headers'] if h['name'] == 'Archived-At'), '')
-        published_at = parsedate_to_datetime(date_str).date()
-        if 'parts' not in payload:
-            content = payload.get('body', {}).get('data', '')
-            if content:
-                decoded_content = base64.urlsafe_b64decode(content + '==').decode('utf-8')
-                articles.append(Article(
-                    name=subject,
-                    subject=state["subject"],
-                    author=author,
-                    published_at=published_at,
-                    content=decoded_content,
-                    url=url
-                ))
-        else:
-            for part in payload['parts']:
-                if part['mimeType'] == 'text/html':
-                    content = part['body']['data']
-                    decoded_content = base64.urlsafe_b64decode(content + '==').decode('utf-8')
-                    articles.append(Article(
-                        name=subject,
-                        subject=state["subject"],
-                        author=author,
-                        published_at=published_at,
-                        content=decoded_content,
-                        url=url
-                    ))
-                    break  # one HTML body per email is enough
-    return {"articles": articles}
 
 
 def _pick_by_ids(items: list, pool: list[Article], limit: int) -> list[Article]:
@@ -141,136 +91,6 @@ def fillter_articles(state: DigestState) -> dict:
     return {"top_articles": top_articles}
 
 
-_NEWSLETTER_CSS = """\
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #f0f4f8; font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; }
-  .wrapper { max-width: 680px; margin: 0 auto; background: #ffffff; }
-  .header { background: linear-gradient(135deg, #2c3e50 0%, #3d5a80 100%); padding: 32px 24px; text-align: center; }
-  .header h1 { color: #ffffff; font-size: 26px; font-weight: 700; letter-spacing: 0.5px; }
-  .header .date { color: #a8c6e0; font-size: 14px; margin-top: 6px; }
-  .section-label { background: #2c3e50; color: #ffffff; font-size: 13px; font-weight: 600;
-    padding: 6px 16px; margin: 24px 24px 0 24px; border-radius: 4px 4px 0 0;
-    display: inline-block; }
-  .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 0 8px 8px 8px;
-    margin: 0 24px 20px 24px; padding: 20px 22px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-  .card-title { font-size: 18px; font-weight: 700; color: #1a202c; margin-bottom: 8px; }
-  .card-source { font-size: 12px; color: #718096; margin-bottom: 14px; }
-  .card-label { font-size: 12px; font-weight: 700; color: #2c3e50; text-transform: uppercase;
-    letter-spacing: 0.5px; margin-bottom: 4px; }
-  .card-body { font-size: 14px; color: #4a5568; line-height: 1.65; margin-bottom: 14px; }
-  .card-so-what { background: #eef2ff; border-right: 4px solid #3d5a80; padding: 10px 14px;
-    border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-  .card-so-what .card-label { color: #3d5a80; }
-  .read-more { display: inline-block; background: #2c3e50; color: #ffffff; font-size: 13px;
-    font-weight: 600; padding: 8px 20px; border-radius: 6px; text-decoration: none; }
-  .read-more.disabled { background: #cbd5e0; color: #718096; cursor: not-allowed; }
-  .link-disabled { color: #a0aec0; font-size: 12px; }
-  .brief-section { margin: 0 24px 20px 24px; padding: 16px 20px;
-    border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
-  .brief-section h2 { font-size: 15px; font-weight: 700; color: #2c3e50; margin-bottom: 12px; }
-  .brief-item { font-size: 13px; color: #4a5568; line-height: 1.6; margin-bottom: 8px;
-    padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0; }
-  .brief-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-  .brief-item a { color: #3d5a80; text-decoration: none; font-weight: 600; }
-  .actions-section { background: #1a202c; margin: 0 24px 28px 24px; padding: 20px 22px;
-    border-radius: 8px; }
-  .actions-section h2 { font-size: 16px; font-weight: 700; color: #fbbf24; margin-bottom: 12px; }
-  .actions-section li { font-size: 14px; color: #e2e8f0; line-height: 1.6; margin-bottom: 6px;
-    padding-right: 16px; list-style: none; }
-  .actions-section li::before { content: "→ "; color: #fbbf24; font-weight: 700; }
-  .footer { text-align: center; padding: 16px; font-size: 12px; color: #a0aec0; }
-  @media (max-width: 600px) {
-    .card, .brief-section, .actions-section, .section-label { margin-right: 12px; margin-left: 12px; }
-    .header h1 { font-size: 20px; }
-  }
-</style>"""
-
-
-def _read_more(url: str, bad_urls) -> str:
-    if url in bad_urls:
-        return '<span class="read-more disabled">הקישור אינו זמין</span>'
-    return f'<a href="{url}" class="read-more">קרא עוד &larr;</a>'
-
-
-def _brief_link(url: str, bad_urls) -> str:
-    if url in bad_urls:
-        return '<span class="link-disabled">(הקישור אינו זמין)</span>'
-    return f'<a href="{url}">קרא עוד</a>'
-
-
-def _render_html(data: NewsletterData, title: str, today: str, bad_urls: frozenset = frozenset()) -> str:
-    cards_html = ""
-    if data.cards:
-        cards_html += '  <div class="section-label" dir="rtl" style="text-align:right">🔥 עיקרי הגיליון</div>\n'
-        for card in data.cards:
-            cards_html += (
-                f'  <div class="card" dir="rtl" style="text-align:right">\n'
-                f'    <div class="card-title" dir="rtl" style="text-align:right">{card.title}</div>\n'
-                f'    <div class="card-source" dir="rtl" style="text-align:right">מקור: {card.source}</div>\n'
-                f'    <div class="card-label" dir="rtl" style="text-align:right">השורה התחתונה</div>\n'
-                f'    <div class="card-body" dir="rtl" style="text-align:right">{card.brief}</div>\n'
-                f'    <div class="card-so-what" dir="rtl" style="text-align:right">\n'
-                f'      <div class="card-label" dir="rtl" style="text-align:right">איך זה פוגש אותך</div>\n'
-                f'      <div class="card-body" dir="rtl" style="text-align:right">{card.personalization}</div>\n'
-                f'    </div>\n'
-                f'    {_read_more(card.url, bad_urls)}\n'
-                f'  </div>\n'
-            )
-
-    brief_html = ""
-    if data.brief_items:
-        items = "\n".join(
-            f'    <div class="brief-item" dir="rtl" style="text-align:right">'
-            f'{item.summary} — {_brief_link(item.url, bad_urls)}</div>'
-            for item in data.brief_items
-        )
-        brief_html = (
-            f'  <div class="brief-section" dir="rtl" style="text-align:right">\n'
-            f'    <h2 dir="rtl" style="text-align:right">⚡ עוד כותרות בקצר</h2>\n'
-            f'{items}\n'
-            f'  </div>\n'
-        )
-
-    actions_html = ""
-    if data.actions:
-        items = "\n".join(
-            f'      <li dir="rtl" style="text-align:right">{action}</li>'
-            for action in data.actions
-        )
-        actions_html = (
-            f'  <div class="actions-section" dir="rtl" style="text-align:right">\n'
-            f'    <h2 dir="rtl" style="text-align:right">⚡ המלצות לביצוע</h2>\n'
-            f'    <ul dir="rtl" style="text-align:right">\n'
-            f'{items}\n'
-            f'    </ul>\n'
-            f'  </div>\n'
-        )
-
-    return (
-        f'<!DOCTYPE html>\n'
-        f'<html lang="he" dir="rtl">\n'
-        f'<head>\n'
-        f'  <meta charset="UTF-8">\n'
-        f'  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-        f'  <title>{title}</title>\n'
-        f'  {_NEWSLETTER_CSS}\n'
-        f'</head>\n'
-        f'<body dir="rtl" style="text-align:right">\n'
-        f'<div class="wrapper" dir="rtl" style="text-align:right">\n\n'
-        f'  <div class="header">\n'
-        f'    <h1 dir="rtl">{title}</h1>\n'
-        f'    <div class="date">{today}</div>\n'
-        f'  </div>\n\n'
-        f'{cards_html}\n'
-        f'{brief_html}\n'
-        f'{actions_html}\n'
-        f'  <div class="footer">Newsletter generated automatically</div>\n'
-        f'</div>\n'
-        f'</body>\n'
-        f'</html>'
-    )
-
 
 def _sanitize_ids(parsed: dict) -> dict:
     """Null any card/brief id that is not a real int (str, bool, float, missing) so resolve_cards drops it."""
@@ -287,11 +107,11 @@ def summraize(state: DigestState):
     top_k = state["top_k"]
     articles = state["top_articles"]
     experience_level = state["experience_level"]
-    newsletter_name = state["digest_name"]
 
     # The model refers to articles by list index; resolve_cards maps each id back to the real URL.
     articles_for_prompt = [
-        {"id": i, "title": a.name, "author": a.author, "signal": a.signal, "origin": a.origin, "read_status": a.read_status, "text": article_text(a)}
+        {"id": i, "title": a.name, "author": a.author, "signal": a.signal, "origin": a.origin,
+         "read_status": a.read_status, "text": article_text(a)}
         for i, a in enumerate(articles)
     ]
 
@@ -338,7 +158,7 @@ OUTPUT FORMAT:
 }}
 
 INPUT ARTICLES (use each article's "id" exactly as given):
-{json.dumps(articles_for_prompt, ensure_ascii=False)}"""
+{json.dumps(articles_for_prompt, ensure_ascii=False)}"""  # noqa: E501 (prompt text)
 
     text = _call_gemini(prompt, config={
         "max_output_tokens": 8000,
@@ -349,34 +169,8 @@ INPUT ARTICLES (use each article's "id" exactly as given):
     if not match:
         raise ValueError(f"No JSON found in newsletter response: {text!r}")
     data = resolve_cards(NewsletterData(**_sanitize_ids(json.loads(match.group()))), articles)
-
-    today = date.today().strftime('%d.%m.%Y')
-    title = f"{newsletter_name} - {today}"
-    # A URL is "bad" (rendered without a link) if its source link was dead/unverifiable or missing.
-    bad_urls = frozenset(a.url or "" for a in articles if a.link_status != "ok" or not a.url)
-    html = _render_html(data, title, today, bad_urls)
-
     stats = {**state.get("run_stats", {}), "cards": len(data.cards), "brief_items": len(data.brief_items)}
-    return {"summary": html, "newsletter_data": data, "run_stats": stats}
-
-
-def send_email(state: DigestState) -> dict:
-    html_content = state["summary"]
-    subject = state['subject']
-    sender = state['sender']
-    to = state['recipient']
-    try:
-        gmail.gmail_send_message(to, sender, subject, html_content)
-    except HttpError:
-        return {"email_status": "failed"}
-
-    profile = state["digest_name"].lower().replace(" ", "_")
-    try:
-        article_store.store_articles(state["top_articles"], profile)
-    except Exception as e:
-        print(f"[warn] Failed to store articles in ChromaDB: {e}")
-
-    return {"email_status": "success"}
+    return {"newsletter_data": data, "run_stats": stats}
 
 
 def dedupe_articles(state: DigestState) -> dict:
@@ -397,21 +191,39 @@ def dedupe_articles(state: DigestState) -> dict:
     return {"articles": unseen, "dedupe_drops": matches, "run_stats": stats}
 
 
+def source_error(source: str, stage: str, error: Exception) -> dict:
+    """One failed source, as recorded in state["source_errors"] and the run summary."""
+    print(f"[warn] {stage}: source '{source}' failed and is skipped: {type(error).__name__}: {error}")
+    return {"source": source, "stage": stage, "error": f"{type(error).__name__}: {error}"}
+
+
 def shortlist_articles(state: DigestState) -> dict:
-    """Title screen run separately per source, so one noisy source cannot crowd out the others."""
+    """Title screen run separately per source, so one noisy source cannot crowd out the others.
+
+    A source whose screen fails (the LLM call, or its reply) is logged and recorded, and its articles are left out
+    of this run; the other sources go on. Missing credentials are not a source failure: they fail the run.
+    """
     articles = state["articles"]
     origins = sorted({a.origin for a in articles})
 
-    def screen(origin: str) -> list[Article]:
+    def screen(origin: str) -> tuple[list[Article], dict | None]:
         group = [a for a in articles if a.origin == origin]
         quota = settings.SHORTLIST_QUOTA.get(origin, 5)
-        return fillter_articles({**state, "articles": group, "top_k": quota})["top_articles"]
+        try:
+            return fillter_articles({**state, "articles": group, "top_k": quota})["top_articles"], None
+        except llm_clients.MissingCredentials:
+            raise
+        except Exception as e:
+            return [], source_error(origin, "shortlist", e)
 
     with ThreadPoolExecutor(max_workers=max(len(origins), 1)) as pool:
-        candidates = [a for group in pool.map(screen, origins) for a in group]
+        results = list(pool.map(screen, origins))
+    candidates = [a for group, _ in results for a in group]
+    errors = [err for _, err in results if err is not None]
     print(f"[shortlist] {len(candidates)} of {len(articles)} candidates: "
           f"{ {o: sum(c.origin == o for c in candidates) for o in origins} }")
-    return {"candidates": candidates, "run_stats": {**state.get("run_stats", {}), "shortlisted": len(candidates)}}
+    stats = {**state.get("run_stats", {}), "shortlisted": len(candidates), "shortlist_failures": len(errors)}
+    return {"candidates": candidates, "source_errors": errors, "run_stats": stats}
 
 
 def read_articles(state: DigestState) -> dict:
@@ -423,8 +235,6 @@ def read_articles(state: DigestState) -> dict:
 
 
 _SOURCE_DESCRIPTIONS = {
-    "inbox": "newsletter email curated by an editor",
-    "medium": "Medium tag feed — unvetted, anyone can publish; often beginner tutorials or self-promotion",
     "hackernews": "Hacker News front-page style submission voted by engineers",
 }
 
@@ -474,7 +284,7 @@ Be strict: on a typical day only about {top_k} candidates deserve 7 or above, an
 Return ONLY a JSON array, no commentary: [{{"id": 0, "score": 7, "reason": "short reason"}}]
 
 CANDIDATES:
-{json.dumps(items, ensure_ascii=False)}"""
+{json.dumps(items, ensure_ascii=False)}"""  # noqa: E501 (prompt text)
 
 
 def _parse_rank_reply(text: str) -> list:
@@ -538,97 +348,52 @@ def rank_articles(state: DigestState) -> dict:
     return {"top_articles": top, "rank_scores": rank_scores, "run_stats": stats}
 
 
-def _map_selection_to_articles(items: list, candidates: list[dict], email_article: Article) -> list[Article]:
-    """Turn the LLM's picks (candidate ids) into Articles. URLs come only from the email's real links."""
-    by_id = {c["id"]: c for c in candidates}
-    results, seen_urls = [], set()
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        cand = by_id.get(item.get("id"))
-        title = str(item.get("title", "")).strip()
-        if cand is None or not title or cand["url"] in seen_urls:
-            continue
-        seen_urls.add(cand["url"])
-        results.append(Article(
-            name=title,
-            subject=email_article.subject,
-            author=email_article.author,
-            published_at=email_article.published_at,
-            content=str(item.get("snippet", "")).strip(),
-            url=cand["url"],
-        ))
-    return results
-
-
-def _extract_from_email(email_article: Article) -> list[Article]:
-    candidates = link_utils.extract_candidate_links(email_article.content)
-    if not candidates:
-        return []
-    body_text = link_utils.email_plain_text(email_article.content)
-    candidates_json = json.dumps(
-        [{"id": c["id"], "text": c["text"], "context": c["context"]} for c in candidates],
-        ensure_ascii=False,
-    )
-    prompt = f"""You are parsing a newsletter email. Identify every individual article or story it links to.
-
-You are given the email's plain text and a numbered list of the links found in it. Choose ONLY from this list.
-For each article return:
-- "id": the id of the link that leads to that article (an integer from the list)
-- "title": the article headline (string)
-- "snippet": 2-3 sentence plain-text summary, based only on the email text and link context
-
-Skip links that are ads, sponsors, unsubscribe, social, "read in app" duplicates of the same article, or navigation.
-Never invent an article that is not in the email. Return ONLY a valid JSON array, no markdown:
-[{{"id": 0, "title": "...", "snippet": "..."}}]
-If there are no real articles, return [].
-
-EMAIL TEXT:
-{body_text}
-
-LINKS:
-{candidates_json}"""
-
-    text = _call_gemini(prompt)
-    if not text:
-        return []
-    match = re.search(r'\[.*\]', text, re.DOTALL)
-    if not match:
-        return []
+def store_picks(state: DigestState) -> dict:
+    """Remember the run's picks in the article store, so the next runs' dedupe drops the same stories."""
+    profile = state["digest_name"].lower().replace(" ", "_")
     try:
-        items = json.loads(match.group())
-    except json.JSONDecodeError:
-        return []
-    return _map_selection_to_articles(items, candidates, email_article)
+        article_store.store_articles(state["top_articles"], profile)
+    except Exception as e:
+        print(f"[warn] Failed to store articles in ChromaDB: {e}")
+    return {"email_status": "success"}
 
 
-def extract_sub_articles(state: DigestState) -> dict:
-    """Explode each newsletter email into individual Article objects with real URLs."""
-    emails = state["articles"]
-    if not emails:
-        return {"articles": []}
-    all_sub_articles: list[Article] = []
-
-    with ThreadPoolExecutor(max_workers=len(emails)) as pool:
-        futures = {pool.submit(_extract_from_email, e): e for e in emails}
-        for future in as_completed(futures):
-            all_sub_articles.extend(future.result())
-
-    return {"articles": all_sub_articles}
-
-
-def collect_medium(state: DigestState) -> dict:
-    return {"extra_articles": medium.collect(
-        state["medium_tags"], state["subject"], settings.COLLECTOR_MAX_AGE_DAYS)}
+def isolated_collector(source: str, collect):
+    """A collector node that never fails the run: an exception in `collect(state)` is logged and recorded in
+    state["source_errors"], and the source contributes no articles; the other collectors go on."""
+    def node(state: DigestState) -> dict:
+        try:
+            return {"extra_articles": list(collect(state))}
+        except llm_clients.MissingCredentials:
+            raise
+        except Exception as e:
+            return {"extra_articles": [], "source_errors": [source_error(source, "collect", e)]}
+    node.__name__ = f"collect_{source}"
+    return node
 
 
-def collect_hackernews(state: DigestState) -> dict:
-    return {"extra_articles": hackernews.collect(
-        state["hn_queries"], state["subject"], settings.COLLECTOR_MAX_AGE_DAYS, settings.HN_MIN_POINTS)}
+COLLECTOR_SOURCES = ("hackernews",)  # one per collector node wired into modules.graph
+
+
+def every_source_failed(result: dict) -> bool:
+    """True when the run had nothing to work with: every collector failed, or every source that reached the
+    shortlist failed there. Such a run is reported as failed, not as an empty day."""
+    errors = result.get("source_errors", [])
+    collect_failed = {e["source"] for e in errors if e["stage"] == "collect"}
+    if set(COLLECTOR_SOURCES) <= collect_failed:
+        return True
+    shortlist_failed = {e["source"] for e in errors if e["stage"] == "shortlist"}
+    screened = {a.origin for a in result.get("articles", [])}
+    return bool(screened) and screened <= shortlist_failed
+
+
+collect_hackernews = isolated_collector("hackernews", lambda state: hackernews.collect(
+    state["hn_queries"], state["subject"], settings.COLLECTOR_MAX_AGE_DAYS, settings.HN_MIN_POINTS))
 
 
 def merge_sources(state: DigestState) -> dict:
-    """Join point for all collectors: de-duplicate by URL, resolve every link to its canonical URL (and de-duplicate again), swap bad links for direct ones."""
+    """Join point for all collectors: de-duplicate by URL, resolve every link to its canonical URL (and
+    de-duplicate again), swap bad links for direct ones."""
     pool = list(state["articles"]) + list(state["extra_articles"])
     by_url = {}
     for a in pool:
@@ -657,13 +422,10 @@ def merge_sources(state: DigestState) -> dict:
     if bad_before:
         print(f"[merge] {bad_before} article(s) had a dead/unverifiable link; "
               f"{bad_before - bad_after} replaced by a direct link, {bad_after} remain.")
-    return {"articles": upgraded, "run_stats": {"merged": len(upgraded)}}
-
-
-def expand_search(state: DigestState) -> dict:
-    return {
-        "days_back": state.get("days_back", 1) + 1,
-    }
+    failed = sorted({e["source"] for e in state.get("source_errors", []) if e["stage"] == "collect"})
+    if failed:
+        print(f"[merge] collectors that failed this run: {failed}")
+    return {"articles": upgraded, "run_stats": {"merged": len(upgraded), "collect_failures": len(failed)}}
 
 
 def no_content(state: DigestState) -> dict:

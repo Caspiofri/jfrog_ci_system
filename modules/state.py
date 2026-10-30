@@ -1,18 +1,15 @@
 import operator
-from typing import Annotated, TypedDict, Optional
+from typing import Annotated, TypedDict
+
 from modules.models import Article, NewsletterData
 
 
 class DigestState(TypedDict):
-    gmail_label: str
-    subject: list[str]
+    subject: str
     target_audience: str
     experience_level: str
-    digest_name: str
-    recipient: str
-    sender: str
+    digest_name: str  # names the article-store collection that dedupe checks against
     top_k: int
-    medium_tags: list[str]
     hn_queries: list[str]
     articles: list[Article]
     candidates: list[Article]  # per-source shortlist, read and ranked into top_articles
@@ -23,10 +20,7 @@ class DigestState(TypedDict):
     run_stats: dict[str, float]
     dedupe_drops: list[dict]
     rank_scores: list[dict]
-    newsletter_data: Optional[NewsletterData]
-    summary: str
-    email_status: str
-    tries: int          # transient failure retries (API errors)
-    max_tries: int      # hard cap on failure retries
-    days_back: int      # current search window in days
-    max_days_back: int  # max time window before giving up
+    # one {"source", "stage", "error"} per source that failed in a collector or the shortlist (the run went on)
+    source_errors: Annotated[list[dict], operator.add]
+    newsletter_data: NewsletterData | None  # written by summraize, which is not wired into the graph
+    email_status: str  # "success" once the picks are stored, "no_content" on an early exit

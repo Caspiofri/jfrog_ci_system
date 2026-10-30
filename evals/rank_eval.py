@@ -4,7 +4,8 @@ per label over every labeled article (evals.rank_metrics). Every article's score
 
 Usage (from the repo root):
   python -m evals.rank_eval [--split train|test|all] [--k 5] [--repeats 3] [--text-chars 6000]
-                            [--golden evals/ranking_golden.json] [--profile AI] [--run]
+                            [--golden evals/ranking_golden.json] [--run]
+The ranker prompt reads SUBJECT, AUDIENCE and EXPERIENCE from the env, as the funnel does (config.settings).
 
 Without --run it only prints the plan (reports, articles, model calls, rough input size) and makes no model call.
 With --run it calls Gemini once per report per repeat and writes output/rank_eval_<timestamp>.json.
@@ -12,7 +13,6 @@ The test split is meant to be scored once per tuning round, never to guide edits
 """
 import argparse
 import json
-import os
 import statistics
 from datetime import date, datetime
 from pathlib import Path
@@ -148,8 +148,10 @@ def format_result(result: dict) -> str:
         lines.append(f"pairwise (better label scored higher, 0.5 = random): {_fmt(m['pairwise'])} ± "
                      f"{_fmt(s['pairwise'])} over {p['pairs']} pairs; without teaser-only articles "
                      f"{_fmt(m['pairwise_read'])} ± {_fmt(s['pairwise_read'])} over {p['pairs_read']} pairs")
-        means = lambda prefix: " · ".join(f"{lab} {'n/a' if m[prefix + lab] is None else f'{m[prefix + lab]:.1f}'}"
-                                          for lab in ("must", "worth", "skip"))
+        def means(prefix: str) -> str:
+            return " · ".join(f"{lab} {'n/a' if m[prefix + lab] is None else f'{m[prefix + lab]:.1f}'}"
+                              for lab in ("must", "worth", "skip"))
+
         lines.append(f"mean score: {means('mean_')}  (teaser-only, capped at the snippet cap: {means('teaser_mean_')})")
     return "\n".join(lines)
 
@@ -172,7 +174,6 @@ def main(argv: list[str] | None = None, output_dir: Path = OUTPUT_DIR, score_fn=
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--text-chars", type=int, default=settings.RANK_TEXT_CHARS)
     ap.add_argument("--golden", type=Path, default=GOLDEN_RANKING_PATH)
-    ap.add_argument("--profile", default="AI", help="reads <PROFILE>_SUBJECT, _AUDIENCE, _EXPERIENCE from the env")
     ap.add_argument("--run", action="store_true", help="call Gemini (costs money); without it only the plan prints")
     args = ap.parse_args(argv)
 
@@ -185,18 +186,11 @@ def main(argv: list[str] | None = None, output_dir: Path = OUTPUT_DIR, score_fn=
         print(_plan(rows, args.k, args.repeats, args.text_chars))
         return None
 
-    p = args.profile.upper()
-    subject, audience, level = (os.getenv(f"{p}_{n}", "") for n in ("SUBJECT", "AUDIENCE", "EXPERIENCE"))
-    if score_fn is None:
-        if not subject:
-            raise SystemExit(f"{p}_SUBJECT is not set; pass --profile for a configured profile")
-        from modules.nodes import GEMINI_MODEL as model
-    else:
-        model = getattr(score_fn, "model", "injected")
-    result = replay(rows, args.k, args.repeats, args.text_chars, score_fn=score_fn, subject=subject,
-                    target_audience=audience, experience_level=level)
+    reader = settings.reader_profile()  # the same SUBJECT / AUDIENCE / EXPERIENCE the funnel's ranker uses
+    model = settings.GEMINI_MODEL if score_fn is None else getattr(score_fn, "model", "injected")
+    result = replay(rows, args.k, args.repeats, args.text_chars, score_fn=score_fn, **reader)
     result["settings"].update(split=args.split, model=model, golden_rows=len(golden), golden=str(args.golden),
-                              profile=p, snippet_cap=settings.SNIPPET_SCORE_CAP, date=str(date.today()))
+                              subject=reader["subject"], snippet_cap=settings.SNIPPET_SCORE_CAP, date=str(date.today()))
     print(format_result(result))
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / f"rank_eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"

@@ -110,7 +110,8 @@ def test_filter_seen_still_returns_survivors():
 
 def test_dedupe_node_records_drops_and_stats():
     arts = [_art("Dup"), _art("Near"), _art("New")]
-    drops = [{"title": "Dup", "similarity": 0.9, "dropped": True}, {"title": "Near", "similarity": 0.78, "dropped": False}]
+    drops = [{"title": "Dup", "similarity": 0.9, "dropped": True},
+             {"title": "Near", "similarity": 0.78, "dropped": False}]
     state = {"digest_name": "My Digest", "articles": arts, "run_stats": {"merged": 3}}
     with patch.object(article_store, "filter_seen_detailed", return_value=(arts[1:], drops)):
         out = nodes.dedupe_articles(state)
@@ -232,7 +233,7 @@ def test_run_stats_accumulate_across_nodes():
     state.update(_rank(state["candidates"], resp, state["run_stats"]))
     assert state["run_stats"] == {"after_dedupe": 3, "dedupe_dropped": 0, "dedupe_matches": 0, "dedupe_url_matches": 0,
                                   "dedupe_near_misses": 0, "dedupe_batch_duplicates": 0,
-                                  "dedupe_max_similarity": 0.0, "shortlisted": 3,
+                                  "dedupe_max_similarity": 0.0, "shortlisted": 3, "shortlist_failures": 0,
                                   "read_full": 3, "read_partial": 0, "read_snippet": 0,
                                   "ranked": 3, "picked": 1}, state["run_stats"]
 
@@ -242,7 +243,7 @@ def test_merge_starts_fresh_run_stats():
     with patch.object(nodes.link_utils, "resolve_links", side_effect=lambda urls: {u: ("ok", u) for u in urls}), \
             patch.object(nodes.article_store, "upgrade_bad_links", side_effect=lambda a: a):
         out = nodes.merge_sources({"articles": arts[:1], "extra_articles": arts[1:], "run_stats": {"stale": 9}})
-    assert out["run_stats"] == {"merged": 2}
+    assert out["run_stats"] == {"merged": 2, "collect_failures": 0}
 
 
 def test_summarize_records_card_counts():

@@ -1,11 +1,11 @@
 """Offline tests for the Claude judge transport. Run from the repo root: python -m tests.test_judge_llm"""
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from modules import judge_llm as jl
 from modules import trace_judge
 from modules.models import Article, ArticleCard, NewsletterData
-from datetime import date
 
 
 class _FakeClient:
@@ -59,17 +59,17 @@ def test_hebrew_prompt_not_escaped():
 
 def test_real_client_builds_offline_with_messages():
     import os
+
     import anthropic
     old_key = os.environ.get("ANTHROPIC_API_KEY")
-    old_cache = jl._client
     os.environ["ANTHROPIC_API_KEY"] = "dummy-key-for-offline-test"
-    jl._client = None
+    jl.llm_clients.anthropic_client.cache_clear()
     try:
         client = jl._get_client()
         assert isinstance(client, anthropic.Anthropic)
         assert hasattr(client, "messages")
     finally:
-        jl._client = old_cache
+        jl.llm_clients.anthropic_client.cache_clear()  # the next test builds its own, with whatever key is set
         if old_key is None:
             os.environ.pop("ANTHROPIC_API_KEY", None)
         else:

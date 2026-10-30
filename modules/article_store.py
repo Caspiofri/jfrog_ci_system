@@ -1,17 +1,29 @@
 import hashlib
 from datetime import date, timedelta
+from functools import cache
 
 import numpy as np
 from bs4 import BeautifulSoup
-from chromadb import PersistentClient
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from langsmith import traceable
 
 from config.settings import CHROMA_PATH, DEDUPE_NEAR_MISS_MIN
 from modules.models import Article
 
-_embed_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-_client = PersistentClient(path=str(CHROMA_PATH))
+
+@cache
+def _embed_fn():
+    """chromadb's bundled ONNX all-MiniLM-L6-v2 (the same model as before, without torch); built on first use, and
+    the model downloads once on the first embedding."""
+    from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+    return DefaultEmbeddingFunction()
+
+
+@cache
+def _client():
+    """The persistent Chroma store, opened on first use so importing this module touches no disk."""
+    from chromadb import PersistentClient
+    from chromadb.config import Settings
+    return PersistentClient(path=str(CHROMA_PATH), settings=Settings(anonymized_telemetry=False))
 
 SIMILARITY_THRESHOLD = 0.82  # cosine similarity; distance = 1 - similarity
 DEDUPE_DAYS = 7  # embedding window; an already-sent URL is dropped for all of RETENTION_DAYS
@@ -19,9 +31,9 @@ RETENTION_DAYS = 14
 
 
 def _collection(profile: str):
-    return _client.get_or_create_collection(
+    return _client().get_or_create_collection(
         name=profile,
-        embedding_function=_embed_fn,
+        embedding_function=_embed_fn(),
         metadata={"hnsw:space": "cosine"},
     )
 
@@ -62,7 +74,7 @@ def upgrade_bad_links(articles: list[Article]) -> list[Article]:
     good = [i for i, a in enumerate(articles) if a.link_status == "ok"]
     if not bad or not good:
         return articles
-    emb = np.array(_embed_fn([_article_text(a) for a in articles]), dtype=float)
+    emb = np.array(_embed_fn()([_article_text(a) for a in articles]), dtype=float)
     emb /= np.maximum(np.linalg.norm(emb, axis=1, keepdims=True), 1e-9)
     sims = emb[bad] @ emb[good].T
     out = list(articles)
@@ -77,7 +89,7 @@ def _dedup_batch(articles: list[Article]) -> list[Article]:
     """Drop near-duplicate articles within the current batch (same story, different headlines)."""
     if len(articles) <= 1:
         return articles
-    embeddings = _embed_fn([_article_text(a) for a in articles])
+    embeddings = _embed_fn()([_article_text(a) for a in articles])
     keep = [True] * len(articles)
     for i in range(len(articles)):
         if not keep[i]:
@@ -89,11 +101,11 @@ def _dedup_batch(articles: list[Article]) -> list[Article]:
                 continue
             ej = embeddings[j]
             norm_j = sum(x * x for x in ej) ** 0.5
-            dot = sum(x * y for x, y in zip(ei, ej))
+            dot = sum(x * y for x, y in zip(ei, ej, strict=True))
             sim = dot / (norm_i * norm_j) if norm_i and norm_j else 0.0
             if sim >= SIMILARITY_THRESHOLD:
                 keep[j] = False
-    return [a for a, k in zip(articles, keep) if k]
+    return [a for a, k in zip(articles, keep, strict=True) if k]
 
 
 def _sent_on(date_int) -> str:
@@ -182,7 +194,7 @@ def filter_seen_detailed(articles: list[Article], profile: str,
         return articles, matches
 
     unseen = []
-    for article, distances, metadatas in zip(articles, results["distances"], results["metadatas"]):
+    for article, distances, metadatas in zip(articles, results["distances"], results["metadatas"], strict=True):
         min_dist = min(distances) if distances else 1.0
         if min_dist >= distance_threshold:
             unseen.append(article)

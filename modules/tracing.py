@@ -1,5 +1,5 @@
 """LangSmith helpers: judge scores and stage counts as feedback on the digest_run root run."""
-from modules import trace_judge
+from modules import llm_clients, trace_judge
 from modules.trace_judge import SKIPPED, TraceReport
 
 
@@ -19,6 +19,7 @@ def run_summary(result: dict) -> dict:
         "picked": [a.name for a in result.get("top_articles", [])],
         "dedupe_drops": result.get("dedupe_drops", []),
         "rank_scores": result.get("rank_scores", []),
+        "source_errors": result.get("source_errors", []),
         "email_status": result.get("email_status", ""),
     }
 
@@ -27,6 +28,7 @@ def run_summary(result: dict) -> dict:
 # so they are not read as judge scores. An unmapped run_stats key posts as "count.<key>".
 FEEDBACK_KEY_NAMES: dict[str, str] = {
     "merged": "count.articles_collected_merged",
+    "collect_failures": "count.sources_failed_collect",
     "after_dedupe": "count.articles_after_dedupe",
     "dedupe_dropped": "count.articles_dedupe_dropped",
     "dedupe_matches": "count.dedupe_matches",
@@ -35,6 +37,7 @@ FEEDBACK_KEY_NAMES: dict[str, str] = {
     "dedupe_batch_duplicates": "count.dedupe_batch_duplicates",
     "dedupe_max_similarity": "metric.dedupe_max_similarity",
     "shortlisted": "count.articles_shortlisted",
+    "shortlist_failures": "count.sources_failed_shortlist",
     "read_full": "count.articles_read_full",
     "read_partial": "count.articles_read_partial",
     "read_snippet": "count.articles_read_snippet",
@@ -55,8 +58,7 @@ def _post(items: list[dict], run_id, client) -> None:
         return
     try:
         if client is None:
-            import langsmith
-            client = langsmith.Client()
+            client = llm_clients.langsmith_client()
         for item in items:
             client.create_feedback(run_id, key=item["key"], score=item["score"], comment=item.get("comment"))
     except Exception as e:

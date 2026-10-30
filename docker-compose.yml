@@ -1,0 +1,70 @@
+# JFrog CI tool. Build and run commands: docs/docker.md.
+#   docker compose run --rm ci                       one CI run (collect -> dedupe -> full text -> output/runs/<run_id>.jsonl)
+#   docker compose run --rm eval --split train       golden-set eval -> output/evals/<timestamp>.json
+#   docker compose up -d labeling                    labeling page on http://127.0.0.1:8000/ only
+#   with -f docker-compose.yml -f docker-compose.tailscale.yml it is also on the Tailscale IP (docs/docker.md)
+# All state is on the host: ./data, ./output and ./evals are bind mounts, so runs, eval reports, test_runs.log,
+# split_assignments.json and caches outlive the container. Before the first start:
+#   mkdir -p output data && touch evals/golden_set.jsonl
+
+x-app: &app
+  image: jfrog-ci:latest
+  build:
+    context: .
+    target: runtime
+    args:
+      # your uid, so the app can write to the bind-mounted ./data, ./output and ./evals; required, no silent default
+      APP_UID: ${APP_UID:?set APP_UID=$$(id -u) in the shell or in .env}
+  env_file:
+    - path: .env
+      required: false
+  # Long syntax with create_host_path: false everywhere: a missing host path fails the start with
+  # "bind source path does not exist" instead of Docker creating a root-owned directory the app cannot write.
+  # The *_HOST_DIR variables exist so a test can point a container at a scratch copy; leave them unset normally.
+  volumes:
+    - type: bind
+      source: ${DATA_HOST_DIR:-./data}
+      target: /app/data
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${OUTPUT_HOST_DIR:-./output}
+      target: /app/output
+      bind:
+        create_host_path: false
+    # The whole directory, not just golden_set.jsonl: eval_golden writes split_assignments.json next to it, and
+    # a single-file bind keeps the old inode when the host file is replaced (an editor's save, a git checkout),
+    # so the container would silently keep reading and appending to the stale copy. This also shadows the
+    # image's evals/*.py with the checkout's, which are the same code when the image is current.
+    - type: bind
+      source: ${EVALS_HOST_DIR:-./evals}
+      target: /app/evals
+      bind:
+        create_host_path: false
+
+services:
+  ci:
+    <<: *app
+    entrypoint: ["python", "-m", "ci.run"]
+
+  eval:
+    <<: *app
+    entrypoint: ["python", "-m", "ci.eval_golden"]  # rules-only by default; add --live for Gemini (GOOGLE_API_KEY)
+    profiles: ["eval"]  # only when named: docker compose run --rm eval --split train
+
+  labeling:
+    <<: *app
+    # 0.0.0.0 inside the container is required for the published port to reach it (ci.labeling warns about it;
+    # expected here). What the host exposes is decided by the ports below, never all interfaces: Docker's
+    # published ports bypass ufw. The Tailscale address is added by docker-compose.tailscale.yml.
+    entrypoint: ["python", "-m", "ci.labeling", "--host", "0.0.0.0"]
+    ports:
+      - "127.0.0.1:${LABELING_PORT:-8000}:8000"  # host port; set LABELING_PORT if 8000 is taken
+    restart: unless-stopped
+    healthcheck:  # the API answers, not just the port: /api/meta reads the runs dir and the competitors config
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/meta', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3

@@ -3,23 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import unquote, urlparse
 
 import requests
-from bs4 import BeautifulSoup
 
-MAX_CANDIDATES = 120
-CONTEXT_CHARS = 300
-
-_JUNK_TEXT = re.compile(
-    r"unsubscribe|manage (your )?(preferences|subscription)|view (this )?(email )?in (your )?browser|"
-    r"privacy policy|terms of (service|use)|update (your )?preferences|forward to a friend|"
-    r"upgrade to paid|subscribe here|sign up here|^like$|^comment$|^restack$|^share$",
-    re.IGNORECASE,
-)
-_JUNK_HREF = re.compile(
-    r"unsubscribe|/subscribe|/signup|/sign-up|preferences|mailto:|tel:|"
-    r"(twitter|x|facebook|linkedin|instagram|youtube)\.com/?$|"
-    r"list-manage\.com|/action/disable",
-    re.IGNORECASE,
-)
 _DEAD_STATUSES = {404, 410}
 
 
@@ -30,42 +14,6 @@ def unwrap_tracking(url: str) -> str:
     """Unwrap TLDR-style click-tracking links (.../CL0/<percent-encoded target>/...) to the real target."""
     m = _CL0.match(url)
     return unquote(m.group(1)) if m else url
-
-
-def extract_candidate_links(html: str) -> list[dict]:
-    """Real <a href> links found in the email HTML, with anchor text and nearby context.
-
-    The LLM picks from this list by id, so it can never return a URL that is not in the email.
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    for tag in soup(["script", "style", "head"]):
-        tag.decompose()
-
-    seen: set[str] = set()
-    candidates: list[dict] = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
-        if urlparse(href).scheme not in ("http", "https") or href in seen:
-            continue
-        text = a.get_text(" ", strip=True)
-        if _JUNK_HREF.search(href) or _JUNK_TEXT.search(text):
-            continue
-        parent = a.find_parent(["td", "p", "div", "li"]) or a
-        context = parent.get_text(" ", strip=True)[:CONTEXT_CHARS]
-        if not text and not context:
-            continue
-        seen.add(href)
-        candidates.append({"id": len(candidates), "text": text[:150], "context": context, "url": unwrap_tracking(href)})
-        if len(candidates) >= MAX_CANDIDATES:
-            break
-    return candidates
-
-
-def email_plain_text(html: str, limit: int = 6000) -> str:
-    soup = BeautifulSoup(html, "html.parser")
-    for tag in soup(["script", "style", "head"]):
-        tag.decompose()
-    return soup.get_text(" ", strip=True)[:limit]
 
 
 _TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid", "_hsenc", "_hsmi", "ref", "source"}
@@ -82,7 +30,8 @@ def _strip_tracking(url: str) -> str:
     """Drop the fragment and tracking query parameters (utm_*, fbclid, ...); other parameters keep their order."""
     p = urlparse(unwrap_tracking(url))
     kept = [kv for kv in p.query.split("&")
-            if kv and not (kv.split("=", 1)[0].lower().startswith("utm_") or kv.split("=", 1)[0].lower() in _TRACKING_PARAMS)]
+            if kv and not (kv.split("=", 1)[0].lower().startswith("utm_")
+                           or kv.split("=", 1)[0].lower() in _TRACKING_PARAMS)]
     return p._replace(query="&".join(kept), fragment="").geturl()
 
 
@@ -133,4 +82,4 @@ def resolve_links(urls: list[str], max_workers: int = 16) -> dict[str, tuple[str
     if not unique:
         return {}
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        return dict(zip(unique, pool.map(resolve_link, unique)))
+        return dict(zip(unique, pool.map(resolve_link, unique), strict=True))

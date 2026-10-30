@@ -28,16 +28,18 @@ def test_gemini_usage_tolerates_missing_counts():
 def test_call_gemini_reports_model_and_usage_to_its_run():
     rt = MagicMock()
     fake = SimpleNamespace(models=SimpleNamespace(generate_content=lambda **kw: _gemini_response()))
-    with patch.object(nodes, "client", fake), \
+    with patch.object(nodes.llm_clients, "gemini_client", return_value=fake), \
             patch("langsmith.run_helpers.get_current_run_tree", return_value=rt):
         assert nodes._call_gemini.__wrapped__("p") == "ok"  # bypass the traceable wrapper; the run tree is a mock
-    rt.add_metadata.assert_called_once_with({"ls_provider": "google_genai", "ls_model_name": nodes.GEMINI_MODEL})
+    rt.add_metadata.assert_called_once_with({"ls_provider": "google_genai",
+                                             "ls_model_name": nodes.settings.GEMINI_MODEL})
     rt.set.assert_called_once_with(usage_metadata=nodes._gemini_usage(_gemini_response()))
 
 
 def test_call_gemini_without_tracing_still_returns_text():
     fake = SimpleNamespace(models=SimpleNamespace(generate_content=lambda **kw: _gemini_response()))
-    with patch.object(nodes, "client", fake), patch("langsmith.run_helpers.get_current_run_tree", return_value=None):
+    with patch.object(nodes.llm_clients, "gemini_client", return_value=fake), \
+            patch("langsmith.run_helpers.get_current_run_tree", return_value=None):
         assert nodes._call_gemini.__wrapped__("p") == "ok"
 
 

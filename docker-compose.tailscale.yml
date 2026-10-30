@@ -1,0 +1,7 @@
+# Also publish the labeling page on this machine's Tailscale address, on top of 127.0.0.1 (docker-compose.yml).
+#   TAILSCALE_IP=$(tailscale ip -4) docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d labeling
+# Never publish on all interfaces: Docker's published ports bypass ufw, so 0.0.0.0 would expose the page to the LAN.
+services:
+  labeling:
+    ports:
+      - "${TAILSCALE_IP:?set TAILSCALE_IP=$$(tailscale ip -4)}:${LABELING_PORT:-8000}:8000"

@@ -1,0 +1,4 @@
+# Tests and lint (the commit gate), on top of the runtime pins.
+-r requirements.txt
+pytest==9.2.0
+ruff==0.17.3

@@ -2,8 +2,8 @@
 judge_llm.py — Claude transport for the trace judge.
 
 The judge runs on a different model family than the ranker and writer so it
-does not grade its own homework. The client is built lazily, so importing
-this module needs no API key.
+does not grade its own homework. The client is built on first use
+(modules.llm_clients), so importing this module needs no API key.
 """
 
 import json
@@ -11,16 +11,11 @@ import json
 from langsmith import run_helpers, traceable
 
 from config.settings import JUDGE_MODEL_DAILY
-
-_client = None
+from modules import llm_clients
 
 
 def _get_client():
-    global _client
-    if _client is None:
-        import anthropic
-        _client = anthropic.Anthropic()
-    return _client
+    return llm_clients.anthropic_client()
 
 
 @traceable(run_type="llm", name="judge_llm")
