@@ -110,6 +110,11 @@ class Classification(BaseModel):
     confidence: float  # 0-1
     method: Method
     reason: str = ""
+    # set when the LLM failed for this item: the prefilled competitor is kept but not confirmed, and it goes to review
+    degraded: bool = False
+    competitor_confirmed: bool = True
+    needs_review: bool = False
+    review_reason: str = ""
 
 
 def aliases(comp: ci_config.Competitor) -> list[str]:
@@ -325,11 +330,15 @@ Items (JSON):
 {json.dumps(payload, ensure_ascii=False, indent=1)}
 """
 
-    def _fallback(self, item: dict, why: str) -> Classification:
+    def _fallback(self, item: dict, why: str, error: str = "InvalidAnswer") -> Classification:
+        """Degraded: the LLM failed for this item. The prefilled competitor is kept, marked unconfirmed, and the
+        item goes to review; nothing here looks like a normal classification."""
         category, _ = rule_category(item.get("title") or "")
         return Classification(id=item["id"], competitor=item.get("competitor") or NON_COMPETITOR, category=category,
                               noise=False, mentions_jfrog=mentions_jfrog(item), confidence=LOW_CONFIDENCE,
-                              method="fallback", reason=f"LLM answer unusable ({why}); kept the prefilled competitor")
+                              method="fallback", reason=f"LLM answer unusable ({why}); kept the prefilled competitor",
+                              degraded=True, competitor_confirmed=False, needs_review=True,
+                              review_reason=f"classifier unavailable: {error}")
 
     def _from_answer(self, item: dict, ans: dict, ambiguous_why: str) -> Classification:
         comp, cat, noise, conf = (ans.get(k) for k in ("competitor", "category", "noise", "confidence"))
@@ -357,13 +366,13 @@ Items (JSON):
                 raise LLMError(f"no items list in answer: {str(answer)[:200]}")
         except Exception as e:  # one bad batch must not stop the run
             log.warning("classifier batch of %d failed: %s", len(items), e)
-            return [self._fallback(it, f"call failed: {e}") for it in items]
+            return [self._fallback(it, f"call failed: {e}", type(e).__name__) for it in items]
         by_id: dict[str, dict] = {}
         for row in rows:
             if isinstance(row, dict) and row.get("id") in ids and row["id"] not in by_id:
                 by_id[row["id"]] = row  # first answer per id wins; invented ids are dropped
         return [self._from_answer(it, by_id[it["id"]], why[it["id"]]) if it["id"] in by_id
-                else self._fallback(it, "item missing from answer") for it in items]
+                else self._fallback(it, "item missing from answer", "MissingAnswer") for it in items]
 
     # ---- entry point -----------------------------------------------------------------------------------------------
 

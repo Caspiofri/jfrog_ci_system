@@ -155,6 +155,10 @@ def test_llm_noise_and_none_are_accepted():
 def test_malformed_answer_degrades_to_low_confidence(answer):
     (c,) = Classifier(FakeLLM([answer]), CFG).classify([_item(1, "Some story")])
     assert c.method == "fallback" and c.confidence == LOW_CONFIDENCE
+    assert c.degraded and c.needs_review and not c.competitor_confirmed
+    assert c.review_reason.startswith("classifier unavailable: ")
+    if isinstance(answer, Exception):
+        assert c.review_reason == f"classifier unavailable: {type(answer).__name__}"
     assert c.competitor == "snyk" and c.noise is False
     assert "unusable" in c.reason
 

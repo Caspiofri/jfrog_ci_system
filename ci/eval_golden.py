@@ -53,7 +53,7 @@ STORY_SIMILARITY = 0.72
 EMBED_MODEL_TAG = "chroma-onnx-all-MiniLM-L6-v2"
 EMBED_CACHE_PATH = DATA_DIR / "ci" / "eval_story_embeddings.json"
 SPLIT_ASSIGNMENTS_PATH = EVALS_DIR / "split_assignments.json"  # item id -> side, fixed the first time it is assigned
-RANKED_FIELDS = {"raw_score", "score", "reason", "adjustments", "needs_review", "review_reasons"}
+RANKED_FIELDS = {"raw_score", "degraded", "score", "reason", "adjustments", "needs_review", "review_reasons"}
 TEST_LOG_NAME = "test_runs.log"  # every --split test run is appended here, so repeated peeking at test is visible
 
 
@@ -316,11 +316,13 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
     j_fp = sum(not row.get("mentions_jfrog") and cls[row["id"]].mentions_jfrog for row in labels)
     j_fn = sum(bool(row.get("mentions_jfrog")) and not cls[row["id"]].mentions_jfrog for row in labels)
 
-    diffs = [abs(final[row["id"]].score - label_score(row)) for row in labels]
+    # degraded items (no score: the ranker failed) are missing, counted apart, never scored as anything
+    scored = [row for row in labels if final[row["id"]].score is not None]
+    diffs = [abs(final[row["id"]].score - label_score(row)) for row in scored]
     precision_at = {}
     important = sum(label_score(row) >= IMPORTANT_MIN for row in labels)
     for k in K_VALUES:
-        top = [r.id for r in ranked if r.id in lab][:k]
+        top = [r.id for r in ranked if r.id in lab and r.score is not None][:k]
         hits = sum(label_score(lab[i]) >= IMPORTANT_MIN for i in top)
         precision_at[str(k)] = {"k": len(top), "hits": hits, "precision": _ratio(hits, len(top))}
 
@@ -353,8 +355,10 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
             "category": {"n": len(cat_rows), "errors": sum(row["category"] != cls[row["id"]].category
                                                            for row in cat_rows)},
             "noise": {"n": len(rows), "errors": sum(row["noise"] != cls[row["id"]].noise for row in rows)},
-            "score": {"n": len(rows), "errors": sum(final[row["id"]].score != label_score(row) for row in rows),
-                      "off_by_2_plus": sum(abs(final[row["id"]].score - label_score(row)) > 1 for row in rows)},
+            "score": {"n": len(rows_scored := [r for r in rows if final[r["id"]].score is not None]),
+                      "errors": sum(final[row["id"]].score != label_score(row) for row in rows_scored),
+                      "off_by_2_plus": sum(abs(final[row["id"]].score - label_score(row)) > 1 for row in rows_scored),
+                      "missing": len(rows) - len(rows_scored)},
         }
 
     return {
@@ -371,7 +375,7 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
         "mentions_jfrog": {"tp": j_tp, "fp": j_fp, "fn": j_fn, "precision": _ratio(j_tp, j_tp + j_fp),
                            "recall": _ratio(j_tp, j_tp + j_fn)},
         "score": {"n": len(diffs), "exact": _ratio(sum(d == 0 for d in diffs), len(diffs)),
-                  "within_1": _ratio(sum(d <= 1 for d in diffs), len(diffs))},
+                  "within_1": _ratio(sum(d <= 1 for d in diffs), len(diffs)), "missing": len(labels) - len(scored)},
         "precision_at_k": precision_at,
         "important_min": IMPORTANT_MIN,
         "important_total": important,
@@ -432,7 +436,7 @@ def run(split: str = "train", live: bool = False, labels_path: Path | None = Non
     ranked = Ranker(llm).rank(items, classifications)
     report["seconds"] = round(time.monotonic() - started, 1)
     report["fallbacks"] = {"classify": sum(c.method == "fallback" for c in classifications),
-                           "rank": sum(r.fallback for r in ranked)}
+                           "rank": sum(r.degraded for r in ranked)}
     if live and any(report["fallbacks"].values()) and not allow_fallback:
         report["aborted"] = True
         _log_test_run(report, out_dir)
@@ -526,7 +530,7 @@ def format_report(report: dict) -> str:
     lines.append(row.format("Mentions JFrog precision", _pct(jf["precision"]),
                             f"{jf['tp']}/{jf['tp'] + jf['fp']} flagged"))
     lines.append(row.format("Mentions JFrog recall", _pct(jf["recall"]), f"{jf['tp']}/{jf['tp'] + jf['fn']} labeled"))
-    lines.append(row.format("Score exact", _pct(sc["exact"]), f"n {sc['n']}"))
+    lines.append(row.format("Score exact", _pct(sc["exact"]), f"n {sc['n']}, {sc['missing']} unscored (degraded)"))
     lines.append(row.format("Score within ±1", _pct(sc["within_1"]), f"n {sc['n']}"))
     if m["precision_at_k"] is None:
         lines.append(row.format("Precision@k", "  -", "rules-only baseline, P@k not meaningful"))

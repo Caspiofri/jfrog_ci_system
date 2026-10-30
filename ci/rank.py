@@ -3,6 +3,8 @@
 Adjustments, in order: +1 when the item mentions JFrog (capped at 5), a cap for items we only have a snippet of,
 and noise forced to 1. Ties are broken by classifier confidence, then by date (newest first).
 Noise items are never sent to the LLM: their score is 1 whatever it would say.
+When the LLM fails for an item, it gets no score at all (score None, degraded, sent to review): a failure must never
+look like a normal score. Degraded items sort after every scored one and are never auto-publishable.
 """
 import json
 import logging
@@ -22,7 +24,6 @@ JFROG_BONUS = 1
 SNIPPET_SCORE_CAP = 4  # an item we could only read a snippet of cannot score above this (Ofri, Oct 30: was 3)
 SNIPPET_REVIEW_MIN = 4  # ...and at or above this it goes to review: a high score resting on a teaser needs a human
 NOISE_SCORE = 1
-FALLBACK_SCORE = 3  # when the LLM gave no usable score: the midpoint, so a failure neither buries nor promotes
 
 # PRD "Item lifecycle", Importance (D14), verbatim
 RUBRIC = """Importance (D14). 1–5, answering "how much does this change JFrog's competitive picture?"
@@ -39,14 +40,19 @@ RUBRIC = """Importance (D14). 1–5, answering "how much does this change JFrog'
 class Ranked(BaseModel):
     id: str
     raw_score: int | None  # the LLM's score; None for noise (not asked) or an unusable answer
-    fallback: bool = False  # True when the LLM gave no usable score and FALLBACK_SCORE was used
-    score: int  # after the code adjustments
+    degraded: bool = False  # the LLM gave no usable score: score is None and the item is in review
+    score: int | None  # after the code adjustments; None when degraded
     reason: str  # one line
     adjustments: list[str] = []
     needs_review: bool = False  # D9: routed to the analyst review queue whatever the autonomy threshold
     review_reasons: list[str] = []
     confidence: float  # the classifier's, used for tie-breaking
     published_at: datetime | None = None
+
+    @property
+    def auto_publishable(self) -> bool:
+        """Scored and not held for review (the autonomy threshold applies on top of this, later)."""
+        return self.score is not None and not self.degraded and not self.needs_review
 
 
 def _as_datetime(value) -> datetime | None:
@@ -62,13 +68,12 @@ def _as_datetime(value) -> datetime | None:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
-def adjust(raw: int, item: dict, cls: Classification, fallback: bool = False) -> tuple[int, list[str]]:
-    """The code side of D14: bonus, snippet cap, noise. Returns the final score and what was applied.
-    A fallback score gets no JFrog bonus: a failure never promotes an item."""
+def adjust(raw: int, item: dict, cls: Classification) -> tuple[int, list[str]]:
+    """The code side of D14: bonus, snippet cap, noise. Returns the final score and what was applied."""
     if cls.noise:
         return NOISE_SCORE, [] if raw == NOISE_SCORE else [f"noise -> {NOISE_SCORE}"]
     score, notes = raw, []
-    if cls.mentions_jfrog and score < MAX_SCORE and not fallback:
+    if cls.mentions_jfrog and score < MAX_SCORE:
         score = min(MAX_SCORE, score + JFROG_BONUS)
         notes.append(f"+{JFROG_BONUS} Mentions JFrog")
     if item.get("text_status") == "snippet" and score > SNIPPET_SCORE_CAP:
@@ -85,16 +90,19 @@ REVIEW_RULES = [
 
 
 def review_reasons(item: dict, cls: Classification, score: int) -> list[str]:
-    return [reason for reason, applies in REVIEW_RULES if applies(item, cls, score)]
+    """The REVIEW_RULES that apply, plus the classifier's own reason when it sent the item to review."""
+    held = [cls.review_reason] if cls.needs_review and cls.review_reason else []
+    return [reason for reason, applies in REVIEW_RULES if applies(item, cls, score)] + held
 
 
 def sort_key(r: Ranked):
     ts = r.published_at.timestamp() if r.published_at else float("-inf")
-    return (-r.score, -r.confidence, -ts, r.id)
+    return (r.score is None, -(r.score or 0), -r.confidence, -ts, r.id)
 
 
 def order(ranked: list[Ranked]) -> list[Ranked]:
-    """Highest score first; ties by classifier confidence, then newest; then id so the order is stable."""
+    """Highest score first, degraded (unscored) items last; ties by classifier confidence, then newest; then id so
+    the order is stable."""
     return sorted(ranked, key=sort_key)
 
 
@@ -137,7 +145,8 @@ Items (JSON):
 {json.dumps(payload, ensure_ascii=False, indent=1)}
 """
 
-    def _llm_scores(self, pairs: list[tuple[dict, Classification]]) -> dict[str, tuple[int | None, str]]:
+    def _llm_scores(self, pairs: list[tuple[dict, Classification]]) -> tuple[dict[str, tuple[int, str]], str]:
+        """({id: (score, reason)} for the usable answers, the error class when the whole batch failed)."""
         ids = [it["id"] for it, _ in pairs]
         try:
             answer = self.llm.complete(self.prompt(pairs), self.schema(ids))
@@ -146,7 +155,7 @@ Items (JSON):
                 raise LLMError(f"no items list in answer: {str(answer)[:200]}")
         except Exception as e:  # one bad batch must not stop the run
             log.warning("ranker batch of %d failed: %s", len(pairs), e)
-            return {}
+            return {}, type(e).__name__
         out: dict[str, tuple[int | None, str]] = {}
         for row in rows:
             if not isinstance(row, dict) or row.get("id") not in ids or row["id"] in out:
@@ -158,31 +167,34 @@ Items (JSON):
                 continue
             reason = " ".join(str(reason or "").split())
             out[row["id"]] = (score, reason)
-        return out
+        return out, ""
 
     def rank(self, items: list[dict], classifications: list[Classification]) -> list[Ranked]:
         """Ranked items, best first. classifications is matched to items by id."""
         by_id = {c.id: c for c in classifications}
         pairs = [(it, by_id[it["id"]]) for it in items]
         to_score = [(it, c) for it, c in pairs if not c.noise]
-        scores: dict[str, tuple[int | None, str]] = {}
+        scores: dict[str, tuple[int, str]] = {}
+        errors: dict[str, str] = {}
         for start in range(0, len(to_score), self.batch_size):
-            scores.update(self._llm_scores(to_score[start:start + self.batch_size]))
+            batch = to_score[start:start + self.batch_size]
+            got, error = self._llm_scores(batch)
+            scores.update(got)
+            errors.update({it["id"]: error for it, _ in batch if error})
         ranked = []
         for it, c in pairs:
-            if c.noise:
-                raw, reason = None, "classified as noise"
-            elif it["id"] in scores:
-                raw, reason = scores[it["id"]]
-            else:
-                raw, reason = None, "ranker answer unusable; midpoint score"
-            fallback = raw is None and not c.noise
-            score, notes = adjust(FALLBACK_SCORE if raw is None else raw, it, c, fallback=fallback)
+            common = {"id": it["id"], "confidence": c.confidence, "published_at": _as_datetime(it.get("published_at"))}
+            if not c.noise and it["id"] not in scores:
+                error = errors.get(it["id"], "InvalidAnswer")
+                reasons = [f"ranker unavailable: {error}", *([c.review_reason] if c.degraded else [])]
+                ranked.append(Ranked(**common, raw_score=None, degraded=True, score=None, needs_review=True,
+                                     review_reasons=reasons, reason=""))
+                continue
+            raw, reason = (None, "classified as noise") if c.noise else scores[it["id"]]
+            score, notes = adjust(NOISE_SCORE if raw is None else raw, it, c)
             reasons = review_reasons(it, c, score)
-            ranked.append(Ranked(id=it["id"], raw_score=raw, fallback=fallback, score=score,
-                                 needs_review=bool(reasons), review_reasons=reasons,
-                                 reason=reason or "(no reason given)", adjustments=notes, confidence=c.confidence,
-                                 published_at=_as_datetime(it.get("published_at"))))
+            ranked.append(Ranked(**common, raw_score=raw, score=score, needs_review=bool(reasons),
+                                 review_reasons=reasons, reason=reason or "(no reason given)", adjustments=notes))
         return order(ranked)
 
 

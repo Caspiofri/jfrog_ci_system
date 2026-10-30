@@ -81,7 +81,7 @@ def test_metrics_on_a_mini_golden_set_with_known_answers():
     assert m["competitor"]["on_noise"] == {"n": 1, "correct": 1, "accuracy": 1.0}
     assert (m["category"]["correct"], m["category"]["n"]) == (2, 3)  # noise label c is not scored on category
     assert m["noise"] == {"tp": 1, "fp": 1, "fn": 0, "tn": 2, "precision": 0.5, "recall": 1.0}
-    assert m["score"] == {"n": 4, "exact": 0.5, "within_1": 0.75}  # noise label counts as score 1
+    assert m["score"] == {"n": 4, "exact": 0.5, "within_1": 0.75, "missing": 0}  # noise label counts as score 1
     assert m["important_total"] == 2
     assert m["precision_at_k"] == {"10": {"k": 4, "hits": 2, "precision": 0.5}}  # k shrinks to the set size
     assert m["by_method"]["rules"] == {"n": 1, "competitor": {"n": 1, "correct": 1, "accuracy": 1.0},
@@ -459,10 +459,11 @@ def test_errors_are_broken_down_by_label_basis():
            _cls("c", "snyk", "Security", noise=False), _cls("d", "industry", "Security")]
     m = evaluate(labels, cls, [_ranked("a", 5), _ranked("b", 1), _ranked("c", 3), _ranked("d", 4)])
     assert m["by_basis"]["full"] == {"n": 2, "competitor": {"n": 2, "errors": 1}, "category": {"n": 2, "errors": 1},
-                                     "noise": {"n": 2, "errors": 0}, "score": {"n": 2, "errors": 1, "off_by_2_plus": 1}}
+                                     "noise": {"n": 2, "errors": 0},
+                                     "score": {"n": 2, "errors": 1, "off_by_2_plus": 1, "missing": 0}}
     assert m["by_basis"]["partial"] == {"n": 1, "competitor": {"n": 0, "errors": 0},
                                         "category": {"n": 0, "errors": 0}, "noise": {"n": 1, "errors": 1},
-                                        "score": {"n": 1, "errors": 1, "off_by_2_plus": 1}}
+                                        "score": {"n": 1, "errors": 1, "off_by_2_plus": 1, "missing": 0}}
     assert m["by_basis"]["unknown"]["n"] == 1 and m["by_basis"]["unknown"]["score"]["errors"] == 0
     report = {"split": "all", "live": True, "model": "m", "fingerprint": "f", "n": 4, "labels_total": 4,
               "stories": 4, "split_counts": {}, "aborted": False, "fallbacks": {"classify": 0, "rank": 0},
@@ -506,3 +507,13 @@ def test_default_split_is_train_and_test_needs_asking(golden, monkeypatch, capsy
     assert not (out / "test_runs.log").exists()  # nothing peeked at test
     eval_golden.main(["--split", "test"])
     assert "split=test" in capsys.readouterr().out
+
+
+def test_degraded_ranker_items_are_missing_not_a_midpoint_score():
+    labels = [_label("a", "snyk", "Security", 3), _label("b", "snyk", "Security", 5)]
+    cls = [_cls("a", "snyk", "Security"), _cls("b", "snyk", "Security")]
+    ranked = [_ranked("a", 3), Ranked(id="b", raw_score=None, degraded=True, score=None, reason="", confidence=0.5,
+                                       needs_review=True, review_reasons=["ranker unavailable: LLMError"])]
+    m = evaluate(labels, cls, ranked)
+    assert m["score"] == {"n": 1, "exact": 1.0, "within_1": 1.0, "missing": 1}
+    assert m["precision_at_k"]["10"] == {"k": 1, "hits": 0, "precision": 0.0}  # the unscored item is not ranked

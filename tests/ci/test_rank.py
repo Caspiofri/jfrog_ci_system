@@ -3,7 +3,7 @@ import pytest
 
 from ci.classify import Classification
 from ci.llm import FakeLLM, LLMError
-from ci.rank import FALLBACK_SCORE, RUBRIC, SNIPPET_SCORE_CAP, Ranker, adjust
+from ci.rank import RUBRIC, SNIPPET_SCORE_CAP, Ranker, adjust
 
 
 def _item(i, text_status="full", published_at="2026-10-29T10:00:00Z"):
@@ -86,24 +86,42 @@ def test_batches_of_ten():
     {"items": [{"id": "id1", "score": "high", "reason": "x"}]},
     {"items": [{"id": "invented", "score": 5, "reason": "x"}]},
 ])
-def test_unusable_answer_falls_back_to_midpoint(answer):
+def test_unusable_answer_gives_no_score_and_review(answer):
     (r,) = Ranker(FakeLLM([answer])).rank([_item(1)], [_cls(1)])
-    assert r.raw_score is None and r.score == FALLBACK_SCORE
-    assert "unusable" in r.reason
+    assert r.degraded and r.score is None and r.raw_score is None and r.needs_review
+    expected = "ranker unavailable: LLMError" if isinstance(answer, Exception) else "ranker unavailable:"
+    assert r.review_reasons[0].startswith(expected) and not r.auto_publishable
 
 
 def test_partial_answer_keeps_the_scores_it_has():
     answer = {"items": [{"id": "id1", "score": 5.0, "reason": "  head-on\n product "}]}
     out = {r.id: r for r in Ranker(FakeLLM([answer])).rank([_item(1), _item(2)], [_cls(1), _cls(2)])}
     assert (out["id1"].raw_score, out["id1"].reason) == (5, "head-on product")
-    assert out["id2"].raw_score is None
+    assert out["id2"].degraded and out["id2"].score is None
 
 
-def test_a_fallback_score_gets_no_jfrog_bonus():
+def test_a_degraded_item_gets_no_score_and_no_bonus():
     (r,) = Ranker(FakeLLM([{"items": []}])).rank([_item(1)], [_cls(1, jfrog=True)])
-    assert r.fallback and (r.raw_score, r.score) == (None, FALLBACK_SCORE) and r.adjustments == []
+    assert r.degraded and r.score is None and r.adjustments == []
     (ok,) = Ranker(FakeLLM(_scores({}))).rank([_item(1)], [_cls(1, jfrog=True)])
-    assert not ok.fallback and ok.score == 4
+    assert not ok.degraded and ok.score == 4 and ok.auto_publishable
+
+
+def test_degraded_items_sort_after_every_scored_item():
+    answer = {"items": [{"id": "id1", "score": 1, "reason": "x"}]}  # id2 left out of the answer
+    out = Ranker(FakeLLM([answer])).rank([_item(2), _item(1)], [_cls(2, confidence=0.99), _cls(1, confidence=0.1)])
+    assert [r.id for r in out] == ["id1", "id2"] and out[1].score is None
+
+
+def test_a_classifier_failure_reaches_review_through_the_ranker():
+    from ci.classify import Classification
+
+    degraded = Classification(id="id1", competitor="snyk", category=None, noise=False, mentions_jfrog=False,
+                              confidence=0.2, method="fallback", degraded=True, competitor_confirmed=False,
+                              needs_review=True, review_reason="classifier unavailable: LLMError")
+    (r,) = Ranker(FakeLLM(_scores({"id1": 3}))).rank([_item(1)], [degraded])
+    assert r.score == 3 and r.needs_review and r.review_reasons == ["classifier unavailable: LLMError"]
+    assert not r.auto_publishable
 
 
 @pytest.mark.parametrize("status,raw,review", [
