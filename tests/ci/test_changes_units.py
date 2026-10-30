@@ -13,6 +13,7 @@ from ci.changes.extract import (
     missing_numbers,
     numbers_in,
     parse_fields,
+    price_in_quote,
     quote_in_text,
     schema_for,
 )
@@ -84,6 +85,32 @@ def test_every_number_in_the_value_and_tiers_must_be_on_the_page():
     fields = parse_fields({"pricing_model": raw}, ["pricing_model"], text)
     assert fields["pricing_model"].confidence == 0 and fields["pricing_model"].quote_verified
     assert fields["pricing_model"].unverified_reason == "numbers not on the page: 2100"
+
+
+SONATYPE_TEXT = ("Sonatype solutions use a consumption-based pricing model for cloud and self-hosted deployment "
+                 "models.\nPro Edition (Cloud) $1,950/year for 1 user and 10k requests.")
+SONATYPE_TIERS = [{"name": "Pro Edition (Cloud)", "price": 1950, "currency": "USD", "period": "year"}]
+
+
+def test_a_generic_pricing_quote_leaves_the_pricing_cell_unconfirmed():
+    raw = {"value": "Pro $1950/year", "confidence": 1.0, "tiers": SONATYPE_TIERS,
+           "evidence": "Sonatype solutions use a consumption-based pricing model"}
+    f = parse_fields({"pricing_model": raw}, ["pricing_model"], SONATYPE_TEXT)["pricing_model"]
+    assert f.quote_verified and f.confidence == 0
+    assert f.unverified_reason == "pricing quote states none of the extracted prices"
+
+
+def test_a_pricing_quote_with_a_price_line_is_confirmed():
+    raw = {"value": "Pro $1950/year", "confidence": 1.0, "tiers": SONATYPE_TIERS,
+           "evidence": "Pro Edition (Cloud) $1,950/year"}
+    f = parse_fields({"pricing_model": raw}, ["pricing_model"], SONATYPE_TEXT)["pricing_model"]
+    assert f.confidence == 1.0 and f.unverified_reason == ""
+
+
+def test_price_in_quote_needs_a_priced_tier():
+    assert price_in_quote("Free for open source", [Tier(name="Free", price=0), Tier(name="Enterprise")])
+    assert not price_in_quote("Pro for teams", [Tier(name="Pro", price=50)])
+    assert price_in_quote("Pro is $50.00 a month", [Tier(name="Pro", price=50)])
 
 
 def test_missing_or_malformed_axes_parse_as_not_stated():

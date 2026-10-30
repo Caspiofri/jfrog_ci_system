@@ -105,6 +105,7 @@ For each axis below give:
   contact sales"), and also list the tiers in `tiers` (price as a number, currency as an ISO code, period month or
   year, unit such as user or GB).
 - evidence: one verbatim quote copied exactly from the page text below (a sentence or phrase, no paraphrase).
+  For pricing_model, quote a line that states a price (e.g. "Pro $1,950 per year"), not a general description.
 - confidence: 0 to 1, how directly the page states it.
 If the page does not say anything about an axis, set value to "{NOT_STATED}", evidence to "" and confidence to 0.
 
@@ -180,9 +181,17 @@ def missing_numbers(value: str, tiers: list[Tier], text: str) -> list[str]:
     return sorted(wanted - numbers_in(text))
 
 
+def price_in_quote(evidence: str, tiers: list[Tier]) -> bool:
+    """The pricing quote states at least one extracted non-zero price ("$1,950" matches 1950). True when no tier has
+    a price (a page without prices, or only free tiers): there is nothing to anchor."""
+    prices = {_price_str(t.price) for t in tiers if t.price}
+    return not prices or bool(prices & numbers_in(evidence))
+
+
 def parse_fields(answer: dict, axes: list[str], text: str) -> dict[str, AxisField]:
     """One AxisField per axis from the LLM answer; a missing axis is 'not stated'. Confidence is forced to 0 when
-    the quote is not on the page, or when a number in the value or the tiers is not on the page."""
+    the quote is not on the page, when a number in the value or the tiers is not on the page, or when a pricing
+    quote states none of the extracted prices."""
     out = {}
     for axis in axes:
         raw = answer.get(axis) if isinstance(answer.get(axis), dict) else {}
@@ -194,9 +203,12 @@ def parse_fields(answer: dict, axes: list[str], text: str) -> dict[str, AxisFiel
         missing = missing_numbers(value, tiers, text)
         if missing:
             reason = "; ".join(filter(None, [reason, f"numbers not on the page: {', '.join(missing)}"]))
+        no_price = axis == "pricing_model" and verified and not price_in_quote(evidence, tiers)
+        if no_price:
+            reason = "; ".join(filter(None, [reason, "pricing quote states none of the extracted prices"]))
+        ok = verified and not missing and not no_price
         out[axis] = AxisField(axis=axis, value=value, evidence=evidence, tiers=tiers, quote_verified=verified,
-                              unverified_reason=reason,
-                              confidence=_confidence(raw.get("confidence")) if verified and not missing else 0.0)
+                              unverified_reason=reason, confidence=_confidence(raw.get("confidence")) if ok else 0.0)
     return out
 
 

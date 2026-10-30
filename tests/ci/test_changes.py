@@ -374,7 +374,8 @@ def test_a_number_not_on_the_page_leaves_the_cell_unconfirmed(env):
 
     res = go(T2, llm=FakeLLM(invented))
     assert res.items == []
-    assert res.report["unconfirmed"][0]["reasons"] == {"pricing_model": "numbers not on the page: 199"}
+    assert res.report["unconfirmed"][0]["reasons"] == {
+        "pricing_model": "numbers not on the page: 199; pricing quote states none of the extracted prices"}
 
 
 def test_a_page_without_prices_tells_the_extractor_and_notes_its_cells(tmp_path):
