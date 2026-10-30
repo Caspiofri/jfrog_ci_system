@@ -84,6 +84,12 @@
   .bk.total { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .bk.warn { background: var(--amber-soft); color: var(--amber); }
   .bbadge { background: #efeafd; color: #5b3fc4; }
+  .jfrog { margin-top: 8px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 6px;
+    padding: 6px 9px; font-size: 12.5px; background: #fafbfc; }
+  .jfrog .h { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 3px; }
+  .jfrog q { color: #384152; font-style: italic; }
+  .jfrog .asof { color: var(--muted); font-size: 11.5px; }
+  .card.done-rl { border-left-color: var(--green); }
   .empty { text-align: center; color: var(--muted); padding: 40px; }
   @media (max-width: 900px) { .card { grid-template-columns: 1fr; } }
 </style>
@@ -93,7 +99,7 @@
   <div class="bar">
     <h1>JFrog CI <span>· labeling</span></h1>
     <label>Run <select id="run"></select></label>
-    <span class="seg"><button id="v-q" class="on" title="Stratified queue: 6 per competitor, 8 industry, 16 likely noise">Queue</button><button id="v-all">All items</button></span>
+    <span class="seg" id="v-seg"><button id="v-q" class="on" title="Stratified queue: 6 per competitor, 8 industry, 16 likely noise">Queue</button><button id="v-all">All items</button></span>
     <span class="seg"><button id="f-un" class="on">Unlabeled</button><button id="f-all">All</button></span>
     <div class="progress">
       <span class="meter"><i id="meter"></i></span>
@@ -124,6 +130,8 @@ function rubricTitle(key) { return RUBRIC[key] ? (key === "noise" ? "Noise" : ke
 const TEASER = 400;
 let META = null, items = [], cards = [], active = -1, filter = "unlabeled", saving = false;
 let view = "queue", QUEUE = null, inQueue = new Map(), order = [];  // order: item indices shown, in view order
+let RELABEL = null;  // the open relabel queue ({queue_id, built_at, ...}); view is then "relabel"
+const relabeling = () => view === "relabel";
 const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : null);  // only http(s) links
 
 const $ = (id) => document.getElementById(id);
@@ -193,7 +201,7 @@ function renderCard(item, idx) {
     el("h2", { class: "title" }, safeUrl(item.url)
       ? el("a", { href: safeUrl(item.url), target: "_blank", rel: "noopener",
         onclick: (e) => { e.preventDefault(); openArticle(idx); } }, item.title) : item.title),
-    meta, body, more, mentionsLine(item),
+    meta, body, more, mentionsLine(item), relabeling() ? jfrogPanel(item.jfrog) : null,
     el("div", { class: "origin" }, "origin: " + item.origin),
   );
 
@@ -247,7 +255,9 @@ function renderCard(item, idx) {
     el("div", { class: "row" }, el("span", { class: "lbl" }, "Note"), note,
       el("button", { class: "save", onclick: () => save(idx) }, "Save")),
     item.label ? el("div", { class: "row" }, el("span", { class: "lbl" }, "Why changed"),
-      el("input", { type: "text", maxlength: "300", placeholder: "reason for this relabel (optional)",
+      el("input", { type: "text", maxlength: "300", value: d.revision_reason,
+        placeholder: relabeling() ? "required if you change anything; empty = confirm as is"
+          : "reason for this relabel (optional)",
         oninput: (e) => { d.revision_reason = e.target.value; } })) : null,
     el("div", { class: "row" }, el("span", { class: "lbl" }), status),
   );
@@ -270,11 +280,12 @@ function refreshCard(idx) {
 function paintCard(idx) {
   const c = cards[idx], it = items[idx];
   c.classList.toggle("active", idx === active);
-  c.classList.toggle("labeled", !!it.label);
+  c.classList.toggle("labeled", relabeling() ? !!it.done : !!it.label);
   c.classList.toggle("is-noise", !!(it.label && it.label.noise));
   c.style.display = visible(idx) ? "" : "none";
 }
 function visible(idx) {
+  if (relabeling()) return filter === "all" || !items[idx].done;
   return (view === "all" || inQueue.has(items[idx].id)) && (filter === "all" || !items[idx].label);
 }
 
@@ -318,11 +329,19 @@ async function save(idx) {
   if (requiresBad(it) && typeof d.bad_extraction !== "boolean") {
     setStatus(idx, "Answer Bad extraction: Yes or No  [x]", "err"); return;
   }
+  const changed = relabeling() ? changedFields(it.prefill, d) : [];
+  if (changed.length && !d.revision_reason.trim()) {
+    setStatus(idx, "You changed " + changed.join(", ") + ": say why in Why changed", "err"); return;
+  }
   if (saving) return;  // no double submit
   saving = true;
   try {
     it.label = await api("/api/labels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    refreshCard(idx); setStatus(idx, "Saved ✓", "ok");
+    if (relabeling()) {
+      it.done = true; it.prefill = { ...d }; d.revision_reason = "";
+    }
+    refreshCard(idx);
+    setStatus(idx, relabeling() ? (changed.length ? "Saved ✓ changed " + changed.join(", ") : "Confirmed ✓") : "Saved ✓", "ok");
     updateProgress(); updateBuckets(); loadStats();
     // next visible card, wrapping around; none when everything is labeled in the Unlabeled view
     let next = nextVisible(idx, 1);
@@ -358,6 +377,11 @@ function updateProgress() {
   $("p-basis").innerHTML = "read full <b>" + full + "</b> · partial <b>" + partial + "</b>"
     + (unknown ? " · unknown <b>" + unknown + "</b>" : "");
   $("meter").style.width = total ? (100 * labeled.length / total) + "%" : "0";
+  if (relabeling()) {  // reviewed = saved (changed or confirmed) after the queue was built
+    const done = items.filter((i) => i.done).length;
+    $("p-run").innerHTML = "relabel <b>" + done + "</b> / " + total + " reviewed";
+    $("meter").style.width = total ? (100 * done / total) + "%" : "0";
+  }
   const cats = $("p-cats"); cats.textContent = "";
   META.categories.forEach((c, i) => {
     const n = labeled.filter((it) => !it.label.noise && it.label.category === c).length;
@@ -398,7 +422,47 @@ async function loadStats() {
   } catch (e) { /* stats are a nicety */ }
 }
 
+// label fields the draft changes vs the prefilled label; filling a field the old label never had is no change
+const COMPARED = ["competitor", "category", "score", "noise", "mentions_jfrog", "basis", "bad_extraction", "note"];
+function changedFields(prev, d) {
+  return COMPARED.filter((f) => {
+    let a = prev[f], b = d[f];
+    if ((f === "basis" || f === "bad_extraction") && (a === null || a === undefined)) return false;
+    if (f === "note") { a = a || ""; b = b || ""; }
+    return a !== b;
+  });
+}
+function jfrogPanel(j) {
+  if (!j) return null;
+  const box = el("div", { class: "jfrog" }, el("div", { class: "h" }, "JFrog baseline · " + j.category));
+  if (j.missing) box.append("no baseline");
+  else if (j.axes) box.append("candidate axes: " + (j.axes.length ? j.axes.join(", ") : "none recorded"));
+  else if (!j.cells.length) box.append("no baseline");
+  else for (const c of j.cells) {
+    box.append(el("div", {}, el("b", {}, c.axis + ": "), c.value || "",
+      c.quote ? el("div", {}, el("q", {}, c.quote)) : null,
+      el("div", { class: "asof" }, "as of " + fmtDate(c.as_of))));
+  }
+  return box;
+}
+async function loadRelabel(queueId) {
+  const list = $("list");
+  list.innerHTML = '<div class="empty">Loading…</div>';
+  RELABEL = await api("/api/relabel/" + encodeURIComponent(queueId));
+  view = "relabel"; QUEUE = null; inQueue = new Map();
+  $("v-seg").style.display = "none";
+  items = RELABEL.items;
+  items.forEach((it) => { it.draft = draftFrom(it); it.prefill = { ...it.draft }; });
+  list.textContent = "";
+  cards = items.map((it, i) => renderCard(it, i));
+  if (!items.length) list.append(el("div", { class: "empty" }, "This relabel queue has no cards."));
+  layout();
+  updateProgress(); updateBuckets();
+}
 async function loadRun(runId) {
+  RELABEL = null;
+  if (view === "relabel") view = "queue";
+  $("v-seg").style.display = "";
   const list = $("list");
   list.innerHTML = '<div class="empty">Loading…</div>';
   const base = "/api/runs/" + encodeURIComponent(runId);
@@ -420,7 +484,7 @@ async function loadRun(runId) {
 // queue view: queue order; all items: run file order
 function layout() {
   const idx = items.map((_, i) => i);
-  order = view === "queue" ? idx.filter((i) => inQueue.has(items[i].id))
+  order = view === "relabel" ? idx : view === "queue" ? idx.filter((i) => inQueue.has(items[i].id))
     .sort((a, b) => inQueue.get(items[a].id).pos - inQueue.get(items[b].id).pos) : idx;
   const list = $("list");
   for (const i of order) list.append(cards[i]);  // append moves the node, so the DOM follows the view order
@@ -470,11 +534,19 @@ document.addEventListener("keydown", (e) => {
     META = await api("/api/meta");
     RUBRIC = META.rubric || {};
     const sel = $("run");
+    const runsGroup = el("optgroup", { label: "Runs" });
     for (const r of META.runs) {
       const st = (META.run_status || {})[r];
-      sel.append(el("option", { value: r }, st && st !== "ok" ? r + " (" + st + ")" : r));
+      runsGroup.append(el("option", { value: r }, st && st !== "ok" ? r + " (" + st + ")" : r));
     }
-    sel.onchange = () => loadRun(sel.value);
+    sel.append(runsGroup);
+    if ((META.relabel_queues || []).length) {
+      const rl = el("optgroup", { label: "Relabel queues" });
+      for (const q of META.relabel_queues) rl.append(el("option", { value: "relabel:" + q }, "Relabel · " + q));
+      sel.append(rl);
+    }
+    const open = (v) => (v.startsWith("relabel:") ? loadRelabel(v.slice(8)) : loadRun(v));
+    sel.onchange = () => open(sel.value).catch((e) => { $("list").innerHTML = ""; $("list").append(el("div", { class: "empty" }, "Error: " + e.message)); });
     $("v-q").onclick = () => setView("queue");
     $("v-all").onclick = () => setView("all");
     $("f-un").onclick = () => setFilter("unlabeled");

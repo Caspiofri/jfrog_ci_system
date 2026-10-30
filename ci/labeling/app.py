@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from ci import config
 from ci import rank as rank_mod
-from ci.labeling import stratified
+from ci.labeling import relabel, stratified
 from ci.packet import NON_COMPETITOR
 from config.settings import EVALS_DIR, OUTPUT_DIR
 from modules.reader import FULL_TEXT_MIN_CHARS
@@ -201,7 +201,8 @@ def snapshot(item: dict) -> dict:
 
 def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
                competitors: list[str] | None = None, default_run: str | None = None,
-               cfg: config.CIConfig | None = None) -> FastAPI:
+               cfg: config.CIConfig | None = None, relabel_dir: Path = relabel.RELABEL_DIR,
+               changes_db: Path = relabel.CHANGES_DB) -> FastAPI:
     if cfg is None:  # tests may pass only competitor keys; the queue's name rules then use the keys as names
         cfg = config.load() if competitors is None else config.CIConfig(competitors=[
             config.Competitor(key=k, name=k.replace("_", " ").title()) for k in competitors])
@@ -249,7 +250,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
             default = usable[0] if usable else (runs[0] if runs else None)
         return {"rubric": rubric_meanings(),
                 "runs": runs, "run_status": status, "default_run": default, "competitors": competitors,
-                "categories": CATEGORIES}
+                "categories": CATEGORIES, "relabel_queues": relabel.list_queues(relabel_dir)}
 
     @app.get("/api/runs")
     def list_runs() -> list[dict]:
@@ -280,6 +281,29 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         """Replace the stored queue with one built from the current rules (labeled items are kept first)."""
         return queue_for(run_id, rebuild=True)
 
+    @app.get("/api/relabel/{queue_id}")
+    def relabel_queue(queue_id: str) -> dict:
+        """A relabel queue's cards in order: each item from its own run (source fields only, no predictions),
+        prefilled with the current label, plus JFrog's baseline cell on score-3/4 cards."""
+        q = relabel.load(relabel_dir, queue_id)
+        if q is None:
+            raise HTTPException(404, f"unknown relabel queue {queue_id}")
+        labels = latest_labels(labels_path)
+        cells = relabel.jfrog_cells(changes_db)
+        runs: dict[str, dict[str, dict]] = {}
+        cards = []
+        for e in q["entries"]:
+            if e["run_id"] not in runs:
+                runs[e["run_id"]] = {it.get("id"): it for it in load_run(e["run_id"])}
+            item = runs[e["run_id"]].get(e["id"])
+            if item is None:
+                continue  # the run file lost it; nothing to show
+            label = labels.get(e["id"])
+            cards.append({**relabel.card_item(blind(item)), "run_id": e["run_id"], "label": label,
+                          "done": relabel.is_done(label, q), "jfrog": relabel.jfrog_baseline(label, cells)})
+        return {"queue_id": queue_id, "built_at": q["built_at"], "cutoff": q["cutoff"], "total": len(cards),
+                "done": sum(c["done"] for c in cards), "items": cards}
+
     @app.get("/api/stats")
     def stats() -> dict:
         """Totals over the whole golden set, across runs."""
@@ -309,6 +333,12 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         row = {**label.model_dump(), "labeled_at": datetime.now(UTC).isoformat(), "item": snapshot(item)}
         with write_lock:  # relabeling replaces the id's line; the file stays one line per id
             previous = latest_labels(labels_path).get(label.id)
+            queues = relabel.queues_holding(relabel_dir, label.id) if previous is not None else []
+            if queues:  # a relabel-queue item: a change needs a reason, an unchanged save is a confirmation
+                changed = relabel.changed_fields(previous, row)
+                if changed and not label.revision_reason.strip():
+                    raise HTTPException(422, f"changed {', '.join(changed)}: say why in revision_reason")
+                row["relabel"] = {"queue_id": queues[0]["queue_id"], "changed": changed}
             if previous is not None:  # a relabel: keep what it was, so the reason has context
                 row["revised_from"] = {k: previous.get(k) for k in REVISED_FIELDS}
             upsert_label(labels_path, row)
