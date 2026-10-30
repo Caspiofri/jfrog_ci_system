@@ -38,6 +38,7 @@ class PageResult:
     hash: str = ""
     items: list[ChangeItem] = field(default_factory=list)
     unconfirmed: list[str] = field(default_factory=list)  # axes whose new value was unstated or unverified
+    reasons: dict[str, str] = field(default_factory=dict)  # axis -> why it was unconfirmed
     cells: int = 0  # cells stored or confirmed for this page
     fetched: bool = False  # the page was fetched and had text (a later LLM failure still fails the page)
     error: str = ""
@@ -61,7 +62,7 @@ def new_run_id(now: datetime) -> str:
 
 def _cell(competitor: str, page: TrackedPage, f: AxisField, now: datetime) -> Cell:
     return Cell(competitor=competitor, axis=f.axis, value=f.value, evidence=f.evidence, confidence=f.confidence,
-                tiers=f.tiers, source_url=page.url, page_key=page.key, as_of=now, checked_at=now)
+                tiers=f.tiers, source_url=page.url, page_key=page.key, as_of=now, checked_at=now, note=page.note)
 
 
 def _usable(f: AxisField) -> bool:
@@ -104,6 +105,7 @@ def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, l
             res.cells += 1
         elif not _usable(new):  # an unstated or unverified value never overwrites a cell
             res.unconfirmed.append(axis)
+            res.reasons[axis] = new.unverified_reason or "not stated on the page"
         elif same_field(old, new):
             cells.put(cell, run_id, "")
             res.cells += 1
@@ -112,7 +114,7 @@ def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, l
             res.cells += 1
         else:
             diff = section_diff(prev_text, text, [old.evidence, new.evidence])
-            item = make_change(run_id, page.page_type, old, new, page.url, now, diff)
+            item = make_change(run_id, page.page_type, old, new, page.url, now, diff, page.note)
             cells.put(cell, run_id, "changed", item.id)
             res.items.append(item)
             res.cells += 1
@@ -135,7 +137,7 @@ def build_report(run_id: str, results: list[PageResult], live: bool, started: da
         "changes": sum(len(r.items) for r in results), "would_extract": len(by["would_extract"]),
         "failures": [{"competitor": r.competitor, "page": r.page_key, "url": r.url, "error": r.error}
                      for r in by["failed"]],
-        "unconfirmed": [{"competitor": r.competitor, "page": r.page_key, "axes": r.unconfirmed}
+        "unconfirmed": [{"competitor": r.competitor, "page": r.page_key, "axes": r.unconfirmed, "reasons": r.reasons}
                         for r in results if r.unconfirmed],
         "per_page": [{"competitor": r.competitor, "page": r.page_key, "status": r.status, "cells": r.cells,
                       "changes": len(r.items)} for r in results],

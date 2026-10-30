@@ -5,7 +5,9 @@
 # Axes: deployment, package_coverage, security_scanning, curation_gating, ai_mcp, cicd_integration, pricing_model.
 # Every URL was fetched live on Oct 30 2026 (200, text extracted by modules.reader.extract_main_text).
 # Known extraction gaps: prices that a page renders with JavaScript or inside <table> do not reach the text, so the
-# pricing_model cell for those pages is the model (tiers, usage-based, credits), not the numbers.
+# pricing_model cell for those pages is the model (tiers, usage-based, credits), not the numbers. They are marked
+# prices_on_page: false, which tells the extractor not to give prices and puts a note on their cells. Every number in
+# an extracted value must appear in the page text anyway, or the cell is unconfirmed.
 
 competitors:
   jfrog:
@@ -61,6 +63,7 @@ competitors:
     - key: pricing
       url: https://about.gitlab.com/pricing/
       page_type: pricing
+      prices_on_page: false  # cells carry the note "prices rendered client-side; pricing model only"
       axes: [pricing_model, deployment]
     - key: platform
       url: https://about.gitlab.com/platform/
@@ -72,6 +75,7 @@ competitors:
     - key: plans
       url: https://snyk.io/plans/
       page_type: pricing
+      prices_on_page: false  # cells carry the note "prices rendered client-side; pricing model only"
       axes: [pricing_model]
     - key: open_source
       url: https://snyk.io/product/open-source-security-management/
@@ -83,6 +87,7 @@ competitors:
     - key: pricing
       url: https://aws.amazon.com/codeartifact/pricing/
       page_type: pricing
+      prices_on_page: false  # cells carry the note "prices rendered client-side; pricing model only"
       axes: [pricing_model]
     - key: features
       url: https://aws.amazon.com/codeartifact/features/

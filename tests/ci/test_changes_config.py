@@ -32,3 +32,14 @@ def test_invalid_pages_are_rejected(page):
     with pytest.raises(ValidationError):
         config.TrackedPage.model_validate(page)
 
+
+def test_js_priced_pages_are_marked_and_get_the_default_note():
+    pages = {(c, p.key): p for c, p in config.load().pages()}
+    for key in [("gitlab", "pricing"), ("snyk", "plans"), ("aws_codeartifact", "pricing")]:
+        assert pages[key].prices_on_page is False
+        assert pages[key].note == config.PRICES_OFF_PAGE_NOTE
+    assert pages[("jfrog", "pricing")].prices_on_page and pages[("jfrog", "pricing")].note == ""
+    custom = config.TrackedPage(key="a", url="https://x.test", page_type="pricing", axes=["pricing_model"],
+                                prices_on_page=False, note="tables load later")
+    assert custom.note == "tables load later"
+

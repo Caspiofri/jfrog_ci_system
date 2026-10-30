@@ -41,6 +41,7 @@ class AxisField(BaseModel):
     confidence: float = 0.0
     tiers: list[Tier] = []
     quote_verified: bool = False
+    unverified_reason: str = ""  # why confidence was forced to 0: the quote, or a number, is not on the page
 
     @property
     def stated(self) -> bool:
@@ -83,13 +84,20 @@ current page text.
 """
 
 
+def _prices_note(page: TrackedPage) -> str:
+    if page.prices_on_page:
+        return ""
+    return ("Note: this page renders its prices client-side, so the text below has no price numbers. Describe the "
+            "pricing model (plans, usage-based or credit pricing, free tier) and give no prices.\n")
+
+
 def build_prompt(competitor_name: str, page: TrackedPage, text: str, previous: dict[str, str] | None = None) -> str:
     axes = "\n".join(f"- {a} ({AXES[a]}): {AXIS_GUIDE[a]}" for a in page.axes)
     return f"""You extract competitive facts about {competitor_name} from one of its web pages, for a head-to-head
 comparison with JFrog.
 
 Page: {page.url} (a {page.page_type} page)
-
+{_prices_note(page)}
 For each axis below give:
 - value: a short, normalized statement of what the page says (at most ~25 words). Write it so that the same facts
   always give the same wording: plain factual phrasing, no marketing adjectives, numbers as digits.
@@ -151,8 +159,30 @@ def _tiers(raw) -> list[Tier]:
     return out
 
 
+def _num(s: str) -> str:
+    s = s.replace(",", "")
+    return s.rstrip("0").rstrip(".") if "." in s else s  # 150.00 -> 150, 1.10 -> 1.1
+
+
+def numbers_in(s: str) -> set[str]:
+    """The numbers written in s, normalized ("1,950.00" -> "1950", "1.10" -> "1.1"); 0 is left out ("Free" is $0
+    without a digit)."""
+    return {n for n in (_num(m) for m in re.findall(r"\d[\d,]*(?:\.\d+)?", s)) if n.strip("0.") != ""}
+
+
+def _price_str(p: float) -> str:
+    return f"{p:.2f}".rstrip("0").rstrip(".")
+
+
+def missing_numbers(value: str, tiers: list[Tier], text: str) -> list[str]:
+    """Numbers in the value or the tier prices that the page text does not contain."""
+    wanted = numbers_in(value) | {_price_str(t.price) for t in tiers if t.price}
+    return sorted(wanted - numbers_in(text))
+
+
 def parse_fields(answer: dict, axes: list[str], text: str) -> dict[str, AxisField]:
-    """One AxisField per axis from the LLM answer; a missing axis is 'not stated'; an unverified quote -> 0."""
+    """One AxisField per axis from the LLM answer; a missing axis is 'not stated'. Confidence is forced to 0 when
+    the quote is not on the page, or when a number in the value or the tiers is not on the page."""
     out = {}
     for axis in axes:
         raw = answer.get(axis) if isinstance(answer.get(axis), dict) else {}
@@ -160,8 +190,13 @@ def parse_fields(answer: dict, axes: list[str], text: str) -> dict[str, AxisFiel
         evidence = str(raw.get("evidence") or "").strip()
         tiers = _tiers(raw.get("tiers"))
         verified = bool(evidence) and quote_in_text(evidence, text)
+        reason = "" if verified or not evidence else "evidence quote not on the page"
+        missing = missing_numbers(value, tiers, text)
+        if missing:
+            reason = "; ".join(filter(None, [reason, f"numbers not on the page: {', '.join(missing)}"]))
         out[axis] = AxisField(axis=axis, value=value, evidence=evidence, tiers=tiers, quote_verified=verified,
-                              confidence=_confidence(raw.get("confidence")) if verified else 0.0)
+                              unverified_reason=reason,
+                              confidence=_confidence(raw.get("confidence")) if verified and not missing else 0.0)
     return out
 
 

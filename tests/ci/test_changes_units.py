@@ -6,7 +6,16 @@ import pytest
 
 from ci.changes import config
 from ci.changes.diff import normalize_value, same_field, section_diff, tokens
-from ci.changes.extract import AxisField, Tier, extract_fields, parse_fields, quote_in_text, schema_for
+from ci.changes.extract import (
+    AxisField,
+    Tier,
+    extract_fields,
+    missing_numbers,
+    numbers_in,
+    parse_fields,
+    quote_in_text,
+    schema_for,
+)
 from ci.changes.snapshot import SnapshotStore, content_hash, normalize_text
 from ci.llm import FakeLLM
 
@@ -60,6 +69,21 @@ def test_a_quote_not_on_the_page_sets_confidence_zero():
     }, ["pricing_model", "deployment"], text)
     assert fields["pricing_model"].confidence == 0.9 and fields["pricing_model"].quote_verified
     assert fields["deployment"].confidence == 0.0 and not fields["deployment"].quote_verified
+
+
+def test_numbers_are_normalized_and_zero_is_ignored():
+    assert numbers_in("Pro $1,950.00/year, Free $0, 2 GB, 1.10 per GB") == {"1950", "2", "1.1"}
+
+
+def test_every_number_in_the_value_and_tiers_must_be_on_the_page():
+    text = "The Pro plan costs $1,950 per year. Storage is $0.25 per GB. The Free plan has no fee."
+    assert missing_numbers("Pro $1950/year; storage $0.25/GB; Free $0", [Tier(name="Free", price=0)], text) == []
+    assert missing_numbers("Pro $1950/year", [Tier(name="Pro", price=2100)], text) == ["2100"]
+    assert missing_numbers("Pro $2,100/year with 50 GB", [], text) == ["2100", "50"]
+    raw = {"value": "Pro $2100/year", "evidence": "The Pro plan costs $1,950 per year", "confidence": 0.9}
+    fields = parse_fields({"pricing_model": raw}, ["pricing_model"], text)
+    assert fields["pricing_model"].confidence == 0 and fields["pricing_model"].quote_verified
+    assert fields["pricing_model"].unverified_reason == "numbers not on the page: 2100"
 
 
 def test_missing_or_malformed_axes_parse_as_not_stated():

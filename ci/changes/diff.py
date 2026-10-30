@@ -116,6 +116,7 @@ class Cell(BaseModel):
     page_key: str
     as_of: datetime  # when the page this value was extracted from was fetched
     checked_at: datetime  # last time the page was fetched and still supported the value
+    note: str = ""  # from the source page's config, e.g. "prices rendered client-side; pricing model only"
 
 
 class ChangeItem(BaseModel):
@@ -141,6 +142,7 @@ class ChangeItem(BaseModel):
     new_as_of: datetime
     diff: str
     needs_review: bool = True  # D9: every changed head-to-head cell is reviewed
+    note: str = ""  # the source page's note (see Cell.note)
     reason: str
 
 
@@ -149,14 +151,14 @@ def change_id(competitor: str, axis: str, new_as_of: datetime) -> str:
 
 
 def make_change(run_id: str, page_type: str, old: Cell, new: AxisField, new_url: str, new_as_of: datetime,
-                diff: str) -> ChangeItem:
+                diff: str, note: str = "") -> ChangeItem:
     label = AXES[new.axis]
     return ChangeItem(
         id=change_id(old.competitor, new.axis, new_as_of), run_id=run_id, competitor=old.competitor, axis=new.axis,
         axis_label=label, page_key=old.page_key, page_url=new_url, page_type=page_type,
         old_value=old.value, new_value=new.value, old_evidence=old.evidence, new_evidence=new.evidence,
         old_confidence=old.confidence, new_confidence=new.confidence, old_tiers=old.tiers, new_tiers=new.tiers,
-        old_as_of=old.as_of, new_as_of=new_as_of, diff=diff,
+        old_as_of=old.as_of, new_as_of=new_as_of, diff=diff, note=note,
         reason=f"{label} changed on the tracked {page_type} page: every changed head-to-head cell is reviewed (D9)")
 
 
@@ -167,7 +169,7 @@ class CellStore:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         cols = ("competitor TEXT, axis TEXT, value TEXT, evidence TEXT, confidence REAL, tiers TEXT, "
-                "source_url TEXT, page_key TEXT, as_of TEXT, checked_at TEXT")
+                "source_url TEXT, page_key TEXT, as_of TEXT, checked_at TEXT, note TEXT")
         self._db.execute(f"CREATE TABLE IF NOT EXISTS cells ({cols}, PRIMARY KEY (competitor, axis))")
         self._db.execute(f"CREATE TABLE IF NOT EXISTS cell_history ({cols}, run_id TEXT, event TEXT, change_id TEXT)")
 
@@ -175,13 +177,13 @@ class CellStore:
     def _values(c: Cell) -> tuple:
         return (c.competitor, c.axis, c.value, c.evidence, c.confidence,
                 json.dumps([t.model_dump() for t in c.tiers]), c.source_url, c.page_key, c.as_of.isoformat(),
-                c.checked_at.isoformat())
+                c.checked_at.isoformat(), c.note)
 
     @staticmethod
     def _cell(row) -> Cell:
         return Cell(competitor=row[0], axis=row[1], value=row[2], evidence=row[3], confidence=row[4],
                     tiers=json.loads(row[5] or "[]"), source_url=row[6], page_key=row[7],
-                    as_of=datetime.fromisoformat(row[8]), checked_at=datetime.fromisoformat(row[9]))
+                    as_of=datetime.fromisoformat(row[8]), checked_at=datetime.fromisoformat(row[9]), note=row[10] or "")
 
     def get(self, competitor: str, axis: str) -> Cell | None:
         row = self._db.execute("SELECT * FROM cells WHERE competitor = ? AND axis = ?", (competitor, axis)).fetchone()
@@ -196,9 +198,10 @@ class CellStore:
     def put(self, cell: Cell, run_id: str, event: str, change: str = "") -> None:
         """Set the current cell; `event` (baseline | changed) also appends it to the history."""
         with self._db:
-            self._db.execute("INSERT OR REPLACE INTO cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", self._values(cell))
+            row = self._values(cell)
+            self._db.execute(f"INSERT OR REPLACE INTO cells VALUES ({', '.join('?' * len(row))})", row)
             if event:
-                self._db.execute("INSERT INTO cell_history VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                self._db.execute("INSERT INTO cell_history VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                                  (*self._values(cell), run_id, event, change))
 
     def history(self, competitor: str, axis: str) -> list[dict]:

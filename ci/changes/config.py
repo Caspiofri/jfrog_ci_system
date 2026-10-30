@@ -22,6 +22,7 @@ AXES: dict[str, str] = {
     "cicd_integration": "CI/CD integration",
     "pricing_model": "Pricing model",
 }
+PRICES_OFF_PAGE_NOTE = "prices rendered client-side; pricing model only"
 PageType = Literal["pricing", "product", "docs"]
 
 
@@ -30,6 +31,16 @@ class TrackedPage(BaseModel):
     url: str
     page_type: PageType
     axes: list[Axis]
+    # False for a pricing page whose prices are rendered client-side (no numbers in the extracted text): its
+    # pricing cell is the pricing model only, and carries `note`
+    prices_on_page: bool = True
+    note: str = ""  # shown on every cell this page sources
+
+    @model_validator(mode="after")
+    def _default_note(self) -> "TrackedPage":
+        if not self.prices_on_page and not self.note:
+            self.note = PRICES_OFF_PAGE_NOTE
+        return self
 
     @field_validator("key")
     @classmethod

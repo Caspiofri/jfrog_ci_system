@@ -225,7 +225,8 @@ def test_a_quote_missing_from_the_page_sets_confidence_zero_and_changes_nothing(
 
     res = go(T2, llm=FakeLLM(misquoting))
     assert res.items == []  # an unverified value never overwrites a cell
-    assert res.report["unconfirmed"] == [{"competitor": "acme", "page": "pricing", "axes": ["pricing_model"]}]
+    assert res.report["unconfirmed"] == [{"competitor": "acme", "page": "pricing", "axes": ["pricing_model"],
+                                          "reasons": {"pricing_model": "evidence quote not on the page"}}]
     store = cells(tmp)
     assert "$150" in store.get("acme", "pricing_model").value
     store.close()
@@ -297,4 +298,36 @@ def test_cli_rejects_an_unknown_competitor():
     with pytest.raises(SystemExit) as exc:
         main(["--competitors", "jfrog,nope"])
     assert exc.value.code == 2
+
+
+def test_a_number_not_on_the_page_leaves_the_cell_unconfirmed(env):
+    site, _, go, tmp = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_price_edit")
+
+    def invented(prompt, schema):
+        out = answer(prompt, schema)
+        if "pricing_model" in out:  # right quote, but a price the page does not show
+            out["pricing_model"]["value"] = "Free $0/month; Pro $199/month; Enterprise contact sales"
+            out["pricing_model"]["tiers"][1]["price"] = 199
+        return out
+
+    res = go(T2, llm=FakeLLM(invented))
+    assert res.items == []
+    assert res.report["unconfirmed"][0]["reasons"] == {"pricing_model": "numbers not on the page: 199"}
+
+
+def test_a_page_without_prices_tells_the_extractor_and_notes_its_cells(tmp_path):
+    page = TrackedPage(key="plans", url=PRICING_URL, page_type="pricing", axes=["pricing_model"],
+                       prices_on_page=False)
+    llm = FakeLLM(lambda prompt, schema: {"pricing_model": {
+        "value": "Free, Pro and Enterprise plans", "evidence": "The Enterprise plan is priced on request",
+        "confidence": 0.7}})
+    res = run(TrackedPages(competitors={"acme": [page]}), llm=llm, fetch=Site({PRICING_URL: html("pricing_v1")}),
+              data_dir=tmp_path / "d", out_dir=tmp_path / "o", now=T1)
+    assert statuses(res) == {"plans": "baseline"}
+    assert "renders its prices client-side" in llm.calls[0][0]
+    store = CellStore(tmp_path / "d" / DB_NAME)
+    assert store.get("acme", "pricing_model").note == "prices rendered client-side; pricing model only"
+    store.close()
 
