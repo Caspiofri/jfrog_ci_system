@@ -142,3 +142,55 @@ def test_change_detection_stores_migrate_legacy_rows(tmp_path):
     with sqlite3.connect(snaps) as con:
         con.execute("INSERT INTO snapshots VALUES (?, 'pricing', 'u', 'h', '2026-10-30T00:00:00+00:00', 'p')", (OLD,))
     assert SnapshotStore(snaps, tmp_path / "s")._db.execute("SELECT competitor FROM snapshots").fetchall() == [("aws",)]
+
+
+def _cell_row(competitor, value, as_of, checked_at="2026-10-30T00:00:00+00:00"):
+    return (competitor, "pricing_model", value, "", 0.9, "[]", "u", "pricing", as_of, checked_at, "", 0, "", 0, "")
+
+
+def _seed(db, *rows, history=(), changes=()):
+    from ci.changes.diff import CellStore
+
+    CellStore(db)  # create the tables
+    with sqlite3.connect(db) as con:
+        for row in rows:
+            con.execute(f"INSERT INTO cells VALUES ({', '.join('?' * len(row))})", row)
+        for row in history:
+            con.execute(f"INSERT INTO cell_history VALUES ({', '.join('?' * (len(row) + 3))})", (*row, RUN, "e", ""))
+        for change_id, item, published_in in changes:
+            con.execute("INSERT INTO changes VALUES (?, ?, ?, ?)", (change_id, RUN, json.dumps(item), published_in))
+    return CellStore(db)
+
+
+def test_cell_collision_keeps_the_newer_legacy_row(tmp_path):
+    store = _seed(tmp_path / "c.sqlite", _cell_row(OLD, "legacy, newer", "2026-10-29T00:00:00+00:00"),
+                  _cell_row("aws", "current, older", "2026-10-20T00:00:00+00:00"))
+    assert store._db.execute("SELECT competitor, value FROM cells").fetchall() == [("aws", "legacy, newer")]
+
+
+def test_cell_collision_keeps_the_newer_current_row(tmp_path):
+    store = _seed(tmp_path / "c.sqlite", _cell_row(OLD, "legacy, older", "2026-10-20T00:00:00+00:00"),
+                  _cell_row("aws", "current, newer", "2026-10-29T00:00:00+00:00"))
+    assert store._db.execute("SELECT competitor, value FROM cells").fetchall() == [("aws", "current, newer")]
+
+
+def test_cell_collision_on_the_same_as_of_uses_checked_at(tmp_path):
+    day = "2026-10-29T00:00:00+00:00"
+    store = _seed(tmp_path / "c.sqlite", _cell_row(OLD, "legacy, checked later", day, "2026-10-30T09:00:00+00:00"),
+                  _cell_row("aws", "current", day, "2026-10-30T08:00:00+00:00"))
+    assert store._db.execute("SELECT competitor, value FROM cells").fetchall() == [("aws", "legacy, checked later")]
+
+
+def test_cell_history_rows_are_all_renamed(tmp_path):
+    rows = [_cell_row(OLD, "v1", "2026-10-01T00:00:00+00:00"), _cell_row("aws", "v2", "2026-10-29T00:00:00+00:00")]
+    store = _seed(tmp_path / "c.sqlite", history=rows)
+    assert [h["value"] for h in store.history("aws", "pricing_model")] == ["v1", "v2"]
+    assert store.history(OLD, "pricing_model") == []
+
+
+def test_unpublished_change_items_are_migrated_and_published_ones_kept(tmp_path):
+    item = {"id": "x", "competitor": OLD, "axis": "pricing_model"}
+    store = _seed(tmp_path / "c.sqlite", changes=[("x", item, ""), ("y", {**item, "id": "y"}, "20261029T0800Z-a")])
+    rows = dict(store._db.execute("SELECT id, item FROM changes").fetchall())
+    assert json.loads(rows["x"])["competitor"] == "aws"
+    assert json.loads(rows["y"])["competitor"] == OLD  # already written out: its file is never rewritten either

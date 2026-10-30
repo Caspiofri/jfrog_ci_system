@@ -218,7 +218,19 @@ class CellStore:
         # every Changes item, with the run that wrote it to output/changes/<run_id>.jsonl ('' = not yet written)
         self._db.execute("CREATE TABLE IF NOT EXISTS changes (id TEXT PRIMARY KEY, run_id TEXT, item TEXT, "
                          "published_in TEXT)")
-        ci_config.migrate_legacy_keys(self._db, ["cells", "cell_history"])  # aws_codeartifact -> aws
+        # aws_codeartifact -> aws: cells keep the newer of a colliding pair; history rows are all renamed
+        ci_config.migrate_legacy_keys(self._db, ["cells", "cell_history"], unique={"cells": ("axis",)})
+        self._migrate_unpublished_items()
+
+    def _migrate_unpublished_items(self) -> None:
+        """Legacy competitor keys inside Changes items not yet written out (published files are never rewritten)."""
+        rows = self._db.execute("SELECT id, item FROM changes WHERE published_in = ''").fetchall()
+        with self._db:
+            for change_id, raw in rows:
+                item = json.loads(raw)
+                if ci_config.canonical_key(item.get("competitor")) != item.get("competitor"):
+                    item["competitor"] = ci_config.canonical_key(item["competitor"])
+                    self._db.execute("UPDATE changes SET item = ? WHERE id = ?", (json.dumps(item), change_id))
 
     @staticmethod
     def _values(c: Cell) -> tuple:

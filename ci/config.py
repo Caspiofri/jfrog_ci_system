@@ -29,13 +29,31 @@ def canonical_counts(counts):
     return out
 
 
-def migrate_legacy_keys(db, tables: list[str]) -> None:
-    """Rename legacy competitor keys in sqlite state tables (change detection's own stores). UPDATE OR IGNORE:
-    a row that would collide with an existing current-key row is left as it was, never lost."""
+def migrate_legacy_keys(db, tables: list[str], unique: dict[str, tuple[str, ...]] | None = None,
+                        newest_by: tuple[str, ...] = ("as_of", "checked_at")) -> None:
+    """Rename legacy competitor keys in sqlite state tables (change detection's own stores). In a table with a
+    unique key (`unique`: table -> its columns besides competitor), a legacy row that collides with a current-key
+    row is resolved first: the newer of the two by `newest_by` is kept and the other deleted."""
     with db:
         for table in tables:
             for old, new in LEGACY_COMPETITOR_KEYS.items():
-                db.execute(f"UPDATE OR IGNORE {table} SET competitor = ? WHERE competitor = ?", (new, old))
+                if unique and table in unique:
+                    _drop_older_twin(db, table, old, new, unique[table], newest_by)
+                db.execute(f"UPDATE {table} SET competitor = ? WHERE competitor = ?", (new, old))
+
+
+def _drop_older_twin(db, table: str, old: str, new: str, key: tuple[str, ...], newest_by: tuple[str, ...]) -> None:
+    order = ", ".join(f"COALESCE({c}, '')" for c in newest_by)
+    match = " AND ".join(f"{c} IS ?" for c in key)
+    for rowid, *rest in db.execute(f"SELECT rowid, {', '.join(key)}, {order} FROM {table} WHERE competitor = ?",
+                                   (old,)).fetchall():
+        key_values, legacy_age = rest[:len(key)], tuple(rest[len(key):])
+        twin = db.execute(f"SELECT rowid, {order} FROM {table} WHERE competitor = ? AND {match}",
+                          (new, *key_values)).fetchone()
+        if twin is None:
+            continue
+        older = twin[0] if legacy_age > tuple(twin[1:]) else rowid  # a tie keeps the current-key row
+        db.execute(f"DELETE FROM {table} WHERE rowid = ?", (older,))
 
 
 def canonical_item(row: dict) -> dict:
