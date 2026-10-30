@@ -1,5 +1,14 @@
 """Extraction quality detector: real articles pass; consent/nav walls and pages about something else fail."""
-from ci.extraction_quality import BOILERPLATE_MAX_RATIO, TITLE_MIN_COVERAGE, assess, title_coverage
+import pytest
+
+from ci.extraction_quality import (
+    BOILERPLATE_MAX_RATIO,
+    BOILERPLATE_MIN_CHARS,
+    TITLE_MIN_COVERAGE,
+    assess,
+    boilerplate_ratio,
+    title_coverage,
+)
 
 ARTICLE = """Sonatype on Tuesday launched Nexus Repository Pro+, adding AI model screening to its repository manager.
 The new tier scans models pulled from Hugging Face for malicious pickles and licence problems before they reach
@@ -38,8 +47,16 @@ def test_a_real_article_passes():
     assert q.ok and q.reasons == [] and q.title_coverage >= 0.8 and q.boilerplate_ratio < 0.1
 
 
-def test_a_cookie_and_nav_page_fails_on_boilerplate():
+def test_a_short_cookie_and_nav_page_fails_on_its_wall_phrase():
+    assert len(CONSENT_WALL) < BOILERPLATE_MIN_CHARS
     q = assess("Sonatype launches Nexus Repository Pro+ for AI model screening", CONSENT_WALL)
+    assert not q.ok and "page wall ('we value your privacy')" in q.reasons
+
+
+def test_a_long_cookie_and_nav_page_fails_on_boilerplate():
+    wall = CONSENT_WALL + "\n" + "\n".join(f"Section {i}" for i in range(30))
+    assert len(wall) >= BOILERPLATE_MIN_CHARS
+    q = assess("Sonatype launches Nexus Repository Pro+ for AI model screening", wall)
     assert not q.ok and q.boilerplate_ratio > BOILERPLATE_MAX_RATIO
     assert any("boilerplate" in r for r in q.reasons)
 
@@ -55,10 +72,35 @@ def test_a_short_legitimate_release_note_is_not_junk():
     assert q.ok, q.reasons
 
 
-def test_tiny_js_walls_fail_on_boilerplate_even_without_title_signal():
-    q = assess("Roku developer repositories moved from GitHub to GitLab",
-               "Please enable JavaScript in your browser to use this website.\nReload Page")
-    assert not q.ok
+# the three short pages that the boilerplate ratio flagged as junk (78-100%) before BOILERPLATE_MIN_CHARS
+SHORT_REAL = {
+    "release note": ("cloudsmith-cli Release v1.31.0", "v1.31.0\nHighlights\nFaster uploads\nNew `cloudsmith whoami`\n"
+                     "Bug fixes\n- retry on 502 from the API\nFull Changelog: v1.30.1...v1.31.0"),
+    "changelog entry": ("Secret scanning now covers npm tokens", "Changelog\nOctober 29, 2026\nImprovement\n"
+                        "Security\nnpm\nSecret scanning covers npm tokens."),
+    "sso news": ("GitLab adds SSO sign in for self-managed instances",
+                 "GitLab adds SSO sign in for self-managed instances\nSign in with your identity provider\n"
+                 "Admins can require SSO for every sign in to the instance."),
+}
+
+
+@pytest.mark.parametrize("name", list(SHORT_REAL))
+def test_short_real_pages_are_not_junk(name):
+    title, text = SHORT_REAL[name]
+    assert boilerplate_ratio(text) > BOILERPLATE_MAX_RATIO  # what flagged them before
+    q = assess(title, text)
+    assert q.ok, q.reasons
+
+
+@pytest.mark.parametrize("text", [
+    "Please enable JavaScript in your browser to use this website.\nReload Page",
+    "M\nmali-pagecache-root\nLoading",
+    "Verifying your browser before proceeding...\nIncident ID:\nd548d34c-bsff-4369-b9dd-83432f06706c",
+    "We use cookies to give you the best experience.\nAccept all\nReject all",
+])
+def test_tiny_walls_fail_on_their_wall_phrase_even_without_title_signal(text):
+    q = assess("Roku developer repositories moved from GitHub to GitLab", text)
+    assert not q.ok and any(r.startswith("page wall") for r in q.reasons)
 
 
 def test_title_coverage_matches_word_forms_and_ignores_stopwords():

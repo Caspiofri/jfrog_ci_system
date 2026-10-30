@@ -6,7 +6,9 @@ Two signals:
 - title coverage: the share of the title's content words (4+ letters, stopwords dropped) found in the text. A page
   that never mentions what its title is about is not the article (a consent wall, a homepage, an error page).
 - boilerplate ratio: the share of the text's characters on boilerplate lines (cookie/consent, subscribe, sign in,
-  copyright, social share, and short nav-like link lines).
+  copyright, social share, and short nav-like link lines). Only for texts of BOILERPLATE_MIN_CHARS or more: a short
+  release note, changelog entry or news item is mostly short lines by nature. A short text is junk instead when it
+  carries an explicit wall phrase (enable JavaScript, verifying your browser, we use cookies, a lone "Loading").
 """
 import re
 from dataclasses import dataclass, field
@@ -20,6 +22,10 @@ TITLE_MIN_COVERAGE = 0.25  # below this share of the title's content words, the 
 TITLE_CHECK_MIN_WORDS = 40  # shorter texts (release notes, teasers) are not judged on title coverage
 TITLE_MIN_CONTENT_WORDS = 2  # a title with fewer content words gives no signal
 BOILERPLATE_MAX_RATIO = 0.5  # above this share of characters on boilerplate lines, the text is junk
+# Below this many characters the ratio is not applied (short release notes, changelog entries and a short SSO
+# "sign in" item scored 78-100%); WALL_RE judges short texts instead. The smallest consent wall in the fixtures is
+# ~380 chars and the walls of run 20261030T0836Z-5d06a9 are 29-93 chars, all caught by their wall phrases.
+BOILERPLATE_MIN_CHARS = 500
 NAV_LINE_MAX_WORDS = 3  # a short line with no sentence punctuation reads as a menu entry...
 NAV_LINE_MAX_CHARS = 40  # ...if it is also short in characters
 STEM_CHARS = 5  # "launches" matches "launched": words are compared on their first 5 letters
@@ -37,6 +43,14 @@ BOILERPLATE_RE = re.compile(
     r"copyright|all rights reserved|share (?:on|this|via)|follow us|tweet|linkedin|facebook|whatsapp|"
     r"advertisement|sponsored|enable javascript|your browser)\b|©",
     re.IGNORECASE)
+
+# a page that is only a gate in front of the content: JS / bot checks, consent walls, a lone loading line
+WALL_RE = re.compile(
+    r"enable javascript|javascript (?:is )?(?:required|disabled)|verifying (?:your browser|you are (?:a )?human)|"
+    r"checking (?:your browser|if the site connection is secure)|just a moment\.\.\.|are you a robot|captcha|"
+    r"access denied|we use cookies|accept (?:all )?cookies|cookie (?:settings|preferences)|we value your privacy|"
+    r"^\s*(?:loading|please wait)\W*$",
+    re.IGNORECASE | re.MULTILINE)
 
 
 @dataclass
@@ -83,7 +97,11 @@ def assess(title: str, text: str) -> Quality:
     if coverage is not None and len(_words(text)) >= TITLE_CHECK_MIN_WORDS and coverage < TITLE_MIN_COVERAGE:
         reasons.append(f"title words missing from the text ({coverage:.0%} found)")
     ratio = boilerplate_ratio(text)
-    if ratio > BOILERPLATE_MAX_RATIO:
+    if len((text or "").strip()) < BOILERPLATE_MIN_CHARS:
+        wall = WALL_RE.search(text or "")
+        if wall:
+            reasons.append(f"page wall ({' '.join(wall.group(0).split()).lower()!r})")
+    elif ratio > BOILERPLATE_MAX_RATIO:
         reasons.append(f"mostly boilerplate ({ratio:.0%} of the text)")
     return Quality(ok=not reasons, reasons=reasons, title_coverage=1.0 if coverage is None else coverage,
                    boilerplate_ratio=ratio)
