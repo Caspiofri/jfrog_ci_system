@@ -268,3 +268,38 @@ def test_a_crash_mid_write_leaves_the_old_file_intact(env, monkeypatch):
         client.post("/api/labels", json=_label(score=5))
     assert labels.read_text(encoding="utf-8") == before
     assert [p.name for p in labels.parent.iterdir()] == [labels.name]  # no temp file left behind
+
+
+def test_bad_extraction_round_trips_and_old_labels_read_back_as_null(env):
+    client, labels = env
+    assert client.post("/api/labels", json=_label(bad_extraction=True)).status_code == 200
+    saved = client.get("/api/runs/run_new/items").json()[0]["label"]
+    assert saved["bad_extraction"] is True and saved["category"] == "Security" and saved["score"] == 4
+    assert client.get("/api/stats").json()["bad_extraction"] == 1
+    client.post("/api/labels", json=_label())  # unchecked
+    assert client.get("/api/runs/run_new/items").json()[0]["label"]["bad_extraction"] is False
+    labels.write_text(json.dumps({"id": "id1", "run_id": "run_new", "competitor": "snyk", "category": "Security",
+                                  "score": 4, "noise": False, "basis": "full"}) + "\n", encoding="utf-8")
+    old = client.get("/api/runs/run_new/items").json()[0]["label"]
+    assert old["bad_extraction"] is None and client.get("/api/stats").json()["bad_extraction"] == 0
+
+
+def test_cards_never_show_the_detectors_verdict(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    junk = _packet(1, text_status="junk", text="Menu " * 400, extraction_reasons=["mostly boilerplate (90%)"])
+    short = _packet(2, text_status="junk", text="Sign in", extraction_reasons=["mostly boilerplate"])
+    _write_run(runs, "r", [junk, short], 1_000)
+    client = TestClient(create_app(runs_dir=runs, labels_path=tmp_path / "l.jsonl", competitors=COMPETITORS))
+    items = client.get("/api/runs/r/items").json()
+    assert [i["text_status"] for i in items] == ["full", "partial"]
+    assert all("extraction_reasons" not in i for i in items)
+    assert "junk" not in json.dumps(items) and "boilerplate" not in json.dumps(items)
+
+
+def test_page_offers_the_toggle_with_a_shortcut():
+    from ci.labeling.app import PAGE_PATH
+
+    page = PAGE_PATH.read_text(encoding="utf-8")
+    assert "<kbd>x</kbd> bad extraction" in page and 'k === "x"' in page and "Bad extraction" in page
+    assert 'id="p-bad"' in page

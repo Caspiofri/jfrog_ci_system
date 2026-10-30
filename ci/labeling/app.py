@@ -1,4 +1,4 @@
-"""Labeling page API: serves a run's packets and appends Ofri's labels to the golden set (PRD D11, D14). No LLM."""
+"""Labeling page API: serves a run's packets and writes Ofri's labels to the golden set (PRD D11, D14). No LLM."""
 import json
 import logging
 import os
@@ -16,6 +16,7 @@ from ci import config
 from ci.labeling import stratified
 from ci.packet import NON_COMPETITOR
 from config.settings import EVALS_DIR, OUTPUT_DIR
+from modules.reader import FULL_TEXT_MIN_CHARS
 
 RUNS_DIR = OUTPUT_DIR / "runs"
 LABELS_PATH = EVALS_DIR / "golden_set.jsonl"  # append-only; not evals/golden_set.json, which is an older file
@@ -44,6 +45,9 @@ class LabelIn(BaseModel):
     noise: bool = False
     mentions_jfrog: bool = False
     basis: Literal["full", "partial"]  # did Ofri read the full article, or only part of it, before labeling
+    # the shown text was not the article (boilerplate, nav, another page); category/score/competitor still describe
+    # the real article. Old labels without it read back as None.
+    bad_extraction: bool = False
     note: str = ""
 
     @model_validator(mode="after")
@@ -132,10 +136,20 @@ def _replace_atomically(path: Path, text: str) -> None:
         pass
 
 
+def blind(item: dict) -> dict:
+    """The item without the automatic extraction verdict: a "junk" status shows as full/partial by length, and the
+    detector's reasons are dropped. Ofri's Bad extraction flags measure that detector, so they must not see it."""
+    item = {k: v for k, v in item.items() if k != "extraction_reasons"}
+    if item.get("text_status") == "junk":
+        item["text_status"] = "full" if len(item.get("text") or "") >= FULL_TEXT_MIN_CHARS else "partial"
+    return item
+
+
 def latest_labels(path: Path) -> dict[str, dict]:
     """Item id -> its latest label; later lines win."""
     rows = (r for r in read_jsonl(path) if isinstance(r.get("id"), str) and isinstance(r.get("noise"), bool))
-    return {row["id"]: {"basis": None, **row} for row in rows}  # lines from before `basis` read back as None
+    # lines from before `basis` / `bad_extraction` existed read back as None
+    return {row["id"]: {"basis": None, "bad_extraction": None, **row} for row in rows}
 
 
 def read_mentions(path: Path) -> dict[str, dict[str, int]]:
@@ -221,7 +235,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
     def items(run_id: str) -> list[dict]:
         labels = latest_labels(labels_path)
         side = read_mentions(runs_dir / f"{run_id}.mentions.json")
-        return [{**item, "mentions": item.get("mentions") or side.get(item.get("id")),
+        return [{**blind(item), "mentions": item.get("mentions") or side.get(item.get("id")),
                  "label": labels.get(item.get("id"))} for item in load_run(run_id)]
 
     def queue_for(run_id: str, rebuild: bool) -> dict:
@@ -254,7 +268,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         for lab in labels:
             per_basis[lab["basis"] if lab["basis"] in per_basis else "unknown"] += 1
         return {"labeled": len(labels), "noise": noise, "relevant": len(labels) - noise, "per_category": per_cat,
-                "per_basis": per_basis}
+                "per_basis": per_basis, "bad_extraction": sum(lab.get("bad_extraction") is True for lab in labels)}
 
     @app.post("/api/labels")
     def save_label(label: LabelIn) -> dict:

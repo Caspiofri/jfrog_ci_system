@@ -66,6 +66,7 @@
   button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.noise.on { background: var(--red); border-color: var(--red); }
   button.jf.on { background: var(--green); border-color: var(--green); }
+  button.bad.on { background: var(--amber); border-color: var(--amber); color: #fff; }
   .cat { font-size: 12px; padding: 2px 7px; }
   .cat u { text-decoration: underline; text-underline-offset: 2px; }
   .score { width: 28px; padding: 3px 0; font-weight: 600; }
@@ -97,6 +98,7 @@
       <span class="meter"><i id="meter"></i></span>
       <span class="chip main" id="p-run"></span>
       <span class="chip noise" id="p-noise"></span>
+      <span class="chip" id="p-bad" title="Labels in this run whose shown text was not the article"></span>
       <span class="chip" id="p-basis" title="What the labels in this run were based on: the full article or part of it"></span>
       <span id="p-cats" class="progress"></span>
       <span class="chip" id="p-gold" title="Whole golden set, all runs. Target: ~40 competitor items + ~20 noise"></span>
@@ -106,7 +108,7 @@
   <div class="legend">
     <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>1</kbd>–<kbd>5</kbd> score · <kbd>n</kbd> noise ·
     category <kbd>p</kbd> Product <kbd>r</kbd> Pricing <kbd>a</kbd> AI <kbd>s</kbd> Security <kbd>f</kbd> Funding/M&amp;A <kbd>c</kbd> Customers <kbd>l</kbd> Leadership ·
-    <kbd>m</kbd> mentions JFrog · <kbd>e</kbd> expand · <kbd>o</kbd> open article (sets read: full) · <kbd>b</kbd> read full/partial · <kbd>/</kbd> note · <kbd>Enter</kbd> save &amp; next
+    <kbd>m</kbd> mentions JFrog · <kbd>x</kbd> bad extraction · <kbd>e</kbd> expand · <kbd>o</kbd> open article (sets read: full) · <kbd>b</kbd> read full/partial · <kbd>/</kbd> note · <kbd>Enter</kbd> save &amp; next
   </div>
 </header>
 <main id="list"><div class="empty">Loading…</div></main>
@@ -159,6 +161,7 @@ function draftFrom(item) {
     // new: "partial" until the article is opened from the card; saved: keep what was stored (null on lines
     // from before basis existed, so the analyst picks one rather than the page claiming "partial")
     basis: l ? l.basis || null : "partial",
+    bad_extraction: l ? l.bad_extraction === true : false,
     note: l ? l.note || "" : "",
   };
 }
@@ -210,6 +213,9 @@ function renderCard(item, idx) {
     onclick: () => toggleNoise(idx) }, "Noise"));
   scores.append(el("button", { class: "jf" + (d.mentions_jfrog ? " on" : ""), title: "Mentions JFrog  [m]",
     onclick: () => toggleJfrog(idx) }, "Mentions JFrog"));
+  scores.append(el("button", { class: "bad" + (d.bad_extraction ? " on" : ""),
+    title: "The text shown is not the article (menus, cookie banner, another page). Still label the real article.  [x]",
+    onclick: () => toggleBad(idx) }, "Bad extraction"));
 
   const note = el("input", { type: "text", placeholder: "note (optional)", value: d.note });
   note.oninput = (e) => { d.note = e.target.value; };
@@ -277,6 +283,7 @@ function mentionsLine(item) {
   return line;
 }
 function toggleJfrog(idx) { const d = items[idx].draft; d.mentions_jfrog = !d.mentions_jfrog; refreshCard(idx); }
+function toggleBad(idx) { const d = items[idx].draft; d.bad_extraction = !d.bad_extraction; refreshCard(idx); }
 function toggleText(idx) {
   const c = cards[idx], text = items[idx].text || "";
   if (!c._more) return;
@@ -323,6 +330,7 @@ function updateProgress() {
   const noise = labeled.filter((i) => i.label.noise).length;
   $("p-run").innerHTML = "<b>" + labeled.length + "</b> / " + total + " labeled";
   $("p-noise").innerHTML = "noise <b>" + noise + "</b>";
+  $("p-bad").innerHTML = "bad extraction <b>" + labeled.filter((i) => i.label.bad_extraction === true).length + "</b>";
   const full = labeled.filter((i) => i.label.basis === "full").length;
   const partial = labeled.filter((i) => i.label.basis === "partial").length;
   const unknown = labeled.length - full - partial;
@@ -425,6 +433,7 @@ document.addEventListener("keydown", (e) => {
   else if (k >= "1" && k <= "5") setScore(active, Number(k));
   else if (k === "n") toggleNoise(active);
   else if (k === "m") toggleJfrog(active);
+  else if (k === "x") toggleBad(active);
   else if (k in CAT_KEYS) setCategory(active, CAT_KEYS[k]);
   else if (k === "e") toggleText(active);
   else if (k === "o") openArticle(active);
