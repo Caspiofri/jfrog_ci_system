@@ -1,5 +1,6 @@
 """Vendor feeds collector: each competitor's official blog and changelog RSS/Atom feeds, from config, plus the
 HTML listing pages configured where a feed is too short to cover the window (ci.collectors.listing_pages)."""
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, time
 
@@ -12,12 +13,18 @@ from ci.packet import CollectorResult, Packet
 SOURCE = "vendor_feed"
 
 
+def keyword_re(keyword: str) -> re.Pattern:
+    """Whole words or a whole phrase, any case and spacing: "ecr" must not match "secrets" or "decrease"."""
+    words = r"\s+".join(re.escape(w) for w in keyword.split())
+    return re.compile(rf"(?<!\w){words}(?!\w)", re.IGNORECASE)
+
+
 def _matches(entry, keywords: list[str]) -> bool:
     if not keywords:
         return True
     # match the text a reader sees, not the markup ("code" must not match <code>, "AT&T" must match AT&amp;T)
-    haystack = f"{html_to_text(entry.get('title', ''))} {html_to_text(entry.get('summary', ''))}".lower()
-    return any(k.lower() in haystack for k in keywords)
+    haystack = f"{html_to_text(entry.get('title', ''))} {html_to_text(entry.get('summary', ''))}"
+    return any(keyword_re(k).search(haystack) for k in keywords)
 
 
 def parse(feed, competitor: Competitor, cfg_feed: Feed, since: datetime) -> list[Packet]:

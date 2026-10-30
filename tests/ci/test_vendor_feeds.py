@@ -133,3 +133,27 @@ def test_dates_are_utc_under_a_non_utc_local_timezone(monkeypatch):
 ])
 def test_html_to_text(html, text):
     assert feedutil.html_to_text(html) == text
+
+
+def test_aws_keywords_match_whole_words_only(monkeypatch):
+    """The real AWS What's New filter: "ecr" inside "secrets" or "decrease" must not let those posts in."""
+    from ci import config
+
+    [whats_new] = [f for f in config.load().by_key()["aws"].feeds if "whats-new" in f.url]
+    url = "https://aws.amazon.com/about-aws/whats-new/recent/feed/"
+    monkeypatch.setattr(feedutil.requests, "get", fake_get({url: "aws_whats_new.xml"}))
+    result = vendor_feeds.collect(cfg([whats_new.model_dump()]), SINCE)
+    assert [p.title for p in result.packets] == ["Amazon ECR now supports pull-through cache rules for Chainguard",
+                                                 "Container image scanning, now in more Regions"]  # a spread phrase
+
+
+@pytest.mark.parametrize("keyword,text,hit", [
+    ("ecr", "AWS Secrets Manager", False),
+    ("ecr", "a price decrease", False),
+    ("ecr", "Amazon ECR, now faster", True),
+    ("supply chain", "Software Supply\nChain security", True),
+    ("agent", "agentic workflows", False),
+    ("c++", "C++ support", True),  # regex characters are literal
+])
+def test_keyword_re(keyword, text, hit):
+    assert bool(vendor_feeds.keyword_re(keyword).search(text)) is hit

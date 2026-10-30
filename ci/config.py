@@ -54,7 +54,8 @@ def canonical_item(row: dict) -> dict:
 
 class Feed(BaseModel):
     url: str
-    # keep an entry only if its title or text contains one of these (case-insensitive); empty keeps everything.
+    # keep an entry only if its title or text contains one of these as a whole word or phrase (case-insensitive);
+    # empty keeps everything.
     # Needed for broad feeds such as AWS What's New, where CodeArtifact is a small fraction.
     keywords: list[str] = []
 

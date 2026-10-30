@@ -31,7 +31,9 @@ competitors:
     feeds:
       - url: https://github.blog/changelog/feed/
       - url: https://github.blog/feed/
-        keywords: [security, supply chain, packages, npm, dependabot, codeql, copilot, mcp, agent]
+        # whole words: list the plural and adjective forms too
+        keywords: [security, supply chain, package, packages, npm, dependabot, codeql, copilot, mcp,
+                   agent, agents, agentic]
     # the changelog feed holds only the newest 10 entries; GitHub posted ~30 on 28 Oct, so read the listing too
     listing_pages:
       - url: https://github.blog/changelog/
@@ -68,10 +70,11 @@ competitors:
     hn_queries: ["CodeArtifact", "Amazon ECR", "Amazon Inspector"]
     feeds:
       - url: https://aws.amazon.com/about-aws/whats-new/recent/feed/
-        keywords: [codeartifact, inspector, ecr, elastic container registry, codecatalyst, software supply chain]
+        # whole words or phrases (ci.collectors.vendor_feeds.keyword_re)
+        keywords: [codeartifact, inspector, amazon ecr, elastic container registry, codecatalyst, software supply chain]
       # added: AWS Security Blog, filtered to the supply-chain products
       - url: https://aws.amazon.com/blogs/security/feed/
-        keywords: [codeartifact, inspector, ecr, elastic container registry, software supply chain, sbom]
+        keywords: [codeartifact, inspector, amazon ecr, elastic container registry, software supply chain, sbom]
     github_repos: []
 
   - key: industry

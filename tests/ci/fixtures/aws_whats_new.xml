@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>Recent Announcements</title>
+  <link>https://aws.amazon.com/about-aws/whats-new/recent/</link>
+  <item>
+    <title>AWS Secrets Manager now supports managed rotation for more databases</title>
+    <link>https://aws.amazon.com/about-aws/whats-new/2026/10/secrets-manager-managed-rotation/</link>
+    <pubDate>Thu, 29 Oct 2026 18:00:00 GMT</pubDate>
+    <description>&lt;p&gt;Rotate secrets without writing a Lambda function.&lt;/p&gt;</description>
+  </item>
+  <item>
+    <title>Amazon RDS for PostgreSQL announces a price decrease for Graviton instances</title>
+    <link>https://aws.amazon.com/about-aws/whats-new/2026/10/rds-postgresql-price-decrease/</link>
+    <pubDate>Thu, 29 Oct 2026 17:00:00 GMT</pubDate>
+    <description>Prices decrease by up to 15%.</description>
+  </item>
+  <item>
+    <title>Amazon ECR now supports pull-through cache rules for Chainguard</title>
+    <link>https://aws.amazon.com/about-aws/whats-new/2026/10/amazon-ecr-pull-through-cache-chainguard/</link>
+    <pubDate>Thu, 29 Oct 2026 16:00:00 GMT</pubDate>
+    <description>&lt;p&gt;Cache images from Chainguard in a private registry.&lt;/p&gt;</description>
+  </item>
+  <item>
+    <title>Container image scanning, now in more Regions</title>
+    <link>https://aws.amazon.com/about-aws/whats-new/2026/10/registry-scanning-regions/</link>
+    <pubDate>Thu, 29 Oct 2026 15:00:00 GMT</pubDate>
+    <description>Amazon   Elastic Container
+      Registry basic scanning is now available in three more Regions.</description>
+  </item>
+</channel>
+</rss>
