@@ -517,3 +517,53 @@ def test_degraded_ranker_items_are_missing_not_a_midpoint_score():
     m = evaluate(labels, cls, ranked)
     assert m["score"] == {"n": 1, "exact": 1.0, "within_1": 1.0, "missing": 1}
     assert m["precision_at_k"]["10"] == {"k": 1, "hits": 0, "precision": 0.0}  # the unscored item is not ranked
+
+
+GOOD_TEXT = ("Sonatype launched Nexus Repository Pro+ with AI model screening on Tuesday, adding checks for "
+             "poisoned models to its repository manager. ") * 6
+JUNK_TEXT = "\n".join(["Menu", "Home", "Sign in", "We use cookies. Accept all", "Subscribe",
+                       "© 2026 All rights reserved"] * 6)
+
+
+def test_errors_by_bad_extraction_flag_and_detector_precision_recall():
+    labels = [_label(i, "snyk", "Security", 4) for i in "abcde"]
+    for row, flag in zip(labels, [True, True, False, False, None], strict=True):
+        if flag is not None:
+            row["bad_extraction"] = flag
+    cls = [_cls(i, "gitlab" if i == "a" else "snyk", "Security") for i in "abcde"]
+    m = evaluate(labels, cls, [_ranked(i, 4) for i in "abcde"])
+    assert m["by_bad_extraction"]["true"]["n"] == 2 and m["by_bad_extraction"]["true"]["competitor"]["errors"] == 1
+    assert m["by_bad_extraction"]["false"]["n"] == 2 and m["by_bad_extraction"]["false"]["competitor"]["errors"] == 0
+    assert m["by_bad_extraction"]["unknown"]["n"] == 1
+
+    title = "Sonatype launches Nexus Repository Pro+ AI model screening"
+    items = [{"id": "a", "title": title, "text": JUNK_TEXT},   # flagged bad, detected: TP
+             {"id": "b", "title": title, "text": GOOD_TEXT},   # flagged bad, not detected: FN
+             {"id": "c", "title": title, "text": JUNK_TEXT},   # not flagged, detected: FP
+             {"id": "d", "title": title, "text": GOOD_TEXT},   # TN
+             {"id": "e", "title": title, "text": JUNK_TEXT}]   # no flag: not counted
+    det = eval_golden.detector_vs_flags(labels, items)
+    assert (det["tp"], det["fp"], det["fn"], det["tn"], det["n"]) == (1, 1, 1, 1, 4)
+    assert det["precision"] == 0.5 and det["recall"] == 0.5
+    assert {x["id"] for x in det["misses"]} == {"b", "c"}
+
+
+def test_detector_runs_on_the_run_file_text_in_the_eval(golden):
+    labels, runs, _ = golden
+    rows = [json.loads(x) for x in labels.read_text(encoding="utf-8").splitlines() if x.startswith("{")]
+    for row in rows:
+        row["bad_extraction"] = row["id"] == "b"
+    labels.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    report = run(split="all", live=True, labels_path=labels, runs_dir=runs, out_dir=None, llm=FakeLLM(_respond),
+                 cfg=CFG)
+    det = report["metrics"]["extraction_detector"]
+    assert det["n"] == 3 and det["fn"] == 1  # 'b' is flagged by the labeler; its text looks like an article
+    assert "Junk detector vs Bad extraction flags" in format_report(report)
+
+
+def test_detector_thresholds_are_in_the_fingerprint(monkeypatch):
+    from ci import extraction_quality
+
+    base = eval_golden.fingerprint(CFG)
+    monkeypatch.setattr(extraction_quality, "TITLE_MIN_COVERAGE", 0.5)
+    assert eval_golden.fingerprint(CFG) != base

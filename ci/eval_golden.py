@@ -28,6 +28,7 @@ import numpy as np
 
 from ci import classify as classify_mod
 from ci import config as ci_config
+from ci import extraction_quality
 from ci import mentions as side_mentions
 from ci import rank as rank_mod
 from ci.classify import Classification, Classifier
@@ -246,6 +247,9 @@ def fingerprint(cfg: ci_config.CIConfig | None = None, side_hashes: dict[str, st
         "eval.IMPORTANT_MIN": IMPORTANT_MIN,
         "classify.source": inspect.getsource(classify_mod),
         "rank.source": inspect.getsource(rank_mod),
+        "extraction_quality.source": inspect.getsource(extraction_quality),
+        **{f"extraction_quality.{k}": _frozen(v) for k, v in sorted(vars(extraction_quality).items())
+           if k.isupper()},
         "config": cfg.model_dump(mode="json"),
         "mention_side_files": dict(sorted((side_hashes or {}).items())),  # run_id -> hash, backfilled counts
     }
@@ -253,6 +257,32 @@ def fingerprint(cfg: ci_config.CIConfig | None = None, side_hashes: dict[str, st
 
 
 BASES = ("full", "partial", "unknown")
+BAD_EXTRACTION = ("true", "false", "unknown")
+
+
+def label_bad_extraction(label: dict) -> str:
+    flag = label.get("bad_extraction")
+    return "unknown" if flag is None else str(bool(flag)).lower()
+
+
+def detector_vs_flags(labels: list[dict], items: list[dict]) -> dict:
+    """ci.extraction_quality run on each labeled item's run-file text, against Ofri's Bad extraction flags
+    (positive = junk). Only labels that carry the flag count; works on runs collected before the detector."""
+    text_of = {it["id"]: it for it in items}
+    tp = fp = fn = tn = 0
+    misses = []
+    for row in labels:
+        if row.get("bad_extraction") is None:
+            continue
+        it = text_of[row["id"]]
+        flagged = not extraction_quality.assess(it.get("title") or "", it.get("text") or "").ok
+        actual = bool(row["bad_extraction"])
+        tp, fp = tp + (flagged and actual), fp + (flagged and not actual)
+        fn, tn = fn + (actual and not flagged), tn + (not flagged and not actual)
+        if flagged != actual:
+            misses.append({"id": row["id"], "labeled_bad": actual, "detected_junk": flagged})
+    return {"n": tp + fp + fn + tn, "tp": tp, "fp": fp, "fn": fn, "tn": tn, "precision": _ratio(tp, tp + fp),
+            "recall": _ratio(tp, tp + fn), "misses": misses}
 
 
 def label_basis(label: dict) -> str:
@@ -343,28 +373,32 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
             "noise": {"n": len(rows), "correct": noise_ok, "accuracy": _ratio(noise_ok, len(rows))},
         }
 
-    # errors by what the labeler read before labeling (labels without basis predate the field)
-    by_basis = {}
-    for basis in BASES:
-        rows = [row for row in labels if label_basis(row) == basis]
+    def errors_for(rows: list[dict]) -> dict:
         relevant = [row for row in rows if not row["noise"]]
         cat_rows = [row for row in relevant if row.get("category")]
-        by_basis[basis] = {
+        rows_scored = [r for r in rows if final[r["id"]].score is not None]
+        return {
             "n": len(rows),
             "competitor": {"n": len(relevant),
                            "errors": sum(row["competitor"] != cls[row["id"]].competitor for row in relevant)},
             "category": {"n": len(cat_rows), "errors": sum(row["category"] != cls[row["id"]].category
                                                            for row in cat_rows)},
             "noise": {"n": len(rows), "errors": sum(row["noise"] != cls[row["id"]].noise for row in rows)},
-            "score": {"n": len(rows_scored := [r for r in rows if final[r["id"]].score is not None]),
+            "score": {"n": len(rows_scored),
                       "errors": sum(final[row["id"]].score != label_score(row) for row in rows_scored),
                       "off_by_2_plus": sum(abs(final[row["id"]].score - label_score(row)) > 1 for row in rows_scored),
                       "missing": len(rows) - len(rows_scored)},
         }
 
+    # errors by what the labeler read before labeling (labels without basis predate the field)
+    by_basis = {b: errors_for([row for row in labels if label_basis(row) == b]) for b in BASES}
+    # errors by whether the labeler saw junk instead of the article (labels without the flag predate it)
+    by_bad = {b: errors_for([row for row in labels if label_bad_extraction(row) == b]) for b in BAD_EXTRACTION}
+
     return {
         "n": len(labels),
         "by_basis": by_basis,
+        "by_bad_extraction": by_bad,
         "competitor": {"correct": sum(a == b for a, b in comp_pairs), "n": len(comp_pairs),
                        "accuracy": _ratio(sum(a == b for a, b in comp_pairs), len(comp_pairs)),
                        "per_competitor": per_comp,
@@ -443,6 +477,7 @@ def run(split: str = "train", live: bool = False, labels_path: Path | None = Non
         _log_test_run(report, out_dir)
         return report
     report["metrics"] = evaluate(labels, classifications, ranked)
+    report["metrics"]["extraction_detector"] = detector_vs_flags(labels, items)
     if not live:  # the abstaining LLM scores every ranked item the same midpoint: the order is not a ranking
         report["metrics"]["precision_at_k"] = None
     cls, fin = {c.id: c for c in classifications}, {r.id: r for r in ranked}
@@ -545,12 +580,17 @@ def format_report(report: dict) -> str:
         cells = [f"{_pct(v[k]['accuracy'])} {v[k]['correct']:>3}/{v[k]['n']:<4}" for k in ("competitor", "category",
                                                                                          "noise")]
         lines.append(f"  {method:<16} {v['n']:>6}   " + "   ".join(cells))
-    lines.append("\n  Errors by label basis  items   competitor   category     noise        score (off by 2+)")
-    for basis, v in m["by_basis"].items():
-        if not v["n"]:
-            continue
-        cells = [f"{v[k]['errors']:>3}/{v[k]['n']:<4}" for k in ("competitor", "category", "noise", "score")]
-        lines.append(f"  {basis:<21} {v['n']:>6}   " + "     ".join(cells) + f" ({v['score']['off_by_2_plus']})")
+    for title, key in (("label basis", "by_basis"), ("bad extraction", "by_bad_extraction")):
+        lines.append(f"\n  Errors by {title:<14}  items   competitor   category     noise        score (off by 2+)")
+        for group, v in m[key].items():
+            if not v["n"]:
+                continue
+            cells = [f"{v[k]['errors']:>3}/{v[k]['n']:<4}" for k in ("competitor", "category", "noise", "score")]
+            lines.append(f"  {group:<23} {v['n']:>6}   " + "     ".join(cells) + f" ({v['score']['off_by_2_plus']})")
+    det = m.get("extraction_detector")
+    if det and det["n"]:
+        lines.append(f"\n  Junk detector vs Bad extraction flags (n {det['n']}): precision {_pct(det['precision'])}"
+                     f" recall {_pct(det['recall'])}  tp {det['tp']} fp {det['fp']} fn {det['fn']} tn {det['tn']}")
     for name in ("competitor", "category"):
         conf = m["confusion"][name]
         if conf:
