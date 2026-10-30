@@ -6,7 +6,7 @@ from ci.packet import INDUSTRY, Packet, packet_id
 def test_competitors_config_loads():
     cfg = config.load()
     keys = cfg.by_key()
-    assert {"cloudsmith", "sonatype", "github", "gitlab", "snyk", "aws_codeartifact", INDUSTRY} == set(keys)
+    assert {"cloudsmith", "sonatype", "github", "gitlab", "snyk", "aws", INDUSTRY} == set(keys)
     assert all(c.news_queries for c in cfg.competitors)
     assert cfg.window_days == 7
 

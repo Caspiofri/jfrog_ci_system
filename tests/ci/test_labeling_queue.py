@@ -57,10 +57,12 @@ def test_gap_falls_to_the_rest_when_noise_runs_dry():
 
 
 def test_real_target_sizes_with_six_competitors():
-    keys = ["cloudsmith", "sonatype", "github", "gitlab", "snyk", "aws_codeartifact"]
-    cfg = CIConfig(competitors=[Competitor(key=k, name=k.title()) for k in keys] + [Competitor(key="industry",
-                                                                                              name="Industry")])
-    items = [_item(f"{k}{i}", k, f"{k.title()} launches feature {i}") for k in keys for i in range(9)]
+    keys = ["cloudsmith", "sonatype", "github", "gitlab", "snyk", "aws"]
+    names = {k: k.title() for k in keys} | {"aws": "Amazon ECR"}  # a bare "AWS" is not an alias, its products are
+    cfg = CIConfig(competitors=[Competitor(key=k, name="AWS" if k == "aws" else names[k],
+                                           aliases=["Amazon ECR"] if k == "aws" else []) for k in keys]
+                   + [Competitor(key="industry", name="Industry")])
+    items = [_item(f"{k}{i}", k, f"{names[k]} launches feature {i}") for k in keys for i in range(9)]
     items += [_item(f"ind{i}", "industry", f"Supply chain attack {i}", "google_news") for i in range(12)]
     items += [_item(f"n{i}", "gitlab", f"Gitlab stock price target {i}", "google_news") for i in range(20)]
     q = stratified.build_queue("r1", items, set(), cfg)

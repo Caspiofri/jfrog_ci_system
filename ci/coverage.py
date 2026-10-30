@@ -31,6 +31,7 @@ from pathlib import Path
 import yaml
 
 from ci.classify import CATEGORIES
+from ci.config import canonical_item, canonical_key
 from ci.dedupe import normalize_url
 from config.settings import EVALS_DIR, OUTPUT_DIR
 
@@ -73,7 +74,7 @@ def load_events(path: Path = EVENTS_PATH) -> list[Event]:
         if any(not g for g in groups):
             raise ValueError(f"{e['id']}: empty keyword group")
         d = e["date"] if isinstance(e["date"], date) else date.fromisoformat(str(e["date"]))
-        events.append(Event(id=e["id"], competitor=e["competitor"], date=d, title=e["title"],
+        events.append(Event(id=e["id"], competitor=canonical_key(e["competitor"]), date=d, title=e["title"],
                             official_url=e["official_url"], category=e["category"],
                             expected_importance=int(e["expected_importance"]), urls=list(match.get("urls") or []),
                             keyword_groups=groups))
@@ -214,9 +215,10 @@ def run(run_id: str, runs_dir: Path = RUNS_DIR, events_path: Path = EVENTS_PATH,
     if not kept_path.exists():
         raise FileNotFoundError(f"no kept items for run {run_id} in {runs_dir}")
     first, last, days = run_window(run_id, runs_dir)
+    kept = [canonical_item(r) for r in read_jsonl(kept_path)]  # old runs carry aws_codeartifact
+    dropped = [canonical_item(r) for r in read_jsonl(runs_dir / f"{run_id}.dropped.jsonl")]
     report = {"run_id": run_id, "runs_dir": str(runs_dir), "events_file": str(events_path), "window_days": days,
-              **evaluate(load_events(events_path), read_jsonl(kept_path),
-                         read_jsonl(runs_dir / f"{run_id}.dropped.jsonl"), (first, last))}
+              **evaluate(load_events(events_path), kept, dropped, (first, last))}
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{run_id}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n",
                                             encoding="utf-8")

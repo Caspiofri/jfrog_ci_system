@@ -82,7 +82,7 @@ competitors:
       page_type: product
       axes: [security_scanning, package_coverage, ai_mcp, cicd_integration]
 
-  aws_codeartifact:
+  aws:  # was aws_codeartifact
     # the rate tables are loaded by JavaScript; the text keeps the pay-per-use model and the free tier
     - key: pricing
       url: https://aws.amazon.com/codeartifact/pricing/

@@ -135,7 +135,7 @@ def load_or_build(runs_dir: Path, run_id: str, items: list[dict], labeled: set[s
         try:
             queue = json.loads(path.read_text(encoding="utf-8"))
             if queue.get("version") == QUEUE_VERSION and queue.get("run_id") == run_id:
-                return queue
+                return canonical_queue(queue)
         except (json.JSONDecodeError, OSError, AttributeError):
             pass  # rebuild below
     queue = build_queue(run_id, items, labeled, cfg)
@@ -143,6 +143,13 @@ def load_or_build(runs_dir: Path, run_id: str, items: list[dict], labeled: set[s
     tmp.write_text(json.dumps(queue, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, path)
     return queue
+
+
+def canonical_queue(queue: dict) -> dict:
+    """A stored queue with legacy competitor keys in its bucket names mapped (the file is not rewritten)."""
+    key = ci_config.canonical_key
+    return {**queue, "buckets": [{**b, "name": key(b.get("name"))} for b in queue.get("buckets", [])],
+            "entries": [{**e, "bucket": key(e.get("bucket"))} for e in queue.get("entries", [])]}
 
 
 def with_progress(queue: dict, labels: dict[str, dict], current_hash: str | None = None) -> dict:

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from ci import config as ci_config
 from ci.changes.config import AXES
 from ci.changes.extract import AxisField, Tier, price_text
 
@@ -217,6 +218,7 @@ class CellStore:
         # every Changes item, with the run that wrote it to output/changes/<run_id>.jsonl ('' = not yet written)
         self._db.execute("CREATE TABLE IF NOT EXISTS changes (id TEXT PRIMARY KEY, run_id TEXT, item TEXT, "
                          "published_in TEXT)")
+        ci_config.migrate_legacy_keys(self._db, ["cells", "cell_history"])  # aws_codeartifact -> aws
 
     @staticmethod
     def _values(c: Cell) -> tuple:

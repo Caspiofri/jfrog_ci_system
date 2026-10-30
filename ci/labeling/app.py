@@ -150,7 +150,8 @@ def latest_labels(path: Path) -> dict[str, dict]:
     """Item id -> its latest label; later lines win."""
     rows = (r for r in read_jsonl(path) if isinstance(r.get("id"), str) and isinstance(r.get("noise"), bool))
     # lines from before `basis` / `bad_extraction` existed read back as None
-    return {row["id"]: {"basis": None, "bad_extraction": None, **row} for row in rows}
+    # legacy competitor keys (aws_codeartifact) read back as the current key; the file itself is never rewritten
+    return {row["id"]: {"basis": None, "bad_extraction": None, **config.canonical_item(row)} for row in rows}
 
 
 def read_mentions(path: Path) -> dict[str, dict[str, int]]:
@@ -164,7 +165,8 @@ def read_mentions(path: Path) -> dict[str, dict[str, int]]:
     for item_id, value in data.items() if isinstance(data, dict) else []:
         counts = value.get("mentions", value) if isinstance(value, dict) else None
         if isinstance(counts, dict):
-            out[item_id] = {k: v for k, v in counts.items() if isinstance(v, int) and not isinstance(v, bool)}
+            out[item_id] = config.canonical_counts(
+                {k: v for k, v in counts.items() if isinstance(v, int) and not isinstance(v, bool)})
     return out
 
 
@@ -209,7 +211,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
     def load_run(run_id: str) -> list[dict]:
         if run_id not in run_ids():  # also guards against path tricks in run_id
             raise HTTPException(404, f"unknown run {run_id}")
-        return read_jsonl(runs_dir / f"{run_id}.jsonl")
+        return [config.canonical_item(r) for r in read_jsonl(runs_dir / f"{run_id}.jsonl")]
 
     @app.get("/", response_class=HTMLResponse)
     def page() -> str:

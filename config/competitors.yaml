@@ -55,16 +55,19 @@ competitors:
       - url: https://updates.snyk.io/rss/
     github_repos: []  # snyk/cli releases were all -preview builds; the changelog feed covers releases
 
-  - key: aws_codeartifact
-    name: AWS CodeArtifact
-    news_queries: ['CodeArtifact', '"Amazon Inspector"']  # the quoted "AWS CodeArtifact" returned nothing
-    hn_queries: ["CodeArtifact"]
+  # AWS's artifact and supply-chain products: CodeArtifact, ECR, Inspector (was aws_codeartifact; readers map the old
+  # key). No bare "AWS"/"Amazon" alias: it would match every AWS story.
+  - key: aws
+    name: AWS
+    aliases: [CodeArtifact, "Amazon ECR", "Elastic Container Registry", "Amazon Inspector", "AWS Inspector"]
+    news_queries: ['CodeArtifact', '"Amazon ECR"', '"Amazon Inspector"']  # the quoted "AWS CodeArtifact" returned nothing
+    hn_queries: ["CodeArtifact", "Amazon ECR", "Amazon Inspector"]
     feeds:
       - url: https://aws.amazon.com/about-aws/whats-new/recent/feed/
-        keywords: [codeartifact, inspector, codecatalyst, software supply chain]
+        keywords: [codeartifact, inspector, ecr, elastic container registry, codecatalyst, software supply chain]
       # added: AWS Security Blog, filtered to the supply-chain products
       - url: https://aws.amazon.com/blogs/security/feed/
-        keywords: [codeartifact, inspector, software supply chain, sbom]
+        keywords: [codeartifact, inspector, ecr, elastic container registry, software supply chain, sbom]
     github_repos: []
 
   - key: industry

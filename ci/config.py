@@ -7,6 +7,48 @@ from pydantic import BaseModel
 from config.settings import CONFIG_DIR
 
 COMPETITORS_PATH = CONFIG_DIR / "competitors.yaml"
+# competitor keys that were renamed: old runs, queue files, labels and coverage events keep the old key, and every
+# reader maps it to the new one (the stored files are never rewritten)
+LEGACY_COMPETITOR_KEYS = {"aws_codeartifact": "aws"}
+
+
+def canonical_key(key):
+    """The current competitor key for a possibly legacy one; anything else comes back unchanged."""
+    return LEGACY_COMPETITOR_KEYS.get(key, key) if isinstance(key, str) else key
+
+
+def canonical_counts(counts):
+    """A {competitor: count} dict with legacy keys mapped (and summed into the current key)."""
+    if not isinstance(counts, dict):
+        return counts
+    out: dict = {}
+    for k, v in counts.items():
+        key = canonical_key(k)
+        out[key] = out.get(key, 0) + v if isinstance(v, int) and key in out else v
+    return out
+
+
+def migrate_legacy_keys(db, tables: list[str]) -> None:
+    """Rename legacy competitor keys in sqlite state tables (change detection's own stores). UPDATE OR IGNORE:
+    a row that would collide with an existing current-key row is left as it was, never lost."""
+    with db:
+        for table in tables:
+            for old, new in LEGACY_COMPETITOR_KEYS.items():
+                db.execute(f"UPDATE OR IGNORE {table} SET competitor = ? WHERE competitor = ?", (new, old))
+
+
+def canonical_item(row: dict) -> dict:
+    """A run item or label with its competitor key (and mention counts) mapped to the current keys."""
+    if not isinstance(row, dict):
+        return row
+    out = dict(row)
+    if "competitor" in out:
+        out["competitor"] = canonical_key(out["competitor"])
+    if isinstance(out.get("mentions"), dict):
+        out["mentions"] = canonical_counts(out["mentions"])
+    if isinstance(out.get("item"), dict):  # a label's snapshot
+        out["item"] = canonical_item(out["item"])
+    return out
 
 
 class Feed(BaseModel):
@@ -23,6 +65,8 @@ class Competitor(BaseModel):
     hn_queries: list[str] = []
     feeds: list[Feed] = []
     github_repos: list[str] = []  # "owner/repo"
+    # extra names that mean this competitor (products: "Amazon ECR"), on top of the name and the key
+    aliases: list[str] = []
 
 
 class CIConfig(BaseModel):

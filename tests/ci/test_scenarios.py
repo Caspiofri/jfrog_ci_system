@@ -16,7 +16,8 @@ from tests.ci.test_dedupe import fake_embed
 CFG = CIConfig(window_days=7, competitors=[
     Competitor(key="sonatype", name="Sonatype"), Competitor(key="snyk", name="Snyk"),
     Competitor(key="github", name="GitHub"), Competitor(key="gitlab", name="GitLab"),
-    Competitor(key="aws_codeartifact", name="AWS CodeArtifact"), Competitor(key="industry", name="Industry")])
+    Competitor(key="aws", name="AWS", aliases=["CodeArtifact", "Amazon ECR", "Amazon Inspector"]),
+    Competitor(key="industry", name="Industry")])
 PAGE = "Hyphenate, the finance startup, said the round was led by Nexus. " * 40
 
 
@@ -61,8 +62,8 @@ def test_a_conflicting_duplicates_keep_the_richer_copy_and_leave_the_other_inspe
 # (b) competitor aliases ------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("title,key", [
-    ("Amazon CodeArtifact adds Cargo package support", "aws_codeartifact"),
-    ("AWS's CodeArtifact now supports Swift packages", "aws_codeartifact"),
+    ("Amazon CodeArtifact adds Cargo package support", "aws"),
+    ("AWS's CodeArtifact now supports Swift packages", "aws"),
     ("Sonatype Nexus Repository 3.80 released", "sonatype"),
     ("GitHub Dependabot now supports uv lockfiles", "github"),
     ("GitLab Duo agents learn from your codebase", "gitlab"),

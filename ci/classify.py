@@ -117,17 +117,25 @@ class Classification(BaseModel):
     review_reason: str = ""
 
 
+MIN_NAME_CHARS = 4  # a name or key shorter than this ("AWS") would match every story about the company
+BLOCKED_ALIASES = frozenset({"aws", "amazon", "amazon web services"})  # whole-company names, never a product
+
+
 def aliases(comp: ci_config.Competitor) -> list[str]:
-    """Names to look for, derived from the config (no aliases list there): the name, the key as words, and their
-    distinctive words (6+ letters, so "AWS" alone does not count but "CodeArtifact" does)."""
-    found = {comp.name.lower(), comp.key.replace("_", " ").lower()}
+    """Names to look for: the configured aliases, the name and the key as words (when 4+ letters), and their
+    distinctive words (6+ letters, so "CodeArtifact" counts). A bare "AWS" or "Amazon" never does."""
+    found = {n.lower() for n in (comp.name, comp.key.replace("_", " ")) if len(n) >= MIN_NAME_CHARS}
     for word in re.split(r"[\s_]+", f"{comp.name} {comp.key}"):
         if len(word) >= 6:
             found.add(word.lower())
-    return sorted(found, key=len, reverse=True)
+    found |= {" ".join(a.split()).lower() for a in comp.aliases if a.strip()}
+    return sorted(found - BLOCKED_ALIASES, key=len, reverse=True)
 
 
 def _alias_re(names: Iterable[str]) -> re.Pattern:
+    names = [n for n in names if n]
+    if not names:
+        return re.compile(r"(?!x)x")  # never matches (an empty alternation would match everywhere)
     return re.compile(r"\b(?:" + "|".join(re.escape(n) for n in names) + r")\b", re.IGNORECASE)
 
 
@@ -302,7 +310,8 @@ class Classifier:
         }
 
     def prompt(self, items: list[dict]) -> str:
-        comps = "\n".join(f"- {c.key}: {c.name}" for c in self.cfg.competitors if c.key != INDUSTRY)
+        comps = "\n".join(f"- {c.key}: {c.name}" + (f" ({', '.join(c.aliases)})" if c.aliases else "")
+                           for c in self.cfg.competitors if c.key != INDUSTRY)
         cats = "\n".join(f"- {c}: {d}" for c, d in CATEGORY_DEFINITIONS.items())
         payload = [{"id": it["id"], "prefilled_competitor": it.get("competitor"), "source": it.get("source"),
                     "found_by": it.get("origin"), "publisher": it.get("publisher") or "",

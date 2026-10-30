@@ -9,6 +9,8 @@ import os
 import tempfile
 from pathlib import Path
 
+from ci.config import canonical_counts
+
 log = logging.getLogger(__name__)
 
 SIDE_SUFFIX = ".mentions.json"
@@ -47,7 +49,8 @@ def attach(items: list[dict], runs_dir: Path | None) -> list[dict]:
             cache[run_id] = load_side(runs_dir, run_id)
         entry = cache[run_id].get(item.get("id"))
         if isinstance(entry, dict) and isinstance(entry.get("mentions"), dict) and entry["mentions"]:
-            item = {**item, "mentions": entry["mentions"], "mentions_jfrog": bool(entry.get("mentions_jfrog")),
+            item = {**item, "mentions": canonical_counts(entry["mentions"]),
+                    "mentions_jfrog": bool(entry.get("mentions_jfrog")),
                     "mentions_config": str(entry.get("config") or "")}
         out.append(item)
     return out

@@ -14,7 +14,8 @@ CFG = CIConfig(competitors=[
                                                {"url": "https://www.snyk.io/blog/feed/"}],
                github_repos=["snyk/cli"]),
     Competitor(key="gitlab", name="GitLab"),
-    Competitor(key="aws_codeartifact", name="AWS CodeArtifact"),
+    Competitor(key="aws", name="AWS", aliases=["CodeArtifact", "Amazon ECR", "Elastic Container Registry",
+               "Amazon Inspector", "AWS Inspector"]),
     Competitor(key="industry", name="Industry"),
 ])
 
@@ -49,7 +50,8 @@ def test_categories_match_the_labeling_page():
 
 
 def test_aliases_are_derived_from_name_and_key():
-    assert set(aliases(CFG.by_key()["aws_codeartifact"])) == {"aws codeartifact", "codeartifact"}
+    assert set(aliases(CFG.by_key()["aws"])) == {"codeartifact", "amazon ecr", "elastic container registry",
+                                                 "amazon inspector", "aws inspector"}  # never a bare "aws"
     assert set(aliases(CFG.by_key()["snyk"])) == {"snyk"}
 
 
@@ -180,7 +182,7 @@ def test_schema_restricts_ids_competitors_and_categories():
     schema = Classifier(FakeLLM(), CFG).schema(["a", "b"])
     props = schema["properties"]["items"]["items"]["properties"]
     assert props["id"]["enum"] == ["a", "b"]
-    assert props["competitor"]["enum"] == ["snyk", "gitlab", "aws_codeartifact", "industry", "none"]
+    assert props["competitor"]["enum"] == ["snyk", "gitlab", "aws", "industry", "none"]
     assert props["category"]["enum"] == CATEGORIES
 
 
@@ -247,7 +249,7 @@ def test_rules_work_with_a_single_tracked_competitor():
 
 
 def _with_mentions(item, mentions, jfrog=False):
-    return {**item, "mentions": {"snyk": 0, "gitlab": 0, "aws_codeartifact": 0, **mentions}, "mentions_jfrog": jfrog}
+    return {**item, "mentions": {"snyk": 0, "gitlab": 0, "aws": 0, **mentions}, "mentions_jfrog": jfrog}
 
 
 def test_full_page_mentions_drive_dominance():
@@ -274,11 +276,11 @@ def test_full_page_jfrog_flag_is_used():
 
 def test_full_text_mentions_hint_reaches_the_llm():
     llm = FakeLLM(_answer_all())
-    items = [_with_mentions(_item(1, "Top 5 SCA tools", competitor="industry"), {"aws_codeartifact": 3, "snyk": 1}),
+    items = [_with_mentions(_item(1, "Top 5 SCA tools", competitor="industry"), {"aws": 3, "snyk": 1}),
              _item(2, "Another list", competitor="industry")]
     Classifier(llm, CFG).classify(items)
     payload = json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
-    assert payload[0]["full_text_mentions"] == "aws_codeartifact×3, snyk×1"
+    assert payload[0]["full_text_mentions"] == "aws×3, snyk×1"
     assert "full_text_mentions" not in payload[1]
     assert "full_text_mentions" in llm.calls[0][0].split("Items (JSON)")[0]  # explained in the instructions
 
@@ -312,9 +314,9 @@ def test_urls_are_not_mentions(text, expected):
 
 def test_stale_stored_counts_never_zero_a_competitor():
     c = Classifier(FakeLLM(), CFG)
-    # counts taken before aws_codeartifact was tracked: the key is missing, but the stored text names it
+    # counts taken before aws was tracked: the key is missing, but the stored text names it
     item = {**_item(1, "x", text="CodeArtifact and CodeArtifact, Snyk"), "mentions": {"snyk": 4, "gitlab": 1}}
-    assert c.text_counts(item) == {"snyk": 4, "gitlab": 1, "aws_codeartifact": 2}
+    assert c.text_counts(item) == {"snyk": 4, "gitlab": 1, "aws": 2}
 
 
 def test_mention_config_hash_tracks_the_name_rules():

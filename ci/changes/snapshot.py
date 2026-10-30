@@ -15,6 +15,7 @@ from pathlib import Path
 
 import requests
 
+from ci import config as ci_config
 from modules.reader import _HEADERS, extract_main_text
 
 KEEP_SNAPSHOTS = 10
@@ -78,6 +79,7 @@ class SnapshotStore:
         self._db.execute("CREATE TABLE IF NOT EXISTS snapshots (competitor TEXT, page_key TEXT, url TEXT, "
                          "hash TEXT, fetched_at TEXT, path TEXT)")
         self._db.execute("CREATE INDEX IF NOT EXISTS snapshots_page ON snapshots (competitor, page_key, fetched_at)")
+        ci_config.migrate_legacy_keys(self._db, ["snapshots"])  # aws_codeartifact -> aws
 
     def _row(self, row) -> Snapshot:
         return Snapshot(row[0], row[1], row[2], row[3], datetime.fromisoformat(row[4]), Path(row[5]))

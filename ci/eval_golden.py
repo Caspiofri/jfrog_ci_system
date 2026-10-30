@@ -305,9 +305,9 @@ def rebuild_item(label: dict, runs_dir: Path, run_cache: dict[str, dict[str, dic
         safe = run_id and "/" not in run_id and "\\" not in run_id
         run_cache[run_id] = {r.get("id"): r for r in read_jsonl(path)} if safe else {}
     original = run_cache[run_id].get(label["id"])
-    if original is not None:
-        return {**original, "id": label["id"]}, False
-    item = {**(label.get("item") or {}), "id": label["id"], "run_id": run_id}
+    if original is not None:  # legacy competitor keys (aws_codeartifact) map to the current one on read
+        return {**ci_config.canonical_item(original), "id": label["id"]}, False
+    item = {**ci_config.canonical_item(label.get("item") or {}), "id": label["id"], "run_id": run_id}
     item["text_status"] = "snippet" if len(item.get("text") or "") < SNIPPET_MAX_CHARS else "full"
     return item, True
 
