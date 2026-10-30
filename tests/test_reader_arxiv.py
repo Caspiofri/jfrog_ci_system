@@ -57,14 +57,28 @@ def test_arxiv_without_abstract_marker_unchanged():
     assert reader.clean_page_text(ABS_URL, "") == ""
 
 
+ABS_PAGE = (Path(__file__).parent / "fixtures" / "arxiv_abs_attention.html").read_text(encoding="utf-8")
+
+
 def test_fetch_text_cleans_by_final_url():
-    resp = MagicMock(status_code=200, url=ABS_URL, text="<html></html>")
-    resp.headers = {"content-type": "text/html"}
-    with patch("modules.reader.requests.get", return_value=resp) as get, \
-            patch("modules.reader.trafilatura.extract", return_value=FIXTURE):
+    """Only the network is faked: the real extraction runs on a real (reduced) arxiv page, then the cleaning."""
+    final = "https://arxiv.org/abs/1706.03762"
+    resp = MagicMock(status_code=200, url=final, text=ABS_PAGE)
+    resp.headers = {"content-type": "text/html; charset=utf-8"}
+    with patch("modules.reader.requests.get", return_value=resp) as get:
         out = reader.fetch_text("https://substack.com/redirect/abc")
     assert get.call_args[0][0] == "https://substack.com/redirect/abc"
-    assert "arXivLabs" not in out and "Abstract:" in out, out
+    assert out.startswith("Title:Attention Is All You Need")
+    assert "[Submitted on 12 Jun 2017" in out and "Abstract:The dominant sequence transduction models" in out
+    assert "arXivLabs" not in out and "Bibliographic" not in out
+
+
+def test_the_same_page_from_elsewhere_is_not_cut():
+    resp = MagicMock(status_code=200, url="https://example.com/mirror", text=ABS_PAGE)
+    resp.headers = {"content-type": "text/html"}
+    with patch("modules.reader.requests.get", return_value=resp):
+        out = reader.fetch_text("https://example.com/mirror")
+    assert "arXivLabs" in out  # cleaning applies only to arxiv.org/abs pages
 
 
 if __name__ == "__main__":
