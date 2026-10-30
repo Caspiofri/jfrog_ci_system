@@ -349,3 +349,16 @@ def test_page_offers_the_reason_only_on_relabel(env):
     page = client.get("/").text
     assert 'item.label ? el("div", { class: "row" }, el("span", { class: "lbl" }, "Why changed")' in page
     assert 'revision_reason: ""' in page
+
+
+def test_the_page_shows_rubric_v2_meanings_from_the_rubric_file(env):
+    client, _ = env
+    rubric = client.get("/api/meta").json()["rubric"]
+    assert set(rubric) == {"5", "4", "3", "2", "1", "noise"}
+    assert rubric["1"].startswith("A routine operational event: patch release")  # v2: 1 = routine, not noise
+    assert rubric["noise"].startswith("Not relevant, or no intelligence value")
+    assert "Industry: A major event in JFrog's market" in rubric["4"]
+    page = client.get("/").text
+    assert "RUBRIC = META.rubric" in page and 'rubricTitle("noise")' in page
+    assert "Noise-level relevance" not in page and "Direct threat" not in page  # the v1 (D14) meanings are gone
+    assert "1 = routine" in page

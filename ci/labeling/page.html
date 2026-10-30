@@ -107,7 +107,8 @@
   </div>
   <div class="buckets" id="buckets"></div>
   <div class="legend">
-    <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>1</kbd>–<kbd>5</kbd> score · <kbd>n</kbd> noise ·
+    <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>1</kbd>–<kbd>5</kbd> score (rubric v2: 1 = routine, hover for each) ·
+    <kbd>n</kbd> noise (no score) ·
     category <kbd>p</kbd> Product <kbd>r</kbd> Pricing <kbd>a</kbd> AI <kbd>s</kbd> Security <kbd>f</kbd> Funding/M&amp;A <kbd>c</kbd> Customers <kbd>l</kbd> Leadership ·
     <kbd>m</kbd> mentions JFrog · <kbd>x</kbd> bad extraction · <kbd>e</kbd> expand · <kbd>o</kbd> open article (sets read: full) · <kbd>b</kbd> read full/partial · <kbd>/</kbd> note · <kbd>Enter</kbd> save &amp; next
   </div>
@@ -117,13 +118,9 @@
 <script>
 const CAT_KEYS = { p: 0, r: 1, a: 2, s: 3, f: 4, c: 5, l: 6 };
 const CAT_SHORT = ["Product", "Pricing", "AI & Agents", "Security", "Funding/M&A", "Customers", "Leadership"];
-const RUBRIC = {
-  5: "5 · Direct threat",
-  4: "4 · Change on a head-to-head axis (pricing, AI/MCP)",
-  3: "3 · Routine product update or relevant industry news",
-  2: "2 · Related, no competitive impact",
-  1: "1 · Noise-level relevance",
-};
+// score meanings come from config/rubric_v2.md via /api/meta (the ranker's own rubric): {"5".."1", "noise"}
+let RUBRIC = {};
+function rubricTitle(key) { return RUBRIC[key] ? (key === "noise" ? "Noise" : key) + " · " + RUBRIC[key] : ""; }
 const TEASER = 400;
 let META = null, items = [], cards = [], active = -1, filter = "unlabeled", saving = false;
 let view = "queue", QUEUE = null, inQueue = new Map(), order = [];  // order: item indices shown, in view order
@@ -214,10 +211,10 @@ function renderCard(item, idx) {
   });
   const scores = el("div", { class: "row" }, el("span", { class: "lbl" }, "Score"));
   for (let s = 1; s <= 5; s++) {
-    scores.append(el("button", { class: "score" + (d.score === s && !d.noise ? " on" : ""), title: RUBRIC[s],
+    scores.append(el("button", { class: "score" + (d.score === s && !d.noise ? " on" : ""), title: rubricTitle(String(s)),
       onclick: () => setScore(idx, s) }, String(s)));
   }
-  scores.append(el("button", { class: "noise" + (d.noise ? " on" : ""), title: "Not relevant at all  [n]",
+  scores.append(el("button", { class: "noise" + (d.noise ? " on" : ""), title: rubricTitle("noise") + "  [n]",
     onclick: () => toggleNoise(idx) }, "Noise"));
   scores.append(el("button", { class: "jf" + (d.mentions_jfrog ? " on" : ""), title: "Mentions JFrog  [m]",
     onclick: () => toggleJfrog(idx) }, "Mentions JFrog"));
@@ -471,6 +468,7 @@ document.addEventListener("keydown", (e) => {
 (async function init() {
   try {
     META = await api("/api/meta");
+    RUBRIC = META.rubric || {};
     const sel = $("run");
     for (const r of META.runs) {
       const st = (META.run_status || {})[r];

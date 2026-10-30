@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, model_validator
 
 from ci import config
+from ci import rank as rank_mod
 from ci.labeling import stratified
 from ci.packet import NON_COMPETITOR
 from config.settings import EVALS_DIR, OUTPUT_DIR
@@ -141,6 +142,22 @@ def _replace_atomically(path: Path, text: str) -> None:
         pass
 
 
+def rubric_meanings(path: Path | None = None) -> dict[str, str]:
+    """{"5".."1", "noise": one line} from the score table of config/rubric_v2.md (the ranker's own rubric), so the
+    labeling page's tooltips can never drift from what the model is told. Industry meanings are appended."""
+    text = (path or rank_mod.RUBRIC_PATH).read_text(encoding="utf-8")
+    out = {}
+    for line in text.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 3 or cells[0].lower() not in {"5", "4", "3", "2", "1", "noise"}:
+            continue
+        meaning = cells[1]
+        if cells[2] and cells[2] not in ("—", "-", "same"):
+            meaning += f" · Industry: {cells[2]}"
+        out[cells[0].lower()] = meaning
+    return out
+
+
 def blind(item: dict) -> dict:
     """The item without the automatic extraction verdict: a "junk" status shows as full/partial by length, and the
     detector's reasons are dropped. Ofri's Bad extraction flags measure that detector, so they must not see it."""
@@ -230,7 +247,8 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
             default = default_run  # asked for by name with --run
         else:
             default = usable[0] if usable else (runs[0] if runs else None)
-        return {"runs": runs, "run_status": status, "default_run": default, "competitors": competitors,
+        return {"rubric": rubric_meanings(),
+                "runs": runs, "run_status": status, "default_run": default, "competitors": competitors,
                 "categories": CATEGORIES}
 
     @app.get("/api/runs")
