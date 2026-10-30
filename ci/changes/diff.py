@@ -180,6 +180,9 @@ class CellStore:
                 "stale_reason TEXT, needs_review INTEGER, review_reason TEXT")
         self._db.execute(f"CREATE TABLE IF NOT EXISTS cells ({cols}, PRIMARY KEY (competitor, axis))")
         self._db.execute(f"CREATE TABLE IF NOT EXISTS cell_history ({cols}, run_id TEXT, event TEXT, change_id TEXT)")
+        # every Changes item, with the run that wrote it to output/changes/<run_id>.jsonl ('' = not yet written)
+        self._db.execute("CREATE TABLE IF NOT EXISTS changes (id TEXT PRIMARY KEY, run_id TEXT, item TEXT, "
+                         "published_in TEXT)")
 
     @staticmethod
     def _values(c: Cell) -> tuple:
@@ -206,14 +209,27 @@ class CellStore:
             q, args = q + " WHERE competitor = ?", (competitor,)
         return [self._cell(r) for r in self._db.execute(q + " ORDER BY competitor, axis", args)]
 
-    def put(self, cell: Cell, run_id: str, event: str, change: str = "") -> None:
-        """Set the current cell; `event` (baseline | changed) also appends it to the history."""
+    def put(self, cell: Cell, run_id: str, event: str, change: "ChangeItem | None" = None) -> None:
+        """Set the current cell; a non-empty `event` also appends it to the history. A Changes item is stored in the
+        same transaction, so a run that dies later cannot lose it (see unpublished)."""
         with self._db:
             row = self._values(cell)
             self._db.execute(f"INSERT OR REPLACE INTO cells VALUES ({', '.join('?' * len(row))})", row)
             if event:
                 self._db.execute(f"INSERT INTO cell_history VALUES ({', '.join('?' * (len(row) + 3))})",
-                                 (*row, run_id, event, change))
+                                 (*row, run_id, event, change.id if change else ""))
+            if change is not None:
+                self._db.execute("INSERT OR IGNORE INTO changes (id, run_id, item, published_in) VALUES (?, ?, ?, '')",
+                                 (change.id, change.run_id, change.model_dump_json()))
+
+    def unpublished(self) -> list[ChangeItem]:
+        """Changes items not yet written to an output file, oldest first, each with the run_id that detected it."""
+        rows = self._db.execute("SELECT item FROM changes WHERE published_in = '' ORDER BY rowid").fetchall()
+        return [ChangeItem.model_validate_json(r[0]) for r in rows]
+
+    def mark_published(self, ids: list[str], run_id: str) -> None:
+        with self._db:
+            self._db.executemany("UPDATE changes SET published_in = ? WHERE id = ?", [(run_id, i) for i in ids])
 
     def history(self, competitor: str, axis: str) -> list[dict]:
         rows = self._db.execute("SELECT value, as_of, confidence, source_url, run_id, event, change_id "

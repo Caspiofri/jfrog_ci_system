@@ -53,10 +53,7 @@ class ChangesRun:
     pages: list[PageResult]
     report: dict
     paths: dict[str, Path]
-
-    @property
-    def items(self) -> list[ChangeItem]:
-        return [i for p in self.pages for i in p.items]
+    items: list[ChangeItem]  # written to <run_id>.jsonl: this run's, plus any an earlier run stored but never wrote
 
 
 def new_run_id(now: datetime) -> str:
@@ -151,7 +148,7 @@ def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, l
         else:
             diff = section_diff(prev_text, text, [old.evidence, new.evidence])
             item = make_change(run_id, page.page_type, old, new, page.url, now, diff, page.note)
-            cells.put(cell, run_id, "changed", item.id)
+            cells.put(cell, run_id, "changed", item)
             res.items.append(item)
             res.cells += 1
     if not res.unconfirmed:
@@ -192,6 +189,8 @@ def format_report(report: dict) -> str:
            f"unchanged by hash {report['unchanged_by_hash']}  changed hash, same fields "
            f"{report['changed_hash_same_fields']}  real changes {report['changes']} "
            f"(on {report['changed_pages']} pages)  failures {len(report['failures'])}"]
+    if report.get("recovered"):
+        out.append(f"  published {report['recovered']} items stored by an earlier run that did not finish")
     if not report["live"]:
         out.append(f"  would extract {report['would_extract']} pages (new or changed hash)")
     out += [f"  FAILED {f['competitor']}/{f['page']}: {f['error']}" for f in report["failures"]]
@@ -211,7 +210,10 @@ def run(pages: TrackedPages, *, llm: JsonLLM | None, fetch: Fetch = http_fetch, 
     kw = {"keep": keep} if keep else {}
     snapshots = SnapshotStore(data_dir / DB_NAME, data_dir / "snapshots", **kw)
     cells = CellStore(data_dir / DB_NAME)
-    results = []
+    results: list[PageResult] = []
+    paths: dict[str, Path] = {}
+    items: list[ChangeItem] = []
+    report: dict = {}
     try:
         for competitor, page in pages.pages(competitors):
             res = PageResult(competitor, page.key, page.url, "failed")
@@ -222,18 +224,19 @@ def run(pages: TrackedPages, *, llm: JsonLLM | None, fetch: Fetch = http_fetch, 
                 log.warning("%s/%s failed: %s", competitor, page.key, e)
                 res.status, res.error = "failed", f"{type(e).__name__}: {e}"
             results.append(res)
+
+        report = build_report(run_id, results, llm is not None, now)
+        if llm is not None:
+            # the items file is built from the changes table, so items stored by a run that died before this point
+            # are published now, under their original run_id
+            items = cells.unpublished()
+            report["recovered"] = sum(1 for i in items if i.run_id != run_id)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            paths = {"items": out_dir / f"{run_id}.jsonl", "report": out_dir / f"{run_id}.report.json"}
+            paths["items"].write_text("".join(i.model_dump_json() + "\n" for i in items), encoding="utf-8")
+            paths["report"].write_text(json.dumps(report, indent=2), encoding="utf-8")
+            cells.mark_published([i.id for i in items], run_id)
     finally:
         snapshots.close()
         cells.close()
-
-    report = build_report(run_id, results, llm is not None, now)
-    paths: dict[str, Path] = {}
-    if llm is not None:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        paths = {"items": out_dir / f"{run_id}.jsonl", "report": out_dir / f"{run_id}.report.json"}
-        with paths["items"].open("w", encoding="utf-8") as fh:
-            for r in results:
-                for item in r.items:
-                    fh.write(item.model_dump_json() + "\n")
-        paths["report"].write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return ChangesRun(run_id, results, report, paths)
+    return ChangesRun(run_id, results, report, paths, items)

@@ -38,13 +38,13 @@ def html(name: str) -> str:
 class Site:
     """The injected fetch: url -> fixture HTML, or an exception to raise. Records the urls fetched."""
 
-    def __init__(self, pages: dict[str, str | Exception]):
+    def __init__(self, pages: dict[str, str | BaseException]):
         self.pages, self.fetched = dict(pages), []
 
     def __call__(self, url: str) -> str:
         self.fetched.append(url)
         page = self.pages[url]
-        if isinstance(page, Exception):
+        if isinstance(page, BaseException):
             raise page
         return page
 
@@ -454,4 +454,32 @@ def test_a_real_change_is_not_mistaken_for_rewording(env):
 
     [item] = go(T2, llm=FakeLLM(new_fact)).items
     assert item.axis == "deployment" and "GCP" in item.new_value
+
+
+class Crash(BaseException):
+    """Kills the run the way a SIGKILL or an out-of-memory would: not caught by the per-page isolation."""
+
+
+def test_items_stored_by_a_crashed_run_are_published_by_the_next_run(env):
+    site, _, go, tmp = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_price_edit")
+    site.pages[PRODUCT_URL] = Crash()  # page 2 kills the run after page 1 stored its change
+    with pytest.raises(Crash):
+        go(T2)
+    assert len(list((tmp / "out").iterdir())) == 2  # only the baseline run wrote its .jsonl and report
+    store = cells(tmp)
+    [lost] = store.unpublished()
+    assert "$180" in lost.new_value and "$180" in store.get("acme", "pricing_model").value
+    store.close()
+
+    site.pages[PRODUCT_URL] = html("product")
+    res = go(T3)
+    assert statuses(res) == {"pricing": "unchanged", "product": "unchanged"}
+    [item] = res.items
+    assert item.id == lost.id and item.run_id == lost.run_id != res.run_id  # keeps the run that detected it
+    assert res.report["recovered"] == 1 and res.report["changes"] == 0
+    rows = [json.loads(line) for line in (tmp / "out" / f"{res.run_id}.jsonl").read_text().splitlines()]
+    assert [r["id"] for r in rows] == [lost.id]
+    assert go(T3 + timedelta(days=1)).items == []  # published once only
 
