@@ -139,6 +139,24 @@ def _alias_re(names: Iterable[str]) -> re.Pattern:
     return re.compile(r"\b(?:" + "|".join(re.escape(n) for n in names) + r")\b", re.IGNORECASE)
 
 
+# the title's subject: it opens with the competitor (after a short lead such as "Exclusive:"), followed by an action
+# verb or in possessive form ("GitHub's npm firewall"); "Malware hidden in GitHub repos" only names a venue
+TITLE_LEAD = r"(?:[^:\s][^:]{0,24}:\s+)?(?:the\s+)?"
+SUBJECT_VERBS = (r"launch(?:es|ed)?|adds?|added|introduc(?:es|ed)|unveil(?:s|ed)?|announc(?:es|ed)|releas(?:es|ed)|"
+                 r"acquir(?:es|ed)|preview(?:s|ed)?|debut(?:s|ed)?|expand(?:s|ed)?|updat(?:es|ed)|ship(?:s|ped)?|"
+                 r"roll(?:s|ed)?\s+out|brings?|brought|makes?|made|patch(?:es|ed)|fix(?:es|ed)")
+
+
+def _subject_re(names: Iterable[str]) -> re.Pattern:
+    alias = "|".join(re.escape(n) for n in names)
+    return re.compile(rf"^{TITLE_LEAD}(?:{alias})(?:['’]s\b|\s+(?:{SUBJECT_VERBS})\b)", re.IGNORECASE)
+
+
+def title_mention_hint(key: str) -> str:
+    """The prompt line for an industry item whose title names a competitor without being about it by rule."""
+    return f"Competitor named in title: {key} — company or platform?"
+
+
 def _host(url: str) -> str:
     host = urlsplit(url).netloc.lower()
     return host[4:] if host.startswith("www.") else host
@@ -232,6 +250,7 @@ class Classifier:
         tracked = [c for c in self.cfg.competitors if c.key != INDUSTRY]
         self.names = {c.key: c.name for c in self.cfg.competitors}
         self.alias_res = {c.key: _alias_re(aliases(c)) for c in tracked}
+        self.subject_res = {c.key: _subject_re(aliases(c)) for c in tracked}
         self.competitor_keys = [c.key for c in self.cfg.competitors] + [NON_COMPETITOR]
         self.own = {c.key: own_sources(c) for c in tracked}  # never for the Industry channel
 
@@ -261,9 +280,9 @@ class Classifier:
         full = item["mentions"] if has_full_mentions(item) else {}
         return {key: max(_as_count(full.get(key)), len(rx.findall(stored))) for key, rx in self.alias_res.items()}
 
-    def title_competitor(self, item: dict) -> str | None:
+    def title_named(self, item: dict) -> str | None:
         """For an item prefilled as industry: the one tracked competitor its title names (whole word, aliases
-        included), or None. Two or more named, or a chatter/marketing/roundup title, settle nothing."""
+        included), or None. Two or more named, or a chatter/marketing/roundup title, name nothing here."""
         if (item.get("competitor") or "") != INDUSTRY:
             return None
         title = item.get("title") or ""
@@ -271,6 +290,12 @@ class Classifier:
             return None
         named = [key for key, rx in self.alias_res.items() if rx.search(title)]
         return named[0] if len(named) == 1 else None
+
+    def title_competitor(self, item: dict) -> str | None:
+        """The competitor settled by rule: named in the title and its subject ("GitHub launches ...", "GitHub's
+        ..."). Named elsewhere in the title, it is left to the LLM with a hint (see classify)."""
+        key = self.title_named(item)
+        return key if key and self.subject_res[key].search(item.get("title") or "") else None
 
     def apply_rules(self, item: dict) -> tuple[Classification | None, str]:
         """A rules classification, or None with why the item is ambiguous."""
@@ -328,6 +353,7 @@ class Classifier:
         payload = [{"id": it["id"], "prefilled_competitor": it.get("competitor"), "source": it.get("source"),
                     "found_by": it.get("origin"), "publisher": it.get("publisher") or "",
                     "title": it.get("title") or "", "text": content_text(it)[:LLM_TEXT_CHARS],
+                    **({"hint": it["_title_hint"]} if it.get("_title_hint") else {}),
                     **({"full_text_mentions": hint}
                        if has_full_mentions(it) and (hint := format_hint(self.text_counts(it))) else {})}
                    for it in items]
@@ -352,6 +378,10 @@ For every item below, answer with its id and:
 Some items carry full_text_mentions: how often each tracked competitor is named across the whole page, which can
 be far longer than the text shown (e.g. "sonatype×3, snyk×1"). Use it to judge what a list or comparison article is
 really about, even when the passage naming the competitor is not in the text shown.
+
+Some items carry a hint "Competitor named in title: <key> — company or platform?": the title names that
+competitor but not as its subject. Use its key only when the story is about the company or its product; when the
+title names it as the place something happened (malware in GitHub repositories), keep "{INDUSTRY}".
 
 Answer only about the ids given, once each.
 
@@ -409,8 +439,9 @@ Items (JSON):
         """One classification per item, in input order. Items without full-page mention counts get them from
         their run's backfill side file when there is one."""
         items = side_mentions.attach(items, self.runs_dir)
-        # an industry-query item whose title names one tracked competitor is about that competitor; the rules or
-        # the LLM still decide category and noise, and industry stays the fallback when nobody is named
+        # an industry-query item whose title has a tracked competitor as its subject is about that competitor (the
+        # rules or the LLM still decide category and noise); one that only names it goes to the LLM with a hint,
+        # still prefilled industry, which stays the fallback
         from_title: dict[str, str] = {}
         tagged = []
         for item in items:
@@ -418,6 +449,8 @@ Items (JSON):
             if key:
                 from_title[item["id"]] = key
                 item = {**item, "competitor": key}
+            elif named := self.title_named(item):
+                item = {**item, "_title_hint": title_mention_hint(named)}
             tagged.append(item)
         out: dict[str, Classification] = {}
         ambiguous, why = [], {}

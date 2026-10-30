@@ -386,3 +386,59 @@ def test_a_title_named_competitor_can_be_settled_by_the_rules_too():
     (c,) = Classifier(FakeLLM(), GH_CFG, runs_dir=None).classify([_industry("Snyk patches critical vulnerability")])
     assert (c.competitor, c.method, c.category) == ("snyk", "rules", "Security")
     assert c.reason.startswith("title names snyk")
+
+
+def _payload(llm) -> list[dict]:
+    return json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+
+
+@pytest.mark.parametrize("title", [
+    "GitHub Launches npm Firewall to Block Malicious Packages Before Installation",
+    "GitHub's npm package firewall can block brand-new versions",
+    "GitHub’s npm package firewall can block brand-new versions",  # typographic apostrophe
+    "Exclusive: GitHub rolls out an npm firewall",
+    "GitHub unveiled its npm firewall",
+])
+def test_competitor_as_the_title_subject_is_settled_by_rule(title):
+    clf = Classifier(FakeLLM(_answer_all(competitor="industry")), GH_CFG, runs_dir=None)
+    item = _industry(title)
+    assert item["text_status"] == "snippet" and clf.title_competitor(item) == "github"
+    (c,) = clf.classify([item])
+    assert c.competitor == "github" and c.reason.startswith("title names github")
+
+
+def test_competitor_named_only_as_a_venue_goes_to_the_llm_with_the_hint_and_stays_industry():
+    llm = FakeLLM(_answer_all(competitor="industry"))
+    clf = Classifier(llm, GH_CFG, runs_dir=None)
+    item = _industry("Hackers Hide Malware in 42 GitHub Repositories")
+    assert clf.title_competitor(item) is None and clf.title_named(item) == "github"
+    (c,) = clf.classify([item])
+    assert c.competitor == "industry" and c.method == "llm" and not c.reason.startswith("title names")
+    prompt = llm.calls[0][0]
+    assert "Competitor named in title: github — company or platform?" in prompt
+    [sent] = _payload(llm)
+    assert sent["prefilled_competitor"] == "industry"
+    assert sent["hint"] == "Competitor named in title: github — company or platform?"
+
+
+def test_a_title_led_by_the_name_without_a_verb_gets_the_hint():
+    llm = FakeLLM(_answer_all(competitor="github"))
+    (c,) = Classifier(llm, GH_CFG, runs_dir=None).classify(
+        [_industry("GitHub Supply Chain Attack: Command Injection in Actions workflows")])
+    assert _payload(llm)[0]["hint"] == "Competitor named in title: github — company or platform?"
+    assert c.competitor == "github" and c.method == "llm"  # the LLM may still decide it is about GitHub
+
+
+def test_hinted_item_falls_back_to_industry_when_the_llm_fails():
+    llm = FakeLLM([RuntimeError("down")])
+    (c,) = Classifier(llm, GH_CFG, runs_dir=None).classify([_industry("Malware found in GitHub Repositories")])
+    assert c.competitor == "industry" and c.degraded
+
+
+def test_no_hint_without_a_named_competitor_or_with_two():
+    llm = FakeLLM(_answer_all())
+    Classifier(llm, GH_CFG, runs_dir=None).classify([
+        {**_industry("Malicious npm packages steal tokens"), "id": "a"},
+        {**_industry("Malware spreads via GitHub and GitLab runners"), "id": "b"},
+        {**_industry("GitLab stock rallies after earnings beat"), "id": "c"}])  # chatter guard still wins
+    assert all("hint" not in row for row in _payload(llm))
