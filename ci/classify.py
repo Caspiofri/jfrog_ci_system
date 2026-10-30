@@ -260,6 +260,17 @@ class Classifier:
         full = item["mentions"] if has_full_mentions(item) else {}
         return {key: max(_as_count(full.get(key)), len(rx.findall(stored))) for key, rx in self.alias_res.items()}
 
+    def title_competitor(self, item: dict) -> str | None:
+        """For an item prefilled as industry: the one tracked competitor its title names (whole word, aliases
+        included), or None. Two or more named, or a chatter/marketing/roundup title, settle nothing."""
+        if (item.get("competitor") or "") != INDUSTRY:
+            return None
+        title = item.get("title") or ""
+        if title_hint(title):
+            return None
+        named = [key for key, rx in self.alias_res.items() if rx.search(title)]
+        return named[0] if len(named) == 1 else None
+
     def apply_rules(self, item: dict) -> tuple[Classification | None, str]:
         """A rules classification, or None with why the item is ambiguous."""
         prefilled, title = item.get("competitor") or "", item.get("title") or ""
@@ -397,9 +408,19 @@ Items (JSON):
         """One classification per item, in input order. Items without full-page mention counts get them from
         their run's backfill side file when there is one."""
         items = side_mentions.attach(items, self.runs_dir)
+        # an industry-query item whose title names one tracked competitor is about that competitor; the rules or
+        # the LLM still decide category and noise, and industry stays the fallback when nobody is named
+        from_title: dict[str, str] = {}
+        tagged = []
+        for item in items:
+            key = self.title_competitor(item)
+            if key:
+                from_title[item["id"]] = key
+                item = {**item, "competitor": key}
+            tagged.append(item)
         out: dict[str, Classification] = {}
         ambiguous, why = [], {}
-        for item in items:
+        for item in tagged:
             result, reason = self.apply_rules(item)
             if result is not None:
                 out[item["id"]] = result
@@ -409,6 +430,9 @@ Items (JSON):
         for start in range(0, len(ambiguous), self.batch_size):
             for c in self.classify_batch(ambiguous[start:start + self.batch_size], why):
                 out[c.id] = c
+        for item_id, key in from_title.items():  # the title settles the competitor, whatever the LLM said
+            c = out[item_id]
+            out[item_id] = c.model_copy(update={"competitor": key, "reason": f"title names {key}; {c.reason}"})
         return [out[item["id"]] for item in items]
 
 

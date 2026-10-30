@@ -337,3 +337,52 @@ def test_junk_text_never_reaches_the_llm_or_the_mention_counts():
     prompt = llm.calls[0][0]
     assert "NAVMENU" not in prompt and "A teaser naming Snyk once." in prompt
     assert out.mentions_jfrog is False  # "JFrog" was only in the junk text
+
+
+GH_CFG = CIConfig(competitors=[Competitor(key="github", name="GitHub"), Competitor(key="gitlab", name="GitLab"),
+                               Competitor(key="snyk", name="Snyk"), Competitor(key="industry", name="Industry")])
+
+
+def _industry(title, text="x" * 92):
+    return {"id": "i1", "title": title, "competitor": "industry", "text": text, "source": "google_news",
+            "origin": "q", "text_status": "snippet"}
+
+
+def test_an_industry_item_whose_title_names_github_is_tagged_github():
+    item = _industry("GitHub Launches npm Firewall to Block Malicious Packages Before Installation",
+                     "GitHub launched an npm firewall that blocks malicious packages before they get installed now")
+    assert len(item["text"]) == 92
+    llm = FakeLLM(_answer_all(competitor="industry", category="Security"))  # the LLM would keep industry
+    (c,) = Classifier(llm, GH_CFG, runs_dir=None).classify([item])
+    assert c.competitor == "github" and c.reason.startswith("title names github")
+    assert c.category == "Security" and c.method == "llm"  # category and noise still come from rules/LLM
+    payload = json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+    assert payload[0]["prefilled_competitor"] == "github"
+
+
+def test_an_industry_title_naming_nobody_stays_industry():
+    llm = FakeLLM(_answer_all(competitor="industry"))
+    (c,) = Classifier(llm, GH_CFG, runs_dir=None).classify([_industry("Malicious npm packages steal tokens")])
+    assert c.competitor == "industry" and not c.reason.startswith("title names")
+
+
+def test_an_industry_title_naming_two_competitors_goes_to_the_llm():
+    clf = Classifier(FakeLLM(_answer_all(competitor="gitlab")), GH_CFG, runs_dir=None)
+    item = _industry("GitHub and GitLab both patch CI runner flaws")
+    assert clf.title_competitor(item) is None
+    (c,) = clf.classify([item])
+    assert c.competitor == "gitlab" and c.method == "llm" and not c.reason.startswith("title names")
+
+
+def test_market_chatter_naming_gitlab_is_not_settled_by_the_title():
+    clf = Classifier(FakeLLM(_answer_all(competitor="none", noise=True)), GH_CFG, runs_dir=None)
+    item = _industry("GitLab stock rallies after earnings beat")
+    assert clf.title_competitor(item) is None
+    (c,) = clf.classify([item])
+    assert c.competitor == "none" and c.noise  # left to the LLM
+
+
+def test_a_title_named_competitor_can_be_settled_by_the_rules_too():
+    (c,) = Classifier(FakeLLM(), GH_CFG, runs_dir=None).classify([_industry("Snyk patches critical vulnerability")])
+    assert (c.competitor, c.method, c.category) == ("snyk", "rules", "Security")
+    assert c.reason.startswith("title names snyk")
