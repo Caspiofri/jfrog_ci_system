@@ -14,7 +14,7 @@
 #   verified             what was fetched to confirm the event and its date
 #
 # Curated on 30 Oct 2026. Coverage checked for every competitor; findings per competitor:
-#   aws_codeartifact: no CodeArtifact announcement in the window (What's New feed, CodeArtifact docs, search). The
+#   aws (was aws_codeartifact): no CodeArtifact announcement in the window (What's New feed, CodeArtifact docs, search). The
 #     AWS events below are Amazon Inspector and an AWS blog post, the adjacent products the config tracks.
 #   sonatype: the only press release near the window, Nexus Repository Pro+ (14 Oct), predates it and is left out.
 #     One official event remains, the eMudhra assessment.
@@ -90,7 +90,8 @@ events:
     title: "eMudhra CA Incident: Sonatype's Assessment and Guidance"
     official_url: https://www.sonatype.com/blog/emudhra-ca-incident-sonatypes-assessment-and-guidance
     category: Security
-    expected_importance: 3
+    expected_importance: 2
+    note: "lowered to 2 by Ofri, Oct 30"
     why: Nexus Repository and IQ Server affected by the compromised eMudhra intermediates; relevant security news.
     match:
       urls: []
@@ -325,7 +326,7 @@ events:
 
   # ---------------------------------------------------------------- AWS (no CodeArtifact events found)
   - id: aws-inspector-ecr-rescan-default
-    competitor: aws_codeartifact
+    competitor: aws
     date: 2026-10-21
     title: Amazon Inspector updates the default Amazon ECR re-scan duration to 7 days
     official_url: https://docs.aws.amazon.com/inspector/latest/user/doc-history.html
@@ -339,7 +340,7 @@ events:
     verified: Fetched the Amazon Inspector document history on 30 Oct; entry "Updated default Amazon ECR re-scan duration" dated 21 Oct 2026.
 
   - id: aws-nitro-supply-chain-attestation
-    competitor: aws_codeartifact
+    competitor: aws
     date: 2026-10-27
     title: Verify software supply chain security using AWS Nitro cryptographic verification
     official_url: https://aws.amazon.com/blogs/publicsector/verify-software-supply-chain-security-using-aws-nitro-cryptographic-verification/
@@ -375,7 +376,8 @@ events:
     title: "Security advisory: Critical remote code execution vulnerabilities, update now (PHP2Shell)"
     official_url: https://www.php.net/archive/2026.php#2026-10-21-5
     category: Security
-    expected_importance: 3
+    expected_importance: 2
+    note: "lowered to 2 by Ofri, Oct 30"
     why: Two critical unauthenticated PHP RCEs (CVE-2026-109618/109619), added to CISA KEV on 26 Oct; relevant industry news.
     match:
       urls: []
@@ -405,7 +407,8 @@ events:
     title: Protecting Chrome and Android Users from Compromised eMudhra Intermediate CA Certificates
     official_url: https://blog.google/security/protecting-chrome-and-android-users-from-compromised-emudhra-intermediate-ca-certificates/
     category: Security
-    expected_importance: 3
+    expected_importance: 2
+    note: "lowered to 2 by Ofri, Oct 30"
     why: Eight CA intermediate keys compromised; trust-store updates ripple through registries and tooling.
     match:
       urls: []

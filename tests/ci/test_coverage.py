@@ -194,3 +194,15 @@ def test_rejects_unknown_category(tmp_path):
     bad.write_text(EVENTS_YAML.replace("category: Security", "category: Security News", 1), encoding="utf-8")
     with pytest.raises(ValueError, match="D11"):
         load_events(bad)
+
+
+def test_curated_list_reflects_ofris_oct_30_review():
+    import yaml
+
+    by_id = {e.id: e for e in load_events(EVENTS_PATH)}
+    raw = {e["id"]: e for e in yaml.safe_load(EVENTS_PATH.read_text(encoding="utf-8"))["events"]}
+    for eid in ("aws-inspector-ecr-rescan-default", "aws-nitro-supply-chain-attestation"):
+        assert by_id[eid].competitor == "aws" and raw[eid]["competitor"] == "aws"
+    for eid in ("industry-emudhra-ca-compromise", "industry-php2shell", "sonatype-emudhra-assessment"):
+        assert by_id[eid].expected_importance == 2 and raw[eid]["note"] == "lowered to 2 by Ofri, Oct 30"
+    assert "aws_codeartifact" not in {e.competitor for e in by_id.values()}
