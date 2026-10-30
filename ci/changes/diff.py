@@ -78,7 +78,11 @@ def _tier_name(t: Tier) -> str:
 
 # words that do not tell plans apart: "Pro (level 1)" and "Pro - 1 user / 10k requests" share "pro", and
 # "Team plan" / "Business plan" share nothing once "plan" is set aside
-_GENERIC_TIER_WORDS = {"plan", "tier", "edition", "level", "package", "bundle", "option", "pricing", "price"}
+_GENERIC_TIER_WORDS = {"plan", "tier", "edition", "level", "package", "bundle", "option", "pricing", "price",
+                       "cloud", "hosted", "self", "saas", "managed"}
+# a tier carrying one of these is a separate product sold beside a plan ("Pro AI add-on"), never a rename of it
+_ADDON_WORDS = {"add", "addon", "extra", "pack", "extension"}
+RENAME_MIN_OVERLAP = 0.5  # shared meaningful words / words of the shorter name
 
 
 def _name_words(t: Tier) -> set[str]:
@@ -95,8 +99,18 @@ def _rename_key(t: Tier) -> tuple | None:
 
 
 def _similarity(a: Tier, b: Tier) -> float:
+    """Jaccard of the name words, or 0 when the names cannot be one tier renamed: an add-on word on either side,
+    or shared meaningful words making up less than RENAME_MIN_OVERLAP of the shorter name."""
+    if (tokens(a.name) | tokens(b.name)) & _ADDON_WORDS:
+        return 0.0
     wa, wb = _name_words(a), _name_words(b)
-    return len(wa & wb) / len(wa | wb) if wa & wb else 0.0
+    shared = wa & wb
+    if not shared or len(shared) < RENAME_MIN_OVERLAP * min(len(wa), len(wb)):
+        return 0.0
+    # ranked on every word, generic ones included: "Pro Cloud" is closer to "Pro Cloud Edition" than to
+    # "Pro Self-Hosted Edition", though both share only "pro" as a meaningful word
+    ta, tb = ({w for w in tokens(t.name) if not w[0].isdigit()} for t in (a, b))
+    return len(ta & tb) / len(ta | tb)
 
 
 def _pair_renames(removed: list[Tier], added: list[Tier]) -> list[tuple[Tier, Tier]]:

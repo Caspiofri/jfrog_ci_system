@@ -289,10 +289,28 @@ def test_a_different_unit_at_the_same_price_is_not_a_rename():
     assert kinds(old, new) == [("added", "Pro storage"), ("removed", "Pro seats")]
 
 
+@pytest.mark.parametrize(("before", "after"), [
+    ("Cloud Pro", "Cloud Enterprise"),  # only the generic "cloud" is shared
+    ("Pro", "Pro AI add-on"),  # an add-on is sold beside the plan
+    ("Pro", "Pro Storage Pack"),
+    ("Pro Team Annual", "Pro Enterprise Security Bundle"),  # one shared word of three
+])
+def test_names_without_enough_shared_meaning_are_not_renames(before, after):
+    old = [Tier(name=before, price=50, currency="USD", period="month")]
+    new = [Tier(name=after, price=50, currency="USD", period="month")]
+    assert kinds(old, new) == [("added", after), ("removed", before)]
+
+
 def test_renames_pair_by_best_name_similarity_one_to_one():
-    old = [Tier(name="Pro Cloud", price=50, currency="USD"), Tier(name="Pro Self-Hosted", price=50, currency="USD")]
-    new = [Tier(name="Pro Self-Hosted Edition", price=50, currency="USD"),
-           Tier(name="Pro Cloud Edition", price=50, currency="USD")]
+    # the name order puts "Pro Cloud" first among the removed and "Pro Cloud Edition" first among the added only by
+    # accident of the keys, so the other pairing is checked too
+    from ci.changes import diff
+
+    assert diff._similarity(Tier(name="Pro Cloud"), Tier(name="Pro Cloud Edition")) > diff._similarity(
+        Tier(name="Pro Cloud"), Tier(name="Pro Self-Hosted Edition"))
+    old = [Tier(name="Pro Self-Hosted", price=50, currency="USD"), Tier(name="Pro Cloud", price=50, currency="USD")]
+    new = [Tier(name="Pro Cloud Edition", price=50, currency="USD"),
+           Tier(name="Pro Self-Hosted Edition", price=50, currency="USD")]
     pairs = {(c["old_name"], c["tier"]) for c in tier_changes(old, new)}
     assert pairs == {("Pro Cloud", "Pro Cloud Edition"), ("Pro Self-Hosted", "Pro Self-Hosted Edition")}
 
