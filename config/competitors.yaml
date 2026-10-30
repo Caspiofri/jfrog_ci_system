@@ -32,6 +32,10 @@ competitors:
       - url: https://github.blog/changelog/feed/
       - url: https://github.blog/feed/
         keywords: [security, supply chain, packages, npm, dependabot, codeql, copilot, mcp, agent]
+    # the changelog feed holds only the newest 10 entries; GitHub posted ~30 on 28 Oct, so read the listing too
+    listing_pages:
+      - url: https://github.blog/changelog/
+        page_url: https://github.blog/changelog/page/{n}/
     github_repos: [github/github-mcp-server, github/codeql-action]
 
   - key: gitlab
