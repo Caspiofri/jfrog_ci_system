@@ -170,6 +170,7 @@ function draftFrom(item) {
     basis: l ? l.basis || null : "partial",
     bad_extraction: l && typeof l.bad_extraction === "boolean" ? l.bad_extraction : (requiresBad(item) ? null : false),
     note: l ? l.note || "" : "",
+    revision_reason: "",  // asked fresh on every relabel; the server keeps the previous values next to it
   };
 }
 
@@ -248,6 +249,9 @@ function renderCard(item, idx) {
         onclick: (e) => { e.preventDefault(); openArticle(idx); } }, "Open article ↗", el("kbd", {}, "o")) : null),
     el("div", { class: "row" }, el("span", { class: "lbl" }, "Note"), note,
       el("button", { class: "save", onclick: () => save(idx) }, "Save")),
+    item.label ? el("div", { class: "row" }, el("span", { class: "lbl" }, "Why changed"),
+      el("input", { type: "text", maxlength: "300", placeholder: "reason for this relabel (optional)",
+        oninput: (e) => { d.revision_reason = e.target.value; } })) : null,
     el("div", { class: "row" }, el("span", { class: "lbl" }), status),
   );
 

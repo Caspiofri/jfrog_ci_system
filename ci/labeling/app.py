@@ -33,6 +33,8 @@ CATEGORIES = [
     "Leadership & Org",
 ]
 SNAPSHOT_TEXT_CHARS = 2000
+# the previous label's values kept on a relabel (with revision_reason saying why it changed)
+REVISED_FIELDS = ("competitor", "category", "score", "noise", "mentions_jfrog", "bad_extraction", "basis", "labeled_at")
 log = logging.getLogger(__name__)
 
 
@@ -49,6 +51,8 @@ class LabelIn(BaseModel):
     # the real article. Old labels without it read back as None.
     bad_extraction: bool | None = None  # None = not answered: stored as False, except where the queue requires it
     note: str = ""
+    # why a relabel changed the label (optional); a relabel also stores the previous values under revised_from
+    revision_reason: str = Field(default="", max_length=300)
 
     @model_validator(mode="after")
     def _check(self):
@@ -286,6 +290,9 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
             label.bad_extraction = False
         row = {**label.model_dump(), "labeled_at": datetime.now(UTC).isoformat(), "item": snapshot(item)}
         with write_lock:  # relabeling replaces the id's line; the file stays one line per id
+            previous = latest_labels(labels_path).get(label.id)
+            if previous is not None:  # a relabel: keep what it was, so the reason has context
+                row["revised_from"] = {k: previous.get(k) for k in REVISED_FIELDS}
             upsert_label(labels_path, row)
         return row
 

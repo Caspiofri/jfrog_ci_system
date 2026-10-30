@@ -325,3 +325,27 @@ def test_cards_show_a_plain_queue_marker_without_bucket_or_reason(env):
     assert "inQueue.get(item.id).why" not in page
     assert 'el("span", { class: "badge bbadge" }, "queue")' in page
     assert "QUEUE.buckets" in page  # the per-bucket progress chips at the top stay
+
+
+def test_relabel_records_the_reason_and_the_previous_values(env):
+    client, labels = env
+    first = client.post("/api/labels", json=_label(score=3)).json()
+    assert "revised_from" not in first and first["revision_reason"] == ""
+    second = client.post("/api/labels", json=_label(score=4, category="AI & Agents",
+                                                     revision_reason="closes a gap vs JFrog's ai_mcp cell")).json()
+    assert second["revision_reason"] == "closes a gap vs JFrog's ai_mcp cell"
+    assert second["revised_from"]["score"] == 3 and second["revised_from"]["category"] == "Security"
+    assert second["revised_from"]["labeled_at"] == first["labeled_at"]
+    assert len(labels.read_text().splitlines()) == 1  # still one line per id
+
+
+def test_revision_reason_is_capped(env):
+    client, _ = env
+    assert client.post("/api/labels", json=_label(revision_reason="x" * 301)).status_code == 422
+
+
+def test_page_offers_the_reason_only_on_relabel(env):
+    client, _ = env
+    page = client.get("/").text
+    assert 'item.label ? el("div", { class: "row" }, el("span", { class: "lbl" }, "Why changed")' in page
+    assert 'revision_reason: ""' in page
