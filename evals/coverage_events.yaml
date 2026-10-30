@@ -6,7 +6,9 @@
 #   competitor           key from config/competitors.yaml (or "industry")
 #   date                 the official publication date (YYYY-MM-DD)
 #   category             one of the 7 D11 categories
-#   expected_importance  1-5 per D14, with `why`
+#   expected_importance  1-5 per rubric v2 (config/rubric_v2.md), with `why`
+#   event_type           new_capability | ga_of_existing | improvement | regional_expansion | pricing_packaging |
+#                        acquisition_funding_partnership | security_incident | vulnerability_fix | deprecation | marketing
 #   match.urls           extra URLs that count as the same event (official_url always counts)
 #   match.title_keywords keyword groups; an item matches when its TITLE contains ALL keywords of ANY one group,
 #                        case-insensitive, on word boundaries. A trailing * matches a word prefix ("exploit*"
@@ -15,7 +17,7 @@
 #
 # Curated on 30 Oct 2026. Coverage checked for every competitor; findings per competitor:
 #   aws (was aws_codeartifact): no CodeArtifact announcement in the window (What's New feed, CodeArtifact docs, search). The
-#     AWS events below are Amazon Inspector and an AWS blog post, the adjacent products the config tracks.
+#     AWS event below is Amazon Inspector (the AWS Nitro blog post was removed on 30 Oct: a blog post, not an event).
 #   sonatype: the only press release near the window, Nexus Repository Pro+ (14 Oct), predates it and is left out.
 #     One official event remains, the eMudhra assessment.
 # Left out on purpose: news without an official page (GitLab's India office, reported only by press); the AOMEI
@@ -30,7 +32,8 @@ events:
     official_url: https://cloudsmith.com/changelog/deprecating-trivy-vulnerability-scanning
     category: Product & Features
     expected_importance: 3
-    why: Swaps its scanner for OSV-based continuous risk detection; a routine product change, not a new capability.
+    event_type: deprecation
+    why: "rubric v2 (Ofri, 30 Oct): not a minor feature (a scanner); whether it opens a gap is unknown, so no raise"
     match:
       urls: []
       title_keywords:
@@ -45,7 +48,8 @@ events:
     official_url: https://cloudsmith.com/changelog/verify-npm-provenance-through-your-cloudsmith-registry
     category: Security
     expected_importance: 3
-    why: Supply-chain verification feature in a direct registry competitor; incremental, npm only.
+    event_type: improvement
+    why: "rubric v2 (Ofri, 30 Oct): a gap not verifiable, so no raise"
     match:
       urls: []
       title_keywords:
@@ -58,8 +62,9 @@ events:
     title: Username and password login on the Cloudsmith CLI stops working on November 20, 2026
     official_url: https://cloudsmith.com/changelog/username-and-password-login-on-the-cloudsmith-cli-stops-working-on-november-20-2026
     category: Security
-    expected_importance: 2
-    why: Auth hardening in their CLI (shipped with CLI v1.30.0); related, no competitive impact.
+    expected_importance: 1
+    event_type: deprecation
+    why: "rubric v2 (Ofri, 30 Oct): deprecation of a minor feature: routine"
     match:
       urls:
         - https://cloudsmith.com/changelog/cli-v1-30-0-error-reporting-tls-intercepting-proxy-support-and-a-username-and-password-login
@@ -74,8 +79,9 @@ events:
     title: Mumbai is now a supported storage region
     official_url: https://cloudsmith.com/changelog/mumbai-is-now-a-supported-storage-region
     category: Product & Features
-    expected_importance: 2
-    why: New storage region; related, no competitive impact.
+    expected_importance: 3
+    event_type: regional_expansion
+    why: "rubric v2 (Ofri, 30 Oct): anchor: a real product event that extends market reach"
     match:
       urls: []
       title_keywords:
@@ -91,8 +97,9 @@ events:
     official_url: https://www.sonatype.com/blog/emudhra-ca-incident-sonatypes-assessment-and-guidance
     category: Security
     expected_importance: 2
+    event_type: marketing
     note: "lowered to 2 by Ofri, Oct 30"
-    why: Nexus Repository and IQ Server affected by the compromised eMudhra intermediates; relevant security news.
+    why: "rubric v2 (Ofri, 30 Oct): vendor commentary on someone else's event: no new event, intelligence value"
     match:
       urls: []
       title_keywords:
@@ -108,7 +115,8 @@ events:
     official_url: https://github.blog/changelog/2026-10-20-github-package-firewall-in-public-preview
     category: Security
     expected_importance: 5
-    why: A registry-side firewall blocking malicious npm packages for coding agents and CI; head-on with JFrog Curation.
+    event_type: new_capability
+    why: "rubric v2 (Ofri, 30 Oct): anchor: head-on vs a JFrog core product (Curation) at GitHub's scale; preview doesn't lower a core move"
     match:
       urls: []
       title_keywords:
@@ -122,8 +130,9 @@ events:
     title: GitHub Enterprise now includes access to GitHub Copilot
     official_url: https://github.blog/changelog/2026-10-28-github-enterprise-now-includes-access-to-github-copilot
     category: Pricing & Packaging
-    expected_importance: 4
-    why: Bundles Copilot into the Enterprise seat with usage-based AI credits; a packaging change on the platform deal.
+    expected_importance: 3
+    event_type: pricing_packaging
+    why: "rubric v2 (Ofri, 30 Oct): anchor: indirect impact, not proven; the bundling trend belongs in insights"
     match:
       urls: []
       title_keywords:
@@ -137,8 +146,9 @@ events:
     title: Route and orchestrate models with GitHub Copilot Fusion
     official_url: https://github.blog/changelog/2026-10-28-route-and-orchestrate-models-with-github-copilot-fusion
     category: AI & Agents
-    expected_importance: 4
-    why: GA multi-model routing in Copilot; a change on the AI-capability axis.
+    expected_importance: 3
+    event_type: improvement
+    why: "rubric v2 (Ofri, 30 Oct): a sub-feature of an existing assistant, not a JFrog head-to-head capability"
     match:
       urls: []
       title_keywords:
@@ -151,8 +161,9 @@ events:
     title: GitHub Agentic Workflows generally available
     official_url: https://github.blog/changelog/2026-10-28-github-agentic-workflows-generally-available
     category: AI & Agents
-    expected_importance: 4
-    why: Coding agents inside GitHub Actions go GA; agents in the CI/CD pipeline JFrog sits next to.
+    expected_importance: 3
+    event_type: ga_of_existing
+    why: "rubric v2 (Ofri, 30 Oct): GA of an existing preview = 3 by default"
     match:
       urls: []
       title_keywords:
@@ -165,8 +176,9 @@ events:
     title: Code scanning for AI applications in public preview
     official_url: https://github.blog/changelog/2026-10-28-code-scanning-for-ai-applications-in-public-preview
     category: Security
-    expected_importance: 4
-    why: Flags prompt injection and over-privileged agents in code; AI/agent security is a matrix axis.
+    expected_importance: 3
+    event_type: new_capability
+    why: "rubric v2 (Ofri, 30 Oct): capability-level, but a preview lowers a step (not a move against a JFrog core capability)"
     match:
       urls: []
       title_keywords:
@@ -180,7 +192,8 @@ events:
     official_url: https://github.blog/changelog/2026-10-28-prioritize-dependabot-alerts-with-reachability-analysis
     category: Security
     expected_importance: 4
-    why: Reachability in free-tier SCA; the contextual-analysis differentiator JFrog Xray and Snyk sell.
+    event_type: new_capability
+    why: "rubric v2 (Ofri, 30 Oct): reachability is a checklist capability; a capability gap closed, with evidence"
     match:
       urls: []
       title_keywords:
@@ -193,8 +206,9 @@ events:
     title: AI Scan for repositories in public preview
     official_url: https://github.blog/changelog/2026-10-28-ai-scan-for-repositories-in-public-preview
     category: Security
-    expected_importance: 4
-    why: AI-driven vulnerability scanning over whole repositories, beyond CodeQL's languages; an AI-capability change.
+    expected_importance: 3
+    event_type: improvement
+    why: "rubric v2 (Ofri, 30 Oct): extends existing code scanning"
     match:
       urls: []
       title_keywords:
@@ -207,8 +221,9 @@ events:
     title: GitHub Actions workflow lockfiles are generally available
     official_url: https://github.blog/changelog/2026-10-28-github-actions-workflow-lockfiles-are-generally-available
     category: Security
-    expected_importance: 4
-    why: Pins Actions and their transitive dependencies with a require-lockfile policy; CI supply-chain integrity.
+    expected_importance: 3
+    event_type: ga_of_existing
+    why: "rubric v2 (Ofri, 30 Oct): GA of an existing preview = 3 by default"
     match:
       urls: []
       title_keywords:
@@ -224,7 +239,8 @@ events:
     official_url: https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/
     category: Security
     expected_importance: 3
-    why: CVSS 10.0 RCE (CVE-2026-110264) in a competitor's platform; relevant security news, no change to the map.
+    event_type: vulnerability_fix
+    why: "rubric v2 (Ofri, 30 Oct): a patch, raised from 1: it fixes CVE-2026-97229, later actively exploited (CISA KEV)"
     match:
       urls: []
       title_keywords:
@@ -241,7 +257,8 @@ events:
     official_url: https://www.cisa.gov/news-events/alerts/2026/10/29/cisa-adds-two-known-exploited-vulnerabilities-catalog
     category: Security
     expected_importance: 3
-    why: Active exploitation of a CVSS 10 GitLab flaw; relevant security news.
+    event_type: security_incident
+    why: "rubric v2 (Ofri, 30 Oct): an exploited flaw in a competitor's product; indirect impact"
     match:
       urls: []
       title_keywords:
@@ -255,8 +272,9 @@ events:
     title: "GitLab Orbit is GA: Higher agent accuracy, lower token cost"
     official_url: https://about.gitlab.com/blog/gitlab-orbit-ga/
     category: AI & Agents
-    expected_importance: 4
-    why: GA of a context graph for AI agents across code, pipelines and vulnerabilities; an AI-capability change.
+    expected_importance: 3
+    event_type: ga_of_existing
+    why: "rubric v2 (Ofri, 30 Oct): GA of Orbit, in public beta since 10 Jun 2026 = 3 by default"
     match:
       urls:
         - https://about.gitlab.com/blog/find-vulnerability-blast-radius-with-gitlab-orbit/
@@ -270,8 +288,9 @@ events:
     title: "GitLab Patch Release and Security Update: 19.5.3, 19.4.5, 19.3.7, 19.2.10, 19.1.10, 19.0.11, 18.11.14"
     official_url: https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-3-released/
     category: Security
-    expected_importance: 2
-    why: Routine patch that removes trust in the compromised eMudhra intermediates; no competitive impact.
+    expected_importance: 1
+    event_type: vulnerability_fix
+    why: "rubric v2 (Ofri, 30 Oct): anchor: a routine patch release"
     match:
       urls: []
       title_keywords:
@@ -285,8 +304,9 @@ events:
     title: Turn Your Vulnerability Backlog Into Pull Requests With Agentic Remediation
     official_url: https://snyk.io/blog/evo-remediation-agent-open-preview/
     category: AI & Agents
-    expected_importance: 4
-    why: Agentic dependency remediation campaigns (open preview); a change on the AI-capability axis.
+    expected_importance: 3
+    event_type: improvement
+    why: "rubric v2 (Ofri, 30 Oct): Snyk already had fix PRs; agentic remediation is a sub-feature (Ofri: 3)"
     match:
       urls: []
       title_keywords:
@@ -300,8 +320,9 @@ events:
     title: Added Secrets in Inventory and centrally manage Secrets scan frequency
     official_url: https://updates.snyk.io/secrets-repository-monitoring-inventory/
     category: Product & Features
-    expected_importance: 2
-    why: Secrets-scan scheduling and inventory view (early access); related, no competitive impact.
+    expected_importance: 3
+    event_type: improvement
+    why: "rubric v2 (Ofri, 30 Oct): management views and scan-frequency controls are sub-features"
     match:
       urls: []
       title_keywords:
@@ -315,8 +336,9 @@ events:
     title: Python 3.15 support is now available
     official_url: https://updates.snyk.io/python-3-15-support-is-now-available/
     category: Product & Features
-    expected_importance: 2
-    why: Language-version support; related, no competitive impact.
+    expected_importance: 1
+    event_type: improvement
+    why: "rubric v2 (Ofri, 30 Oct): version support: routine"
     match:
       urls: []
       title_keywords:
@@ -331,27 +353,14 @@ events:
     title: Amazon Inspector updates the default Amazon ECR re-scan duration to 7 days
     official_url: https://docs.aws.amazon.com/inspector/latest/user/doc-history.html
     category: Product & Features
-    expected_importance: 2
-    why: Default setting change in container-image scanning; related, no competitive impact.
+    expected_importance: 1
+    event_type: improvement
+    why: "rubric v2 (Ofri, 30 Oct): a default/config change: routine"
     match:
       urls: []
       title_keywords:
         - [Inspector, re-scan duration]
     verified: Fetched the Amazon Inspector document history on 30 Oct; entry "Updated default Amazon ECR re-scan duration" dated 21 Oct 2026.
-
-  - id: aws-nitro-supply-chain-attestation
-    competitor: aws
-    date: 2026-10-27
-    title: Verify software supply chain security using AWS Nitro cryptographic verification
-    official_url: https://aws.amazon.com/blogs/publicsector/verify-software-supply-chain-security-using-aws-nitro-cryptographic-verification/
-    category: Security
-    expected_importance: 2
-    why: Guidance post on attesting build hosts; related, no competitive impact.
-    match:
-      urls: []
-      title_keywords:
-        - [Nitro, supply chain]
-    verified: Fetched the AWS Public Sector Blog post on 30 Oct; published 27 Oct 2026.
 
   # ---------------------------------------------------------------- Industry
   - id: industry-litellm-pypi-compromise
@@ -361,7 +370,8 @@ events:
     official_url: https://docs.litellm.ai/blog/security-incident-oct-21-2026
     category: Security
     expected_importance: 4
-    why: Credential-stealing release of a widely used AI gateway on PyPI and Docker; the attack class JFrog sells against.
+    event_type: security_incident
+    why: "rubric v2 (Ofri, 30 Oct): industry: a broad supply-chain attack on AI tooling"
     match:
       urls: []
       title_keywords:
@@ -376,9 +386,10 @@ events:
     title: "Security advisory: Critical remote code execution vulnerabilities, update now (PHP2Shell)"
     official_url: https://www.php.net/archive/2026.php#2026-10-21-5
     category: Security
-    expected_importance: 2
-    note: "lowered to 2 by Ofri, Oct 30"
-    why: Two critical unauthenticated PHP RCEs (CVE-2026-109618/109619), added to CISA KEV on 26 Oct; relevant industry news.
+    expected_importance: 3
+    event_type: security_incident
+    note: "lowered to 2 by Ofri on Oct 30 (old rubric); 3 under rubric v2 (Ofri)"
+    why: "rubric v2 (Ofri, 30 Oct): industry: a relevant vulnerability of limited scope (Ofri: 3)"
     match:
       urls: []
       title_keywords:
@@ -393,7 +404,8 @@ events:
     official_url: https://www.ruby-lang.org/en/news/2026/10/23/regexp-fixes-for-gitlab-cves/
     category: Security
     expected_importance: 3
-    why: Ruby 4.0.9/3.4.12/3.3.13 fix the Onigmo bugs behind four GitLab RCEs; relevant industry news.
+    event_type: vulnerability_fix
+    why: "rubric v2 (Ofri, 30 Oct): industry: a relevant vulnerability of limited scope"
     match:
       urls: []
       title_keywords:
@@ -407,9 +419,10 @@ events:
     title: Protecting Chrome and Android Users from Compromised eMudhra Intermediate CA Certificates
     official_url: https://blog.google/security/protecting-chrome-and-android-users-from-compromised-emudhra-intermediate-ca-certificates/
     category: Security
-    expected_importance: 2
-    note: "lowered to 2 by Ofri, Oct 30"
-    why: Eight CA intermediate keys compromised; trust-store updates ripple through registries and tooling.
+    expected_importance: 3
+    event_type: security_incident
+    note: "lowered to 2 by Ofri on Oct 30 (old rubric); 3 under rubric v2 (Ofri)"
+    why: "rubric v2 (Ofri, 30 Oct): industry: an incident of limited scope (Ofri: 3)"
     match:
       urls: []
       title_keywords:

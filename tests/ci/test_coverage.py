@@ -201,10 +201,16 @@ def test_curated_list_reflects_ofris_oct_30_review():
 
     by_id = {e.id: e for e in load_events(EVENTS_PATH)}
     raw = {e["id"]: e for e in yaml.safe_load(EVENTS_PATH.read_text(encoding="utf-8"))["events"]}
-    for eid in ("aws-inspector-ecr-rescan-default", "aws-nitro-supply-chain-attestation"):
-        assert by_id[eid].competitor == "aws" and raw[eid]["competitor"] == "aws"
-    for eid in ("industry-emudhra-ca-compromise", "industry-php2shell", "sonatype-emudhra-assessment"):
-        assert by_id[eid].expected_importance == 2 and raw[eid]["note"] == "lowered to 2 by Ofri, Oct 30"
+    assert by_id["aws-inspector-ecr-rescan-default"].competitor == "aws"
+    assert raw["aws-inspector-ecr-rescan-default"]["competitor"] == "aws"
+    assert "aws-nitro-supply-chain-attestation" not in by_id  # removed under rubric v2: a blog post, not an event
+    # rubric v2 decisions (Ofri, Oct 30 evening)
+    expected = {"industry-emudhra-ca-compromise": 3, "industry-php2shell": 3, "sonatype-emudhra-assessment": 2,
+                "snyk-evo-remediation-agent": 3, "gitlab-orbit-ga": 3, "industry-litellm-pypi-compromise": 4,
+                "gitlab-patch-19-5-3": 1, "snyk-python-3-15": 1, "github-package-firewall-preview": 5}
+    for eid, score in expected.items():
+        assert by_id[eid].expected_importance == score, eid
+    assert by_id["gitlab-orbit-ga"].event_type == "ga_of_existing"
     assert "aws_codeartifact" not in {e.competitor for e in by_id.values()}
 
 
@@ -255,3 +261,24 @@ def test_recall_is_reported_per_source_kind(fixture_run, tmp_path):
     assert by["feed"]["events"] == sum(1 for e in report["events"] if e["in_window"] and e["source_kind"] == "feed")
     table = coverage.format_report(report)
     assert "source" in table and "feed" in table and "external" in table
+
+
+def test_event_type_is_validated(tmp_path):
+    bad = tmp_path / "events.yaml"
+    bad.write_text("events:\n  - id: x\n    competitor: github\n    date: 2026-10-28\n    title: t\n"
+                   "    official_url: https://github.blog/changelog/x\n    category: Security\n"
+                   "    expected_importance: 3\n    event_type: big_news\n    match:\n      title_keywords: [[t]]\n")
+    with pytest.raises(ValueError, match="event_type"):
+        load_events(bad)
+
+
+def test_every_shipped_event_is_typed_and_scored_under_rubric_v2():
+    events = load_events(EVENTS_PATH)
+    assert events and all(e.event_type in coverage.EVENT_TYPES for e in events)
+    assert not any("nitro" in e.id for e in events)  # removed: a blog post, not an event
+
+
+def test_important_line_is_a_count_with_its_n(fixture_run):
+    text = coverage.format_report(fixture_run[0])
+    line = next(row for row in text.splitlines() if row.startswith("importance >="))
+    assert "captured 2 of 3 (n=3; a count, not a rate)" in line and "%" not in line

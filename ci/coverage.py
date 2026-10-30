@@ -40,7 +40,9 @@ from config.settings import EVALS_DIR, OUTPUT_DIR
 EVENTS_PATH = EVALS_DIR / "coverage_events.yaml"
 COVERAGE_DIR = OUTPUT_DIR / "coverage"
 RUNS_DIR = OUTPUT_DIR / "runs"
-HIGH_IMPORTANCE = 4  # expected_importance at or above this gets its own recall line
+HIGH_IMPORTANCE = 4  # expected_importance at or above this gets its own line, as a count with its n (no rate)
+EVENT_TYPES = {"new_capability", "ga_of_existing", "improvement", "regional_expansion", "pricing_packaging",
+               "acquisition_funding_partnership", "security_incident", "vulnerability_fix", "deprecation", "marketing"}
 RUN_ID_RE = re.compile(r"^(\d{8}T\d{4}Z)-")
 
 
@@ -53,6 +55,7 @@ class Event:
     official_url: str
     category: str
     expected_importance: int
+    event_type: str = ""  # one of EVENT_TYPES (rubric v2); empty only in old lists
     urls: list[str] = field(default_factory=list)
     keyword_groups: list[list[str]] = field(default_factory=list)
 
@@ -71,6 +74,8 @@ def load_events(path: Path = EVENTS_PATH) -> list[Event]:
             raise ValueError(f"{e['id']}: category {e['category']!r} is not one of the D11 categories")
         if not 1 <= int(e["expected_importance"]) <= 5:
             raise ValueError(f"{e['id']}: expected_importance must be 1-5")
+        if e.get("event_type") and e["event_type"] not in EVENT_TYPES:
+            raise ValueError(f"{e['id']}: event_type {e['event_type']!r} is not one of {sorted(EVENT_TYPES)}")
         match = e.get("match") or {}
         groups = [[str(k) for k in g] for g in match.get("title_keywords") or []]
         if any(not g for g in groups):
@@ -78,7 +83,8 @@ def load_events(path: Path = EVENTS_PATH) -> list[Event]:
         d = e["date"] if isinstance(e["date"], date) else date.fromisoformat(str(e["date"]))
         events.append(Event(id=e["id"], competitor=canonical_key(e["competitor"]), date=d, title=e["title"],
                             official_url=e["official_url"], category=e["category"],
-                            expected_importance=int(e["expected_importance"]), urls=list(match.get("urls") or []),
+                            expected_importance=int(e["expected_importance"]), event_type=e.get("event_type") or "",
+                            urls=list(match.get("urls") or []),
                             keyword_groups=groups))
     return events
 
@@ -196,7 +202,8 @@ def evaluate(events: list[Event], kept: list[dict], dropped: list[dict], window:
         rows.append({"id": ev.id, "competitor": ev.competitor, "date": ev.date.isoformat(), "title": ev.title,
                      "official_url": ev.official_url, "source_kind": source_kind(ev.official_url, cfg),
                      "category": ev.category,
-                     "expected_importance": ev.expected_importance, "in_window": first <= ev.date <= last,
+                     "expected_importance": ev.expected_importance, "event_type": ev.event_type,
+                     "in_window": first <= ev.date <= last,
                      "captured": bool(hits), "kept": "kept" in statuses,
                      "dropped_only": statuses == {"dropped"}, "matches": hits})
     scored = [r for r in rows if r["in_window"]]
@@ -235,7 +242,8 @@ def format_report(report: dict) -> str:
            f"({report['items']['kept']} kept, {report['items']['dropped']} dropped items)",
            f"recall {_pct(o['recall'])}  {o['captured']}/{o['events']} events  "
            f"(in kept {o['captured_in_kept']}, dropped only {o['captured_dropped_only']})",
-           f"importance >= {h['min']}: {_pct(h['recall'])}  {h['captured']}/{h['events']}", "",
+           f"importance >= {h['min']}: captured {h['captured']} of {h['events']} "
+           f"(n={h['events']}; a count, not a rate)", "",
            f"{'competitor':<18}{'events':>7}{'captured':>9}{'recall':>8}"]
     out += [f"{k:<18}{v['events']:>7}{v['captured']:>9}{_pct(v['recall']):>8}"
             for k, v in report["by_competitor"].items()]
