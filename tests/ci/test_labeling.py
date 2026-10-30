@@ -107,11 +107,11 @@ def test_save_label_appends_with_snapshot(env):
     assert items[0]["label"]["score"] == 4 and items[1]["label"] is None
 
 
-def test_relabel_latest_wins(env):
+def test_relabel_replaces_the_line(env):
     client, labels = env
     client.post("/api/labels", json=_label(score=2))
     client.post("/api/labels", json=_label(score=5, competitor="sonatype"))
-    assert len(labels.read_text().splitlines()) == 2  # append-only
+    assert len(labels.read_text().splitlines()) == 1  # one line per id
     label = client.get("/api/runs/run_new/items").json()[0]["label"]
     assert label["score"] == 5 and label["competitor"] == "sonatype"
     assert client.get("/api/stats").json()["labeled"] == 1
@@ -221,3 +221,50 @@ def test_only_failed_runs_still_give_a_default(tmp_path):
     _write_run(runs, "only", [], 1_000)
     client = TestClient(create_app(runs_dir=runs, labels_path=tmp_path / "l.jsonl", competitors=COMPETITORS))
     assert client.get("/api/meta").json()["default_run"] == "only"  # nothing better to open
+
+
+def _line(item_id, score, **kw):
+    return json.dumps({"id": item_id, "run_id": "run_new", "competitor": "snyk", "category": "Security",
+                       "score": score, "noise": False, **kw})
+
+
+def test_existing_duplicates_are_compacted_on_the_next_save_keeping_the_latest(env):
+    client, labels = env
+    labels.parent.mkdir(parents=True)
+    labels.write_text("\n".join([_line("id2", 1), _line("id9", 3), "not json at all", _line("id2", 2),
+                                 _line("id9", 4)]) + "\n", encoding="utf-8")
+    assert client.post("/api/labels", json=_label(score=5)).status_code == 200  # id1, new
+    lines = labels.read_text(encoding="utf-8").splitlines()
+    ids = [json.loads(x)["id"] for x in lines if x.startswith("{")]
+    assert sorted(ids) == ["id1", "id2", "id9"]  # one line each
+    latest = {json.loads(x)["id"]: json.loads(x)["score"] for x in lines if x.startswith("{")}
+    assert latest == {"id1": 5, "id2": 2, "id9": 4}
+    assert "not json at all" in lines  # a malformed line is preserved verbatim
+
+
+def test_relabel_replaces_in_place_and_keeps_malformed_lines(env):
+    client, labels = env
+    labels.parent.mkdir(parents=True)
+    labels.write_text(_line("id1", 1) + "\n" + '{"id": "half' + "\n" + _line("id7", 3) + "\n", encoding="utf-8")
+    client.post("/api/labels", json=_label(score=4))
+    lines = labels.read_text(encoding="utf-8").splitlines()
+    assert json.loads(lines[0])["id"] == "id1" and json.loads(lines[0])["score"] == 4
+    assert lines[1] == '{"id": "half' and json.loads(lines[2])["id"] == "id7"
+
+
+def test_a_crash_mid_write_leaves_the_old_file_intact(env, monkeypatch):
+    from ci.labeling import app as app_mod
+
+    client, labels = env
+    labels.parent.mkdir(parents=True)
+    before = _line("id1", 1) + "\n" + _line("id7", 3) + "\n"
+    labels.write_text(before, encoding="utf-8")
+
+    def crash(*a, **k):
+        raise OSError("power cut")
+
+    monkeypatch.setattr(app_mod.os, "replace", crash)
+    with pytest.raises(OSError):
+        client.post("/api/labels", json=_label(score=5))
+    assert labels.read_text(encoding="utf-8") == before
+    assert [p.name for p in labels.parent.iterdir()] == [labels.name]  # no temp file left behind

@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import tempfile
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -75,6 +76,62 @@ def read_jsonl(path: Path) -> list[dict]:
     return rows
 
 
+def _is_label(row) -> bool:
+    return isinstance(row, dict) and isinstance(row.get("id"), str) and isinstance(row.get("noise"), bool)
+
+
+def upsert_label(path: Path, row: dict) -> None:
+    """Write the label so the file holds one line per id: an existing label for the id is replaced in place (else
+    the line is appended), and any older duplicate ids are dropped, keeping the latest. Lines that are not labels
+    (malformed JSON, anything else) are kept verbatim. The file is replaced atomically: a temp file in the same
+    directory, fsync, os.replace, so a crash leaves either the old file or the new one, never a torn one."""
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    parsed = []
+    for line in lines:
+        try:
+            parsed.append(json.loads(line) if line.strip() else None)
+        except json.JSONDecodeError:
+            parsed.append(None)
+    last = {}  # id -> index of its latest line
+    for i, obj in enumerate(parsed):
+        if _is_label(obj):
+            last[obj["id"]] = i
+    new_line = json.dumps(row, ensure_ascii=False)
+    out = []
+    for i, (line, obj) in enumerate(zip(lines, parsed, strict=True)):
+        if _is_label(obj):
+            if last[obj["id"]] != i:
+                continue  # an older duplicate
+            out.append(new_line if obj["id"] == row["id"] else line)
+        elif line.strip():
+            out.append(line)  # malformed or not a label: preserved as it was
+    if row["id"] not in last:
+        out.append(new_line)
+    _replace_atomically(path, "".join(f"{line}\n" for line in out))
+
+
+def _replace_atomically(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+    try:  # make the rename itself durable
+        dir_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        pass
+
+
 def latest_labels(path: Path) -> dict[str, dict]:
     """Item id -> its latest label; later lines win."""
     rows = (r for r in read_jsonl(path) if isinstance(r.get("id"), str) and isinstance(r.get("noise"), bool))
@@ -114,7 +171,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         competitors = [c.key for c in cfg.competitors]
     competitors = [*competitors, NON_COMPETITOR]  # always offered, so an off-target story can be relabeled
     app = FastAPI(title="JFrog CI labeling")
-    write_lock = threading.Lock()  # one append at a time (FastAPI runs sync handlers in a thread pool)
+    write_lock = threading.Lock()  # one write at a time (FastAPI runs sync handlers in a thread pool)
     queue_lock = threading.Lock()  # one queue build per run, even when two tabs open it at once
 
     def run_ids() -> list[str]:
@@ -207,18 +264,8 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         if item is None:
             raise HTTPException(404, f"item {label.id} not in run {label.run_id}")
         row = {**label.model_dump(), "labeled_at": datetime.now(UTC).isoformat(), "item": snapshot(item)}
-        line = json.dumps(row, ensure_ascii=False) + "\n"
-        with write_lock:
-            labels_path.parent.mkdir(parents=True, exist_ok=True)
-            with labels_path.open("ab+") as f:
-                # never glue a line onto an unterminated last line (e.g. after a crash mid-write)
-                if f.tell() > 0:
-                    f.seek(-1, os.SEEK_END)
-                    if f.read(1) != b"\n":
-                        line = "\n" + line
-                f.write(line.encode("utf-8"))
-                f.flush()
-                os.fsync(f.fileno())
+        with write_lock:  # relabeling replaces the id's line; the file stays one line per id
+            upsert_label(labels_path, row)
         return row
 
     return app
