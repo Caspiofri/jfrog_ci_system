@@ -89,7 +89,8 @@ def upsert_label(path: Path, row: dict) -> None:
     the line is appended), and any older duplicate ids are dropped, keeping the latest. Lines that are not labels
     (malformed JSON, anything else) are kept verbatim. The file is replaced atomically: a temp file in the same
     directory, fsync, os.replace, so a crash leaves either the old file or the new one, never a torn one."""
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    # split on "\n" only: splitlines() also breaks on U+2028/U+2029/NEL, which scraped text carries unescaped
+    lines = path.read_text(encoding="utf-8").split("\n") if path.exists() else []
     parsed = []
     for line in lines:
         try:

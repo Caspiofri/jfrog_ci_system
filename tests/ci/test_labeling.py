@@ -303,3 +303,16 @@ def test_page_offers_the_toggle_with_a_shortcut():
     page = PAGE_PATH.read_text(encoding="utf-8")
     assert "<kbd>x</kbd> bad extraction" in page and 'k === "x"' in page and "Bad extraction" in page
     assert 'id="p-bad"' in page
+
+
+@pytest.mark.parametrize("sep", [" ", " ", "\x85"])
+def test_line_separator_chars_in_text_do_not_break_labels(tmp_path, sep):
+    # scraped text can carry U+2028/U+2029/NEL unescaped; a save must not split another label's line
+    from ci.labeling.app import latest_labels, upsert_label
+
+    path = tmp_path / "golden.jsonl"
+    upsert_label(path, {"id": "a", "noise": True, "item": {"text": f"first{sep}second"}})
+    upsert_label(path, {"id": "b", "noise": True, "item": {"text": "plain"}})
+    upsert_label(path, {"id": "b", "noise": False, "category": "Security", "score": 3})
+    assert set(latest_labels(path)) == {"a", "b"}
+    assert latest_labels(path)["a"]["item"]["text"] == f"first{sep}second"

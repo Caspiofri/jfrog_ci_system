@@ -107,7 +107,8 @@ def match_item(event: Event, item: dict) -> str | None:
 def read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    # split on "\n" only: splitlines() also breaks on U+2028/U+2029/NEL inside scraped text
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").split("\n") if line.strip()]
 
 
 def run_window(run_id: str, runs_dir: Path, default_days: int = 7) -> tuple[date, date, int]:
