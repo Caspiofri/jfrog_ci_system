@@ -554,9 +554,24 @@ def test_a_change_detection_run_holds_the_lock_while_it_runs(tmp_path, monkeypat
 
     monkeypatch.setattr(cli, "run", fake_run)
     monkeypatch.setattr(cli, "format_report", lambda report: "report")
-    cli.main([])
+    cli.main(["--live"])  # GeminiLLM is lazy: no key, no call
     with run_lock("changes", tmp_path):  # released afterwards
         pass
+
+
+def test_a_dry_run_takes_no_lock(tmp_path, monkeypatch):
+    import ci.changes.__main__ as cli
+    import ci.runlock
+    from ci.runlock import run_lock
+
+    monkeypatch.setattr(ci.runlock, "LOCK_DIR", tmp_path)
+    ran = []
+    monkeypatch.setattr(cli, "run", lambda *a, **k: ran.append(k["llm"]) or type(
+        "R", (), {"report": {"status": "ok", "run_id": "r", "live": False}, "paths": {}})())
+    monkeypatch.setattr(cli, "format_report", lambda report: "report")
+    with run_lock("changes", tmp_path):  # a live run is in progress
+        cli.main([])  # the dry run neither waits nor exits 2
+    assert ran == [None]
 
 
 def test_renamed_tiers_at_the_same_prices_give_no_item_but_are_reported(env):

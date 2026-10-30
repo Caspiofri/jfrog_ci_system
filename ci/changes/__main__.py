@@ -7,6 +7,7 @@ cells under data/ci/, and writes output/changes/<run_id>.jsonl (the Changes item
 import argparse
 import logging
 import sys
+from contextlib import nullcontext
 
 from ci import config as ci_config
 from ci.changes import config
@@ -19,7 +20,7 @@ LOCK_NAME = "changes"
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Exits 1 when every page failed, and 2 when another change-detection run holds the "changes" lock."""
+    """Exits 1 when every page failed, and 2 when a --live run finds another one holding the "changes" lock."""
     ap = argparse.ArgumentParser(prog="python -m ci.changes", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--competitors", help="comma-separated competitor keys from config/tracked_pages.yaml")
@@ -37,7 +38,8 @@ def main(argv: list[str] | None = None) -> None:
         from ci.llm import GeminiLLM
         llm = GeminiLLM()
     try:
-        with run_lock(LOCK_NAME):
+        # only a --live run writes (snapshots, cells, items) and calls Gemini; a dry run never blocks one
+        with run_lock(LOCK_NAME) if args.live else nullcontext():
             result = run(pages, llm=llm, names=names, competitors=chosen)
     except RunLocked as e:
         print(str(e), file=sys.stderr)
