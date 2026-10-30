@@ -316,3 +316,12 @@ def test_line_separator_chars_in_text_do_not_break_labels(tmp_path, sep):
     upsert_label(path, {"id": "b", "noise": False, "category": "Security", "score": 3})
     assert set(latest_labels(path)) == {"a", "b"}
     assert latest_labels(path)["a"]["item"]["text"] == f"first{sep}second"
+
+
+def test_cards_show_a_plain_queue_marker_without_bucket_or_reason(env):
+    client, _ = env
+    page = client.get("/").text
+    assert '"queue · "' not in page and "inQueue.get(item.id).bucket" not in page
+    assert "inQueue.get(item.id).why" not in page
+    assert 'el("span", { class: "badge bbadge" }, "queue")' in page
+    assert "QUEUE.buckets" in page  # the per-bucket progress chips at the top stay

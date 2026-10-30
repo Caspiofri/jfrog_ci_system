@@ -180,8 +180,8 @@ function renderCard(item, idx) {
     el("span", { class: "rs rs-" + (["full", "partial", "snippet"].includes(item.text_status) ? item.text_status : "snippet"),
       title: "How much of the article the pipeline read" }, "text: " + (item.text_status || "unknown")),
     item.url_resolved === false ? el("span", { class: "badge bwarn", title: item.original_url }, "⚠ URL not resolved") : null,
-    inQueue.has(item.id) ? el("span", { class: "badge bbadge", title: inQueue.get(item.id).why },
-      "queue · " + inQueue.get(item.id).bucket) : null,
+    // only "queue": the bucket and its reason come from the rules, and showing them would bias Noise labels
+    inQueue.has(item.id) ? el("span", { class: "badge bbadge" }, "queue") : null,
     item.label ? el("span", { class: "badge bdone" }, "saved " + fmtDate(item.label.labeled_at)) : null,
   );
   const left = el("div", {},
