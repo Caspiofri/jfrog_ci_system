@@ -84,7 +84,7 @@ def test_run_end_to_end(tmp_path, registry):
 
     assert src["hackernews"] | {"errors": [], "duration_s": 0} == {
         "collected": 3, "in_24h": 2, "unresolved_urls": 0, "dup_url": 1, "dup_embedding": 0, "kept": 2,
-        "full": 1, "partial": 1, "snippet": 0, "contaminated": 0, "contaminated_ids": [], "errors": [],
+        "full": 1, "partial": 1, "snippet": 0, "junk": 0, "contaminated": 0, "contaminated_ids": [], "errors": [],
         "duration_s": 0}
     assert src["google_news"]["unresolved_urls"] == 1 and src["google_news"]["dup_embedding"] == 1
     assert res.report["totals"]["collected"] == 5 and res.report["totals"]["kept"] == 3
@@ -386,3 +386,18 @@ def test_a_good_page_keeps_its_status_and_the_teaser():
     p = pipeline.read_full_text(pkt("google_news", "https://a.com/ok", "Sonatype launches Nexus Pro+ AI screening"),
                                 lambda url: page)
     assert p.text_status == "full" and p.extraction_reasons == [] and p.teaser == "teaser"
+
+
+def test_report_counts_junk_items_per_source():
+    def mk(i, source, status):
+        return Packet(source=source, origin="o", competitor="acme", title=f"t{i}", url=f"https://a/{i}",
+                      original_url=f"https://a/{i}", text="x", id=f"id{i}", text_status=status)
+
+    kept = [mk(1, "google_news", "junk"), mk(2, "google_news", "junk"), mk(3, "google_news", "full"),
+            mk(4, "hackernews", "partial")]
+    collected = {s: (CollectorResult(source=s), 1.0) for s in ("google_news", "hackernews")}
+    report = pipeline.build_report("r", collected, kept, kept, [], {"window_days": 7, "fresh": False, "duration_s": 1})
+    assert report["sources"]["google_news"]["junk"] == 2 and report["sources"]["hackernews"]["junk"] == 0
+    assert report["totals"]["junk"] == 2
+    header = pipeline.format_report(report).splitlines()[1]
+    assert "junk" in header.split()

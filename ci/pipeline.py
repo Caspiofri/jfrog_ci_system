@@ -34,7 +34,7 @@ FETCH_WORKERS = 8
 # distinct tags of one repo read as near-identical; their URLs are unique per tag, so URL dedupe is enough
 NO_EMBEDDING_DEDUPE = {"github_releases"}
 REPORT_COLUMNS = ["collected", "in_24h", "unresolved_urls", "dup_url", "dup_embedding", "kept",
-                  "full", "partial", "snippet", "contaminated", "errors", "duration_s"]
+                  "full", "partial", "snippet", "junk", "contaminated", "errors", "duration_s"]
 
 
 @dataclass
@@ -153,7 +153,7 @@ def build_report(run_id: str, collected: dict[str, tuple[CollectorResult, float]
             "dup_url": sum(r["drop_stage"] == "url_dedupe" for r in d),
             "dup_embedding": sum(r["drop_stage"] == "embedding_dedupe" for r in d),
             "kept": len(k),
-            **{s: sum(p.text_status == s for p in k) for s in ("full", "partial", "snippet")},
+            **{s: sum(p.text_status == s for p in k) for s in ("full", "partial", "snippet", "junk")},
             # items whose text contains another item's title from this run: the extractor pulled in a neighbour
             "contaminated": dirty.get(res.source, {}).get("contaminated", 0),
             "contaminated_ids": dirty.get(res.source, {}).get("worst", []),
