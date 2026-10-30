@@ -131,6 +131,9 @@ def load_or_build(runs_dir: Path, run_id: str, items: list[dict], labeled: set[s
     A stored queue is never rebuilt on its own, even when the rules changed (someone may be labeling from it);
     only rebuild=True replaces it. Already-labeled items are picked first, so a rebuild keeps finished work."""
     path = queue_path(runs_dir, run_id)
+    stored = _read_queue(path, run_id)
+    if stored is not None and stored.get("mode") == "topup":
+        return canonical_queue(stored)  # a top-up queue is never replaced by a stratified rebuild
     if path.exists() and not rebuild:
         try:
             queue = json.loads(path.read_text(encoding="utf-8"))
@@ -143,6 +146,22 @@ def load_or_build(runs_dir: Path, run_id: str, items: list[dict], labeled: set[s
     tmp.write_text(json.dumps(queue, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, path)
     return queue
+
+
+def _read_queue(path: Path, run_id: str) -> dict | None:
+    try:
+        queue = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return queue if isinstance(queue, dict) and queue.get("run_id") == run_id else None
+
+
+def requires_bad_extraction(runs_dir: Path, run_id: str) -> set[str]:
+    """Ids whose label must answer bad_extraction explicitly: the entries of a queue marked so (the top-up)."""
+    queue = _read_queue(queue_path(runs_dir, run_id), run_id)
+    if not queue or not queue.get("require_bad_extraction"):
+        return set()
+    return {e.get("id") for e in queue.get("entries", [])}
 
 
 def canonical_queue(queue: dict) -> dict:
@@ -159,5 +178,6 @@ def with_progress(queue: dict, labels: dict[str, dict], current_hash: str | None
     for e in queue["entries"]:
         per[e["bucket"]] = per.get(e["bucket"], 0) + (e["id"] in done)
     buckets = [{**b, "labeled": per.get(b["name"], 0)} for b in queue["buckets"]]
-    stale = current_hash is not None and queue.get("rules_hash") != current_hash  # no hash: built before hashing
+    # no hash: built before hashing; a top-up queue has its own selection, never the stratified rules
+    stale = current_hash is not None and queue.get("mode") != "topup" and queue.get("rules_hash") != current_hash
     return {**queue, "buckets": buckets, "labeled": len(done), "total": len(queue["entries"]), "stale": stale}

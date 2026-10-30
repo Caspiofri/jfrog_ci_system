@@ -66,6 +66,7 @@
   button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.noise.on { background: var(--red); border-color: var(--red); }
   button.jf.on { background: var(--green); border-color: var(--green); }
+  .seg.badq.unset { outline: 2px dashed var(--amber); outline-offset: 2px; border-radius: 6px; }
   button.bad.on { background: var(--amber); border-color: var(--amber); color: #fff; }
   .cat { font-size: 12px; padding: 2px 7px; }
   .cat u { text-decoration: underline; text-underline-offset: 2px; }
@@ -153,6 +154,9 @@ function fmtDate(s, dayOnly) {
 }
 
 // ---- per-item draft state, seeded from the saved label or the packet
+// a queue that requires an explicit Bad-extraction answer (the top-up queue): no default, yes or no must be picked
+function requiresBad(item) { return !!(QUEUE && QUEUE.require_bad_extraction && inQueue.has(item.id)); }
+
 function draftFrom(item) {
   const l = item.label;
   return {
@@ -164,7 +168,7 @@ function draftFrom(item) {
     // new: "partial" until the article is opened from the card; saved: keep what was stored (null on lines
     // from before basis existed, so the analyst picks one rather than the page claiming "partial")
     basis: l ? l.basis || null : "partial",
-    bad_extraction: l ? l.bad_extraction === true : false,
+    bad_extraction: l && typeof l.bad_extraction === "boolean" ? l.bad_extraction : (requiresBad(item) ? null : false),
     note: l ? l.note || "" : "",
   };
 }
@@ -216,9 +220,18 @@ function renderCard(item, idx) {
     onclick: () => toggleNoise(idx) }, "Noise"));
   scores.append(el("button", { class: "jf" + (d.mentions_jfrog ? " on" : ""), title: "Mentions JFrog  [m]",
     onclick: () => toggleJfrog(idx) }, "Mentions JFrog"));
-  scores.append(el("button", { class: "bad" + (d.bad_extraction ? " on" : ""),
-    title: "The text shown is not the article (menus, cookie banner, another page). Still label the real article.  [x]",
-    onclick: () => toggleBad(idx) }, "Bad extraction"));
+  const badTitle = "The text shown is not the article (menus, cookie banner, another page). "
+    + "Still label the real article.  [x]";
+  if (requiresBad(item)) {  // required answer: unset until picked
+    scores.append(el("span", { class: "seg badq" + (d.bad_extraction === null ? " unset" : ""), title: badTitle },
+      el("span", { class: "lbl" }, "Bad extraction?"),
+      el("button", { class: d.bad_extraction === false ? "on" : "", onclick: () => setBad(idx, false) }, "No"),
+      el("button", { class: "bad" + (d.bad_extraction === true ? " on" : ""), onclick: () => setBad(idx, true) },
+        "Yes")));
+  } else {
+    scores.append(el("button", { class: "bad" + (d.bad_extraction ? " on" : ""), title: badTitle,
+      onclick: () => toggleBad(idx) }, "Bad extraction"));
+  }
 
   const note = el("input", { type: "text", placeholder: "note (optional)", value: d.note });
   note.oninput = (e) => { d.note = e.target.value; };
@@ -286,7 +299,8 @@ function mentionsLine(item) {
   return line;
 }
 function toggleJfrog(idx) { const d = items[idx].draft; d.mentions_jfrog = !d.mentions_jfrog; refreshCard(idx); }
-function toggleBad(idx) { const d = items[idx].draft; d.bad_extraction = !d.bad_extraction; refreshCard(idx); }
+function toggleBad(idx) { const d = items[idx].draft; d.bad_extraction = d.bad_extraction !== true; refreshCard(idx); }
+function setBad(idx, v) { items[idx].draft.bad_extraction = v; refreshCard(idx); }
 function toggleText(idx) {
   const c = cards[idx], text = items[idx].text || "";
   if (!c._more) return;
@@ -300,6 +314,9 @@ async function save(idx) {
   const body = { id: it.id, run_id: it.run_id || $("run").value, ...d };
   if (!d.noise && (!d.category || !d.score)) { setStatus(idx, "Pick a category and a score, or mark Noise", "err"); return; }
   if (!d.basis) { setStatus(idx, "Pick Read: Partial or Full  [b]", "err"); return; }
+  if (requiresBad(it) && typeof d.bad_extraction !== "boolean") {
+    setStatus(idx, "Answer Bad extraction: Yes or No  [x]", "err"); return;
+  }
   if (saving) return;  // no double submit
   saving = true;
   try {

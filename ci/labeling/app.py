@@ -47,7 +47,7 @@ class LabelIn(BaseModel):
     basis: Literal["full", "partial"]  # did Ofri read the full article, or only part of it, before labeling
     # the shown text was not the article (boilerplate, nav, another page); category/score/competitor still describe
     # the real article. Old labels without it read back as None.
-    bad_extraction: bool = False
+    bad_extraction: bool | None = None  # None = not answered: stored as False, except where the queue requires it
     note: str = ""
 
     @model_validator(mode="after")
@@ -280,6 +280,10 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         item = next((it for it in load_run(label.run_id) if it.get("id") == label.id), None)
         if item is None:
             raise HTTPException(404, f"item {label.id} not in run {label.run_id}")
+        if label.bad_extraction is None:
+            if label.id in stratified.requires_bad_extraction(runs_dir, label.run_id):
+                raise HTTPException(422, "this queue requires an explicit bad_extraction answer (true or false)")
+            label.bad_extraction = False
         row = {**label.model_dump(), "labeled_at": datetime.now(UTC).isoformat(), "item": snapshot(item)}
         with write_lock:  # relabeling replaces the id's line; the file stays one line per id
             upsert_label(labels_path, row)
