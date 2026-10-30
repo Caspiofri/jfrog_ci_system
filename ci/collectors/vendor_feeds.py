@@ -15,9 +15,10 @@ DAY_STAMP = time(12, 0)  # a day-only date is stamped at noon UTC: off by at mos
 
 
 def keyword_re(keyword: str) -> re.Pattern:
-    """Whole words or a whole phrase, any case and spacing: "ecr" must not match "secrets" or "decrease"."""
-    words = r"\s+".join(re.escape(w) for w in keyword.split())
-    return re.compile(rf"(?<!\w){words}(?!\w)", re.IGNORECASE)
+    """Whole words or a whole phrase, any case, joined by spaces or hyphens ("supply-chain"), with an optional
+    plural s ("SBOMs"). Whole words: "ecr" must not match "secrets" or "decrease"."""
+    words = r"[\s-]+".join(re.escape(w) for w in keyword.split())
+    return re.compile(rf"(?<!\w){words}s?(?!\w)", re.IGNORECASE)
 
 
 def _matches(entry, keywords: list[str]) -> bool:

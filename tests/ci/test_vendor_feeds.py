@@ -152,7 +152,16 @@ def test_aws_keywords_match_whole_words_only(monkeypatch):
     ("ecr", "a price decrease", False),
     ("ecr", "Amazon ECR, now faster", True),
     ("supply chain", "Software Supply\nChain security", True),
+    ("supply chain", "supply-chain attacks", True),  # hyphenated
+    ("software supply chain", "Software-Supply chain", True),
+    ("sbom", "Generate SBOMs for every build", True),  # plural
+    ("elastic container registry", "Amazon Elastic Container Registry adds", True),
+    ("amazon ecr", "Amazon   ECR now supports", True),
+    ("amazon ecr", "Amazon Secrets", False),
+    ("ecr", "decreased prices", False),
+    ("ecr", "secret", False),
     ("agent", "agentic workflows", False),
+    ("agent", "AI agents", True),
     ("c++", "C++ support", True),  # regex characters are literal
 ])
 def test_keyword_re(keyword, text, hit):
