@@ -110,7 +110,7 @@ def test_baseline_stores_cells_and_emits_no_item(env):
     store = cells(tmp)
     got = {c.axis: c for c in store.all("acme")}
     assert set(got) == {"pricing_model", "deployment", "package_coverage", "security_scanning", "cicd_integration"}
-    assert got["pricing_model"].value == "Free $0/month; Pro $150/month; Enterprise contact sales"
+    assert got["pricing_model"].value == "Free $0/month; Pro $150/month; Enterprise (no price listed)"
     assert got["pricing_model"].source_url == PRICING_URL and got["pricing_model"].as_of == T1
     assert [t.price for t in got["pricing_model"].tiers] == [0, 150, None]
     assert [h["event"] for h in store.history("acme", "pricing_model")] == ["baseline"]
@@ -186,7 +186,7 @@ def test_cosmetic_change_in_the_article_calls_the_llm_but_emits_no_item(env):
     assert len(llm.calls) == calls + 1  # the hash differs, so the page is re-extracted
     assert "Previous values" not in llm.calls[0][0]  # the baseline extraction has nothing to anchor on
     prompt = llm.calls[-1][0]  # the re-extraction is anchored on the current cells, to keep their wording
-    assert '- pricing_model: "Free $0/month; Pro $150/month; Enterprise contact sales"' in prompt
+    assert '- pricing_model: "Free $0/month; Pro $150/month; Enterprise (no price listed)"' in prompt
     assert '- deployment: "SaaS; self-hosted and air-gapped on Enterprise"' in prompt
     assert statuses(res)["pricing"] == "same_fields"
     assert res.items == [] and res.report["changed_hash_same_fields"] == 1 and res.report["changes"] == 0

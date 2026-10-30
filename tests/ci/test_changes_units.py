@@ -11,10 +11,12 @@ from ci.changes.extract import (
     Tier,
     extract_fields,
     missing_numbers,
+    name_levels,
     numbers_in,
     parse_fields,
     price_in_quote,
     quote_in_text,
+    render_tiers,
     schema_for,
 )
 from ci.changes.snapshot import SnapshotStore, content_hash, normalize_text
@@ -113,13 +115,35 @@ def test_price_in_quote_needs_a_priced_tier():
     assert price_in_quote("Pro is $50.00 a month", [Tier(name="Pro", price=50)])
 
 
+def test_the_pricing_value_is_rendered_from_the_tiers_not_taken_from_the_model():
+    text = "Team $1,200 per year. Pro $50/month per user. Enterprise: contact sales."
+    raw = {"value": "a lovely summary", "evidence": "Pro $50/month per user", "confidence": 0.9, "tiers": [
+        {"name": "Enterprise"}, {"name": "Pro", "price": 50, "currency": "$", "period": "monthly", "unit": "user"},
+        {"name": "Team", "price": 1200, "currency": "usd", "period": "annually"}]}
+    f = parse_fields({"pricing_model": raw}, ["pricing_model"], text)["pricing_model"]
+    assert f.value == "Pro $50/user/month; Team $1,200/year; Enterprise (no price listed)"
+    assert [(t.name, t.currency, t.period) for t in f.tiers] == [("Pro", "USD", "month"), ("Team", "USD", "year"),
+                                                                 ("Enterprise", "", "")]
+    shuffled = {**raw, "value": "other words", "tiers": list(reversed(raw["tiers"]))}
+    assert parse_fields({"pricing_model": shuffled}, ["pricing_model"], text)["pricing_model"].value == f.value
+
+
+def test_one_plan_at_several_prices_becomes_levels_ordered_by_price():
+    pro = [Tier(name="Pro", price=p, currency="USD", period="year") for p in (4800, 1200, 7500, 1950, 1200)]
+    assert [(t.name, t.price) for t in name_levels(pro)] == [
+        ("Pro (level 1)", 1200), ("Pro (level 2)", 1950), ("Pro (level 3)", 4800), ("Pro (level 4)", 7500)]
+    labeled = [Tier(name="Pro - 1 user / 10k requests", price=1950), Tier(name="Pro - 5 users", price=4800)]
+    assert [t.name for t in name_levels(labeled)] == ["Pro - 1 user / 10k requests", "Pro - 5 users"]
+    assert render_tiers(name_levels(pro)).startswith("Pro (level 1) $1,200/year; Pro (level 2) $1,950/year")
+
+
 def test_missing_or_malformed_axes_parse_as_not_stated():
     tiers = [{"name": "Pro", "price": "$150"}, {"name": "Free", "price": 0}]
     fields = parse_fields({"pricing_model": {"value": "", "confidence": "high", "tiers": tiers}},
                           ["pricing_model", "ai_mcp"], "page")
     assert not fields["ai_mcp"].stated and fields["ai_mcp"].confidence == 0
-    assert not fields["pricing_model"].stated
     assert [t.name for t in fields["pricing_model"].tiers] == ["Free"]  # the unparseable price is dropped
+    assert fields["pricing_model"].value == "Free 0"  # rendered from the remaining tier
 
 
 def test_extraction_asks_for_exactly_the_page_axes_with_structured_pricing():

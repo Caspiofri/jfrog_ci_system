@@ -6,7 +6,7 @@ The quote is checked against the page text; a quote that is not on the page sets
 import json
 import re
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from ci.changes.config import AXES, TrackedPage
 from ci.llm import JsonLLM
@@ -26,12 +26,72 @@ AXIS_GUIDE = {
 }
 
 
+_CURRENCY_CODES = {"$": "USD", "us$": "USD", "usd": "USD", "€": "EUR", "eur": "EUR", "£": "GBP", "gbp": "GBP"}
+_PERIODS = {"month": "month", "monthly": "month", "mo": "month", "/month": "month", "per month": "month",
+            "year": "year", "yearly": "year", "annual": "year", "annually": "year", "yr": "year", "/year": "year",
+            "per year": "year", "one-time": "one-time", "once": "one-time"}
+_SYMBOLS = {"USD": "$", "EUR": "€", "GBP": "£"}
+
+
 class Tier(BaseModel):
+    """One price point. Pricing cells are these, structured; their value is render_tiers(), never model prose."""
     name: str
     price: float | None = None  # None when the page gives no number ("Contact sales")
-    currency: str = ""  # ISO code, e.g. USD
+    currency: str = ""  # ISO code: "$" and "usd" are stored as USD
     period: str = ""  # month | year | one-time | ""
-    unit: str = ""  # what the price is per, e.g. "user", "GB", "1,000 requests"
+    unit: str = ""  # optional: what the price is per, e.g. "user", "GB", "1,000 requests"
+
+    @field_validator("name", "unit")
+    @classmethod
+    def _squash(cls, v: str) -> str:
+        return re.sub(r"\s+", " ", v or "").strip()
+
+    @field_validator("currency")
+    @classmethod
+    def _currency(cls, v: str) -> str:
+        v = (v or "").strip()
+        return _CURRENCY_CODES.get(v.casefold(), v.upper())
+
+    @field_validator("period")
+    @classmethod
+    def _period(cls, v: str) -> str:
+        v = re.sub(r"\s+", " ", v or "").strip().casefold()
+        return _PERIODS.get(v, v)
+
+
+def _price_text(t: Tier) -> str:
+    if t.price is None:
+        return " (no price listed)"
+    amount = f"{t.price:,.2f}".removesuffix(".00")
+    money = f"{_SYMBOLS[t.currency]}{amount}" if t.currency in _SYMBOLS else f"{amount} {t.currency}".strip()
+    return " " + "/".join(filter(None, [money, t.unit, t.period]))
+
+
+def _tier_order(t: Tier) -> tuple:
+    return (t.price is None, t.price or 0.0, t.name.casefold(), t.period, t.unit.casefold())
+
+
+def render_tiers(tiers: list[Tier]) -> str:
+    """The pricing cell's value: every tier, sorted by price (unpriced last) then name, in one fixed format, so a
+    re-ordering or a wording difference in the model's answer cannot show up as a change."""
+    return "; ".join(f"{t.name}{_price_text(t)}" for t in sorted(tiers, key=_tier_order))
+
+
+def name_levels(tiers: list[Tier]) -> list[Tier]:
+    """Distinct names for one plan listed at several prices (usage levels the page gives no label for): "Pro" at
+    $1,200, $1,950 and $4,800 become "Pro (level 1..3)" in price order. Exact repeats are dropped."""
+    groups: dict[str, list[Tier]] = {}
+    for t in tiers:
+        groups.setdefault(t.name.casefold(), []).append(t)
+    out = []
+    for group in groups.values():
+        unique = list({(t.price, t.currency, t.period, t.unit.casefold()): t for t in group}.values())
+        if len(unique) == 1:
+            out.append(unique[0])
+            continue
+        for i, t in enumerate(sorted(unique, key=_tier_order), 1):
+            out.append(t.model_copy(update={"name": f"{t.name} (level {i})"}))
+    return sorted(out, key=_tier_order)
 
 
 class AxisField(BaseModel):
@@ -101,9 +161,11 @@ Page: {page.url} (a {page.page_type} page)
 For each axis below give:
 - value: a short, normalized statement of what the page says (at most ~25 words). Write it so that the same facts
   always give the same wording: plain factual phrasing, no marketing adjectives, numbers as digits.
-  For pricing_model, include each tier's name and price in the value (e.g. "Free $0; Pro $150/month; Enterprise
-  contact sales"), and also list the tiers in `tiers` (price as a number, currency as an ISO code, period month or
-  year, unit such as user or GB).
+  For pricing_model, list every price point in `tiers`: name, price as a number, currency as an ISO code, period
+  month or year, and unit (user, GB, ...) only when the page gives one. A tier with no listed price ("Contact
+  sales") has no price. When one plan lists several prices (usage levels), give each its own tier, named with the
+  level's label from the page (e.g. "Pro - 1 user / 10k requests"). The pricing_model value is rebuilt from the
+  tiers, so it only matters when the page lists no tiers at all.
 - evidence: one verbatim quote copied exactly from the page text below (a sentence or phrase, no paraphrase).
   For pricing_model, quote a line that states a price (e.g. "Pro $1,950 per year"), not a general description.
 - confidence: 0 to 1, how directly the page states it.
@@ -197,7 +259,9 @@ def parse_fields(answer: dict, axes: list[str], text: str) -> dict[str, AxisFiel
         raw = answer.get(axis) if isinstance(answer.get(axis), dict) else {}
         value = str(raw.get("value") or "").strip() or NOT_STATED
         evidence = str(raw.get("evidence") or "").strip()
-        tiers = _tiers(raw.get("tiers"))
+        tiers = name_levels(_tiers(raw.get("tiers")))
+        if axis == "pricing_model" and tiers:
+            value = render_tiers(tiers)  # never the model's prose: a format change cannot become a diff
         verified = bool(evidence) and quote_in_text(evidence, text)
         reason = "" if verified or not evidence else "evidence quote not on the page"
         missing = missing_numbers(value, tiers, text)
