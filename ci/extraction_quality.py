@@ -46,30 +46,48 @@ BOILERPLATE_RE = re.compile(
     re.IGNORECASE)
 
 # A page that is only a gate in front of the content: JS / bot checks, consent walls, error pages, a lone loading
-# line. The phrase must sit at the start of a short line of its own (at most WALL_LEAD_WORDS words before it, e.g.
-# "You need to enable JavaScript to run this app."; WALL_LINE_MAX_WORDS in all; not a list bullet): "captcha" or
-# "cookie settings" inside a CVE note or a release-note entry is content, not a wall.
+# line. A wall line holds a wall phrase at its start (at most WALL_LEAD_WORDS words before it, e.g. "You need to
+# enable JavaScript to run this app."), has at most WALL_LINE_MAX_WORDS words and is not a list bullet. A full
+# sentence (more than SENTENCE_MIN_WORDS words, ending in a period) is a wall line only when it addresses the reader
+# ("you", "please", "this site"): "CAPTCHA is now required after five failed attempts." is product news. And the
+# page is a wall only when its other lines are menu-like: a short article with a "Loading..." line is an article.
 WALL_LINE_MAX_WORDS = 10
 WALL_LEAD_WORDS = 3
-WALL_RE = re.compile(
-    r"^\W*(?:\w+\s+){0,3}?(?:please\s+)?(?:enable javascript|javascript (?:is )?(?:required|disabled)|"
+SENTENCE_MIN_WORDS = 6
+_WALL_PHRASES = (
+    r"enable javascript|javascript (?:is )?(?:required|disabled)|"
     r"verifying (?:your browser|you are (?:a )?human)|checking (?:your browser|if the site connection is secure)|"
     r"just a moment|are you a robot|(?:complete the )?captcha|access denied|we use cookies|"
     r"accept (?:all )?cookies|cookie (?:settings|preferences)|we value your privacy|(?:error )?404\b|"
-    r"page not found|the page you (?:are|were) looking for|loading\W*$|please wait\W*$)",  # {0,3}: WALL_LEAD_WORDS
-    re.IGNORECASE)
+    r"page not found|the page you (?:are|were) looking for|sorry,? (?:we|but) (?:couldn.?t|can.?t|cannot|could not) "
+    r"find|loading\W*$|please wait\W*$")
+WALL_RE = re.compile(r"^\W*(?:\w+\s+){0,%d}?(?:please\s+)?(?:%s)" % (WALL_LEAD_WORDS, _WALL_PHRASES),  # noqa: UP031
+                     re.IGNORECASE)
+_WALL_ANYWHERE = re.compile(_WALL_PHRASES, re.IGNORECASE)
+_ADDRESSES_READER = re.compile(r"\b(?:you|your|please|this (?:site|website|app|page))\b", re.IGNORECASE)
 MENU_LINE_MIN_WORDS = 6  # a line this long, or a 3+ word line ending a sentence, is content, not a menu entry
 
 
+def _wall_match(line: str) -> re.Match | None:
+    words = len(line.split())
+    if line[:1] in "-*•" or words > WALL_LINE_MAX_WORDS:
+        return None
+    m = WALL_RE.search(line)
+    if m and words > SENTENCE_MIN_WORDS and line.endswith(".") and not _ADDRESSES_READER.search(line):
+        return None  # a sentence about the product ("Access denied errors for SSO users are fixed.")
+    return m
+
+
 def wall_phrase(text: str) -> str | None:
-    """The wall phrase opening a short line of the text, or None."""
-    for line in (text or "").splitlines():
-        line = line.strip()
-        if line[:1] in "-*•" or len(line.split()) > WALL_LINE_MAX_WORDS:
-            continue
-        if m := WALL_RE.search(line):
-            return " ".join(m.group(0).split()).strip(" .!-:").lower()
-    return None
+    """The wall phrase of a page that is only a wall, or None. The other lines must be menu-like; lines holding a
+    wall phrase anywhere (a consent banner's long cookie sentence) or boilerplate ("© 2026 ... All rights
+    reserved.") do not count as content."""
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    found = next((m for line in lines if (m := _wall_match(line))), None)
+    rest = [x for x in lines if not _WALL_ANYWHERE.search(x) and not BOILERPLATE_RE.search(x)]
+    if found is None or not menu_like("\n".join(rest)):
+        return None
+    return " ".join(found.group(0).split()).strip(" .!-:").lower()
 
 
 def menu_like(text: str) -> bool:

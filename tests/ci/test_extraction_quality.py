@@ -100,6 +100,7 @@ def test_short_real_pages_are_not_junk(name):
     "404\nPage not found\nThe page you are looking for does not exist.\nGo home",
     "Page Not Found\nSorry, we couldn't find that page.",
     "You need to enable JavaScript to run this app.",
+    "Skip to content\nProducts\nPricing\n404\nPage not found\nThe page you are looking for does not exist.\nGo home",
 ])
 def test_tiny_walls_fail_on_their_wall_phrase_even_without_title_signal(text):
     q = assess("Roku developer repositories moved from GitHub to GitLab", text)
@@ -128,6 +129,13 @@ def test_a_short_nav_menu_still_fails_on_boilerplate():
      "- chore: bump deps"),
     ("example-cli v2.3.2", "v2.3.2\n- fix: cookie settings now persist\nUpgrade with `pip install -U example-cli`."),
     ("Login hardening", "Login hardening\nThe new captcha flow is now on for every tenant by default."),
+    ("Artifacts API retries", "404 errors on the artifacts API are now retried."),
+    ("SSO fix", "Access denied errors for SSO users are fixed."),
+    ("Login protection", "CAPTCHA is now required after five failed attempts."),
+    ("Usage dashboard", "GitLab shipped a usage dashboard for CI minutes this week.\nEnable JavaScript to see the "
+     "interactive chart.\nThe dashboard breaks usage down by project and runner."),
+    ("Registry stats", "Cloudsmith published its registry statistics for October.\nLoading...\nDownloads grew 12% "
+     "month over month, led by npm and Docker."),
 ])
 def test_wall_words_inside_content_sentences_are_not_walls(title, text):
     assert len(text) < BOILERPLATE_MIN_CHARS
