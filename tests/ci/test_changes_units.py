@@ -255,9 +255,46 @@ SONATYPE_LABELED = [Tier(name=n, price=p, currency="USD", period="year") for n, 
 def test_the_sonatype_levels_relabeled_at_the_same_prices_are_renames_not_changes():
     changes = tier_changes(SONATYPE_LEVELS, SONATYPE_LABELED)
     assert len(changes) == 4 and renamed_only(changes)  # was 4 removed + 4 added
-    assert changes[1] == {"tier": "Pro (Cloud)", "change": "renamed", "old_name": "Pro (level 2)",
-                          "old": "$1,950/year", "new": "$1,950/year"}
+    assert {c["old_name"]: c["tier"] for c in changes} == {
+        "Pro (level 1)": "Pro - 1 user / 10k requests", "Pro (level 2)": "Pro (Cloud)",
+        "Pro (level 3)": "Pro - 5 users", "Pro (level 4)": "Pro Edition (Self-Hosted)"}
+    assert {"tier": "Pro (Cloud)", "change": "renamed", "old_name": "Pro (level 2)", "old": "$1,950/year",
+            "new": "$1,950/year"} in changes
     assert same_field(priced(*SONATYPE_LEVELS), priced(*SONATYPE_LABELED))
+
+
+def kinds(old: list[Tier], new: list[Tier]) -> list[tuple[str, str]]:
+    return sorted((c["change"], c["tier"]) for c in tier_changes(old, new))
+
+
+def test_unpriced_tiers_are_never_paired_as_a_rename():
+    old = [Tier(name="Pro", price=50, currency="USD", period="month"), Tier(name="Enterprise")]
+    new = [Tier(name="Pro", price=50, currency="USD", period="month"), Tier(name="AI Security Add-on")]
+    assert kinds(old, new) == [("added", "AI Security Add-on"), ("removed", "Enterprise")]
+    assert not same_field(priced(*old), priced(*new))
+
+
+def test_a_new_plan_at_a_discontinued_plans_price_is_not_a_rename():
+    old = [Tier(name="Pro", price=50, currency="USD", period="month")]
+    new = [Tier(name="Business", price=50, currency="USD", period="month")]
+    assert kinds(old, new) == [("added", "Business"), ("removed", "Pro")]
+    old = [Tier(name="Team plan", price=50, currency="USD", period="month")]  # "plan" is not a shared word
+    assert kinds(old, [Tier(name="Business plan", price=50, currency="USD", period="month")]) == [
+        ("added", "Business plan"), ("removed", "Team plan")]
+
+
+def test_a_different_unit_at_the_same_price_is_not_a_rename():
+    old = [Tier(name="Pro seats", price=50, currency="USD", period="month", unit="user")]
+    new = [Tier(name="Pro storage", price=50, currency="USD", period="month", unit="GB")]
+    assert kinds(old, new) == [("added", "Pro storage"), ("removed", "Pro seats")]
+
+
+def test_renames_pair_by_best_name_similarity_one_to_one():
+    old = [Tier(name="Pro Cloud", price=50, currency="USD"), Tier(name="Pro Self-Hosted", price=50, currency="USD")]
+    new = [Tier(name="Pro Self-Hosted Edition", price=50, currency="USD"),
+           Tier(name="Pro Cloud Edition", price=50, currency="USD")]
+    pairs = {(c["old_name"], c["tier"]) for c in tier_changes(old, new)}
+    assert pairs == {("Pro Cloud", "Pro Cloud Edition"), ("Pro Self-Hosted", "Pro Self-Hosted Edition")}
 
 
 def test_a_rename_with_a_price_change_is_still_a_change():

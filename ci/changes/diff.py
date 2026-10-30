@@ -76,13 +76,51 @@ def _tier_name(t: Tier) -> str:
     return " ".join(sorted(tokens(t.name)))
 
 
+# words that do not tell plans apart: "Pro (level 1)" and "Pro - 1 user / 10k requests" share "pro", and
+# "Team plan" / "Business plan" share nothing once "plan" is set aside
+_GENERIC_TIER_WORDS = {"plan", "tier", "edition", "level", "package", "bundle", "option", "pricing", "price"}
+
+
+def _name_words(t: Tier) -> set[str]:
+    return {w for w in tokens(t.name) if w not in _GENERIC_TIER_WORDS and not w[0].isdigit()}
+
+
+def _rename_key(t: Tier) -> tuple | None:
+    """(price, currency, period, unit) of a priced tier; None for an unpriced one, which is never paired as a
+    rename ("Enterprise: contact sales" dropped and "AI add-on: contact sales" launched are two changes)."""
+    key = _tier_key(t)
+    if key[1] is None:
+        return None
+    return (*key[1:], " ".join(sorted(tokens(t.unit))))
+
+
+def _similarity(a: Tier, b: Tier) -> float:
+    wa, wb = _name_words(a), _name_words(b)
+    return len(wa & wb) / len(wa | wb) if wa & wb else 0.0
+
+
+def _pair_renames(removed: list[Tier], added: list[Tier]) -> list[tuple[Tier, Tier]]:
+    """One-to-one pairs of a removed and an added tier that are the same tier renamed: same price, currency, period
+    and unit, and names sharing a meaningful word; the most similar names pair first."""
+    candidates = sorted(
+        ((_similarity(o, n), i, j) for i, o in enumerate(removed) for j, n in enumerate(added)
+         if _rename_key(o) is not None and _rename_key(o) == _rename_key(n) and _similarity(o, n) > 0),
+        key=lambda c: (-c[0], c[1], c[2]))
+    used_o, used_n, pairs = set(), set(), []
+    for _, i, j in candidates:
+        if i not in used_o and j not in used_n:
+            used_o.add(i)
+            used_n.add(j)
+            pairs.append((removed[i], added[j]))
+    return pairs
+
+
 def tier_changes(old: list[Tier], new: list[Tier]) -> list[dict]:
     """Per tier, matched by normalized name: added, removed, or changed price/currency/period (the optional unit is
     not compared). Order and rendering never count. Each entry: {tier, change, old, new} with the price as shown.
 
-    A removed and an added tier with the same (price, currency, period) are one tier renamed ("Pro (level 2)" ->
-    "Pro - 1 user / 10k requests"): {tier, change: "renamed", old_name, old, new}. Several at one price pair up in
-    name order."""
+    A removed and an added tier are one tier renamed ("Pro (level 2)" -> "Pro - 1 user / 10k requests") when
+    _pair_renames pairs them: {tier, change: "renamed", old_name, old, new}."""
     before = {_tier_name(t): t for t in old}
     after = {_tier_name(t): t for t in new}
     out, removed, added = [], [], []
@@ -95,15 +133,15 @@ def tier_changes(old: list[Tier], new: list[Tier]) -> list[dict]:
         elif _tier_key(o)[1:] != _tier_key(n)[1:]:
             out.append({"tier": n.name, "change": "changed", "old": price_text(o).strip(),
                         "new": price_text(n).strip()})
-    for o in removed:
-        n = next((n for n in added if _tier_key(n)[1:] == _tier_key(o)[1:]), None)
-        if n is None:
-            out.append({"tier": o.name, "change": "removed", "old": price_text(o).strip(), "new": ""})
-        else:
-            added.remove(n)
-            out.append({"tier": n.name, "change": "renamed", "old_name": o.name, "old": price_text(o).strip(),
-                        "new": price_text(n).strip()})
-    out += [{"tier": n.name, "change": "added", "old": "", "new": price_text(n).strip()} for n in added]
+    pairs = _pair_renames(removed, added)
+    paired_old = {id(o) for o, _ in pairs}
+    paired_new = {id(n) for _, n in pairs}
+    out += [{"tier": n.name, "change": "renamed", "old_name": o.name, "old": price_text(o).strip(),
+             "new": price_text(n).strip()} for o, n in pairs]
+    out += [{"tier": o.name, "change": "removed", "old": price_text(o).strip(), "new": ""}
+            for o in removed if id(o) not in paired_old]
+    out += [{"tier": n.name, "change": "added", "old": "", "new": price_text(n).strip()}
+            for n in added if id(n) not in paired_new]
     return out
 
 
