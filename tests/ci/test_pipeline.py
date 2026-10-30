@@ -361,3 +361,28 @@ def test_contamination_check_is_fast_on_thousands_of_items():
     hits = contamination.find(items)
     assert time.perf_counter() - start < 3.0
     assert hits.get("i5") == ["i7"]
+
+
+JUNK_PAGE = "\n".join(["Skip to main content", "Menu", "Home", "News", "We use cookies to improve your experience.",
+                       "Accept all", "Reject all", "Sign in", "Subscribe to our newsletter", "GitLab", "GitHub",
+                       "Snyk", "Sonatype", "© 2026 Example Media. All rights reserved."] * 8)
+
+
+def test_junk_page_text_is_marked_kept_and_not_counted_for_mentions():
+    from ci.classify import MentionCounter
+
+    teaser = pkt("google_news", "https://a.com/junk", "Sonatype launches Nexus Pro+ for AI model screening")
+    teaser = teaser.model_copy(update={"text": "Sonatype adds AI model screening to Nexus."})
+    p = pipeline.read_full_text(teaser, lambda url: JUNK_PAGE, count=MentionCounter(MENTION_CFG))
+    assert p.text_status == "junk" and p.extraction_reasons and "boilerplate" in p.extraction_reasons[0]
+    assert p.text.startswith("Skip to main content")  # kept for inspection
+    assert p.teaser == "Sonatype adds AI model screening to Nexus."
+    assert p.mentions == {"sonatype": 1, "snyk": 0}  # from the teaser, not the nav menu naming every vendor
+
+
+def test_a_good_page_keeps_its_status_and_the_teaser():
+    page = ("Sonatype launched Nexus Pro+ with AI model screening on Tuesday, adding checks for poisoned models "
+            "to the repository manager. ") * 20
+    p = pipeline.read_full_text(pkt("google_news", "https://a.com/ok", "Sonatype launches Nexus Pro+ AI screening"),
+                                lambda url: page)
+    assert p.text_status == "full" and p.extraction_reasons == [] and p.teaser == "teaser"

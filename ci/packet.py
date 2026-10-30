@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 Source = Literal["google_news", "vendor_feed", "github_releases", "hackernews"]
-TextStatus = Literal["full", "partial", "snippet"]
+TextStatus = Literal["full", "partial", "snippet", "junk"]  # junk: the fetched page text is not the article
 TextSource = Literal["feed", "page", "teaser"]
 # A feed entry whose own body (Atom content, RSS content:encoded, GitHub release notes) has at least this much text
 # is taken as the complete item, and the pipeline does not fetch its page. Below it the body is usually a teaser
@@ -35,6 +35,8 @@ class Packet(BaseModel):
     text: str = ""  # plain text: the source's teaser, replaced by the full page text when fetched
     text_status: TextStatus = "snippet"
     text_source: TextSource = "teaser"  # where text came from: the feed's full entry body, the fetched page, a teaser
+    teaser: str = ""  # the source's teaser, kept when page text replaces it (the fallback when the page is junk)
+    extraction_reasons: list[str] = []  # why the page text was judged junk (ci.extraction_quality)
     publisher: str = ""  # outlet name when the source gives one (Google News does)
     # filled by the pipeline, not by collectors
     id: str = ""

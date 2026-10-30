@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from ci import contamination
+from ci import contamination, extraction_quality
 from ci.classify import MentionCounter
 from ci.config import CIConfig
 from ci.dedupe import Drop, EmbeddingDeduper, EmbedFn, SeenUrls, resolve_duplicates, url_dedupe
@@ -103,15 +103,21 @@ Counter = Callable[[str], tuple[dict[str, int], bool]]  # page text -> (mentions
 
 def read_full_text(p: Packet, fetch: Callable[[str], str | None], count: Counter | None = None) -> Packet:
     """Replace the teaser with the page text when the page gives more; a failed fetch keeps the teaser.
-    Mentions are counted over the whole page (or the teaser) before the text is capped at TEXT_MAX_CHARS."""
+    Mentions are counted over the whole page (or the teaser) before the text is capped at TEXT_MAX_CHARS.
+    Page text that is not the article (ci.extraction_quality) is kept for inspection but marked "junk", with its
+    reasons; mentions then come from the teaser, since nav menus name competitors."""
     text = None if _skip_fetch(p) else fetch(p.url)
     if not text or len(text) <= len(p.text):
         update = {"text": p.text[:TEXT_MAX_CHARS]}
         page = p.text
     else:
         status = "full" if len(text) >= FULL_TEXT_MIN_CHARS else "partial"
-        update = {"text": text[:TEXT_MAX_CHARS], "text_status": status, "text_source": "page"}
+        update = {"text": text[:TEXT_MAX_CHARS], "text_status": status, "text_source": "page", "teaser": p.text}
         page = text
+        quality = extraction_quality.assess(p.title, text)
+        if not quality.ok:
+            update |= {"text_status": "junk", "extraction_reasons": quality.reasons}
+            page = p.text
     if count is not None:
         update["mentions"], update["mentions_jfrog"] = count(page)
         update["mentions_config"] = getattr(count, "config_hash", "")
