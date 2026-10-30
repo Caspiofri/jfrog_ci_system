@@ -8,10 +8,12 @@ from ci.collectors.feedutil import entry_date, feed_body, fetch_feed, html_to_te
 from ci.collectors.listing_pages import ListingEntry, read_listing
 from ci.config import CIConfig, Competitor, Feed, ListingPage
 from ci.dedupe import normalize_url
-from ci.packet import CollectorResult, Packet
+from ci.packet import CollectorResult, Packet, utc_now
 
 SOURCE = "vendor_feed"
-DAY_STAMP = time(12, 0)  # a day-only date is stamped at noon UTC: off by at most 12h either way
+# a day-only date is stamped at noon UTC (off by at most 12h either way), but never later than the run: a post
+# dated today must not sort as newer than it can be
+DAY_STAMP = time(12, 0)
 
 
 def keyword_re(keyword: str) -> re.Pattern:
@@ -54,7 +56,7 @@ def parse(feed, competitor: Competitor, cfg_feed: Feed, since: datetime) -> list
     return packets
 
 
-def listing_packet(entry: ListingEntry, competitor: Competitor, page: ListingPage) -> Packet:
+def listing_packet(entry: ListingEntry, competitor: Competitor, page: ListingPage, now: datetime) -> Packet:
     """A listing entry has no body: text is its teaser if any, and the pipeline fetches the entry page."""
     return Packet(
         source=SOURCE,
@@ -63,7 +65,7 @@ def listing_packet(entry: ListingEntry, competitor: Competitor, page: ListingPag
         title=entry.title,
         url=entry.url,
         original_url=entry.url,
-        published_at=datetime.combine(entry.day, DAY_STAMP, tzinfo=UTC),
+        published_at=min(datetime.combine(entry.day, DAY_STAMP, tzinfo=UTC), now),
         date_precision="day",  # the listing gives the day only
         text=entry.teaser,
         text_status="snippet",
@@ -105,7 +107,8 @@ def collect(cfg: CIConfig, since: datetime) -> CollectorResult:
             entries, errors = read_listing(page, since)
         except Exception as e:  # a parser crash stays inside its listing
             return [], [short_error(page.url, e)]
-        packets = [listing_packet(e, competitor, page) for e in entries]
+        now = utc_now()
+        packets = [listing_packet(e, competitor, page, now) for e in entries]
         return [p for p in packets if p.published_at >= since], errors  # the window, on the stamped time
 
     with ThreadPoolExecutor(max_workers=8) as pool:

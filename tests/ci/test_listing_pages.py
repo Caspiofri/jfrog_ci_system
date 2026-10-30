@@ -203,13 +203,35 @@ def _packet(published: datetime, precision: str) -> Packet:
                   original_url="https://u", published_at=published, date_precision=precision)
 
 
-@pytest.mark.parametrize("published,precision,in_24h", [
-    (datetime(2026, 10, 29, 12, tzinfo=UTC), "day", True),  # today
-    (datetime(2026, 10, 28, 12, tzinfo=UTC), "day", True),  # yesterday: it may have been posted at 23:00
-    (datetime(2026, 10, 27, 12, tzinfo=UTC), "day", False),
-    (datetime(2026, 10, 28, 7, tzinfo=UTC), "time", False),  # an exact time is still compared exactly
-    (datetime(2026, 10, 28, 9, tzinfo=UTC), "time", True),
+@pytest.mark.parametrize("now_hour,day,in_24h", [
+    (1, 29, True),  # 01:00 on the 29th: today's entry (stamped now, see listing_packet)
+    (1, 28, True),  # yesterday's noon stamp is 13h old
+    (1, 27, False),  # 37h
+    (23, 29, True),  # 11h
+    (23, 28, False),  # 35h: "dated yesterday" alone no longer counts
 ])
-def test_in_24h_compares_day_precision_dates_by_date(published, precision, in_24h):
+def test_in_24h_for_day_precision_uses_the_stamp_like_the_window(now_hour, day, in_24h):
+    now = datetime(2026, 10, 29, now_hour, tzinfo=UTC)
+    entry = listing_pages.ListingEntry(title="t", url="https://u", day=date(2026, 10, day))
+    p = vendor_feeds.listing_packet(entry, cfg([]).competitors[0], ListingPage(url=LISTING), now)
+    assert stamp(p, "run", now).in_24h is in_24h
+
+
+@pytest.mark.parametrize("published,in_24h", [
+    (datetime(2026, 10, 28, 7, tzinfo=UTC), False),  # an exact time is compared exactly
+    (datetime(2026, 10, 28, 9, tzinfo=UTC), True),
+])
+def test_in_24h_for_exact_times(published, in_24h):
     now = datetime(2026, 10, 29, 8, 30, tzinfo=UTC)
-    assert stamp(_packet(published, precision), "run", now).in_24h is in_24h
+    assert stamp(_packet(published, "time"), "run", now).in_24h is in_24h
+
+
+@pytest.mark.parametrize("now,expected", [
+    (datetime(2026, 10, 28, 8, tzinfo=UTC), datetime(2026, 10, 28, 8, tzinfo=UTC)),  # before noon: never ahead
+    (datetime(2026, 10, 28, 15, tzinfo=UTC), datetime(2026, 10, 28, 12, tzinfo=UTC)),
+    (datetime(2026, 10, 30, 8, tzinfo=UTC), datetime(2026, 10, 28, 12, tzinfo=UTC)),
+])
+def test_day_stamp_is_noon_but_never_after_the_run(now, expected):
+    entry = listing_pages.ListingEntry(title="t", url="https://u", day=date(2026, 10, 28))
+    p = vendor_feeds.listing_packet(entry, cfg([]).competitors[0], ListingPage(url=LISTING), now)
+    assert p.published_at == expected and p.date_precision == "day"
