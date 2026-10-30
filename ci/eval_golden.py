@@ -33,6 +33,8 @@ from ci import mentions as side_mentions
 from ci import rank as rank_mod
 from ci.classify import Classification, Classifier
 from ci.dedupe import EMBED_TEXT_CHARS, default_embedding_fn
+from ci.labeling import audit as label_audit
+from ci.labeling import relabel as relabel_mod
 from ci.labeling.app import LABELS_PATH, RUNS_DIR, latest_labels, read_jsonl
 from ci.llm import FakeLLM, GeminiLLM, JsonLLM
 from ci.rank import Ranked, Ranker
@@ -488,7 +490,8 @@ _DEFAULT = Path("<default>")  # sentinel: resolve the module-level path at call 
 def run(split: str = "train", live: bool = False, labels_path: Path | None = None, runs_dir: Path | None = None,
         out_dir: Path | None = _DEFAULT, llm: JsonLLM | None = None, cfg: ci_config.CIConfig | None = None,
         allow_fallback: bool = False, embed_fn: Callable[[], EmbedFn] | None = None,
-        embed_cache: Path | None = _DEFAULT, split_path: Path | None = _DEFAULT) -> dict:
+        embed_cache: Path | None = _DEFAULT, split_path: Path | None = _DEFAULT,
+        relabel_dir: Path | None = None) -> dict:
     """Run the eval and return the report; write it under out_dir unless out_dir is None or nothing was labeled.
 
     A live run in which any classifier or ranker batch fell back is aborted (report["aborted"], nothing written):
@@ -502,6 +505,10 @@ def run(split: str = "train", live: bool = False, labels_path: Path | None = Non
     if split not in SPLITS:
         raise ValueError(f"split must be one of {SPLITS}, got {split!r}")
     all_labels = list(latest_labels(labels_path).values())
+    audit_summary = label_audit.audit_labels(
+        all_labels, label_audit.Context(runs_dir, relabel_dir or relabel_mod.RELABEL_DIR))
+    if warning := audit_warning(audit_summary):  # a warning only: the eval still runs on what is there
+        print(warning, file=sys.stderr)
     side_hashes = {r: h for r in sorted({row.get("run_id") or "" for row in all_labels})
                    if (h := side_mentions.side_hash(runs_dir, r))}
     run_cache: dict[str, dict[str, dict]] = {}
@@ -521,7 +528,7 @@ def run(split: str = "train", live: bool = False, labels_path: Path | None = Non
               "full_page_mentions": sum(bool(it.get("mentions")) for it in items),
               "snapshot_text_used": sum(rebuilt[row["id"]][1] for row in labels),
               "metrics": None, "items": [], "path": None,
-              "fallbacks": {"classify": 0, "rank": 0}, "aborted": False}
+              "fallbacks": {"classify": 0, "rank": 0}, "aborted": False, "label_audit": audit_summary}
     if not labels:
         return report
     started = time.monotonic()
@@ -589,6 +596,15 @@ def fallback_warning(report: dict) -> str | None:
     what = "ABORTED, nothing written" if report["aborted"] else "scored anyway (--allow-fallback)"
     return (f"!!! WARNING: the LLM answer was unusable for {fb['classify']} classifier and {fb['rank']} ranker items;"
             f" they fell back to rules / the midpoint score. {what}. !!!")
+
+
+def audit_warning(summary: dict) -> str | None:
+    """One line when some labels are not complete under the current standard (ci.labeling.audit)."""
+    if not summary["needs_attention"]:
+        return None
+    counts = ", ".join(f"{code} {n}" for code, n in summary["per_issue"].items() if n)
+    return (f"WARNING: {summary['needs_attention']} of {summary['total']} labels not complete under rubric v2: "
+            f"{counts}")
 
 
 def format_report(report: dict) -> str:

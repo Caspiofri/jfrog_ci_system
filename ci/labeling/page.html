@@ -90,6 +90,12 @@
   .jfrog q { color: #384152; font-style: italic; }
   .jfrog .asof { color: var(--muted); font-size: 11.5px; }
   .card.done-rl { border-left-color: var(--green); }
+  .biss { background: var(--amber-soft); color: var(--amber); font-weight: 600; }
+  .audit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: 1280px; margin: 8px auto 0; font-size: 12.5px; }
+  .audit button { border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+  .audit button.attn { border-color: var(--amber); color: var(--amber); }
+  .audit button.ok { border-color: var(--green); color: var(--green); }
+  .audit button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
   .empty { text-align: center; color: var(--muted); padding: 40px; }
   @media (max-width: 900px) { .card { grid-template-columns: 1fr; } }
 </style>
@@ -112,6 +118,7 @@
     </div>
   </div>
   <div class="buckets" id="buckets"></div>
+  <div class="audit" id="audit" title="Checks on your own labels against the current standard (rubric v2)"></div>
   <div class="legend">
     <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>1</kbd>–<kbd>5</kbd> score (rubric v2: 1 = routine, hover for each) ·
     <kbd>n</kbd> noise (no score) ·
@@ -130,6 +137,7 @@ function rubricTitle(key) { return RUBRIC[key] ? (key === "noise" ? "Noise" : ke
 const TEASER = 400;
 let META = null, items = [], cards = [], active = -1, filter = "unlabeled", saving = false;
 let view = "queue", QUEUE = null, inQueue = new Map(), order = [];  // order: item indices shown, in view order
+let auditFilter = null;  // null | "attention" | "complete" | an issue code
 let RELABEL = null;  // the open relabel queue ({queue_id, built_at, ...}); view is then "relabel"
 const relabeling = () => view === "relabel";
 const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : null);  // only http(s) links
@@ -160,7 +168,10 @@ function fmtDate(s, dayOnly) {
 
 // ---- per-item draft state, seeded from the saved label or the packet
 // a queue that requires an explicit Bad-extraction answer (the top-up queue): no default, yes or no must be picked
-function requiresBad(item) { return !!(QUEUE && QUEUE.require_bad_extraction && inQueue.has(item.id)); }
+function requiresBad(item) {
+  return relabeling() || !!(QUEUE && QUEUE.require_bad_extraction && inQueue.has(item.id));
+}
+const issuesOf = (item) => item.issues || [];
 
 function draftFrom(item) {
   const l = item.label;
@@ -173,7 +184,9 @@ function draftFrom(item) {
     // new: "partial" until the article is opened from the card; saved: keep what was stored (null on lines
     // from before basis existed, so the analyst picks one rather than the page claiming "partial")
     basis: l ? l.basis || null : "partial",
-    bad_extraction: l && typeof l.bad_extraction === "boolean" ? l.bad_extraction : (requiresBad(item) ? null : false),
+    // relabel queue: unset unless the stored answer was explicit (an old False may be the page default)
+    bad_extraction: relabeling() && issuesOf(item).includes("bad_extraction_unanswered") ? null
+      : l && typeof l.bad_extraction === "boolean" ? l.bad_extraction : (requiresBad(item) ? null : false),
     note: l ? l.note || "" : "",
     revision_reason: "",  // asked fresh on every relabel; the server keeps the previous values next to it
   };
@@ -196,6 +209,7 @@ function renderCard(item, idx) {
     // only "queue": the bucket and its reason come from the rules, and showing them would bias Noise labels
     inQueue.has(item.id) ? el("span", { class: "badge bbadge" }, "queue") : null,
     item.label ? el("span", { class: "badge bdone" }, "saved " + fmtDate(item.label.labeled_at)) : null,
+    ...issuesOf(item).map((c) => el("span", { class: "badge biss", title: c }, issueName(c))),
   );
   const left = el("div", {},
     el("h2", { class: "title" }, safeUrl(item.url)
@@ -239,7 +253,7 @@ function renderCard(item, idx) {
       onclick: () => toggleBad(idx) }, "Bad extraction"));
   }
 
-  const note = el("input", { type: "text", placeholder: "note (optional)", value: d.note });
+  const note = el("input", { type: "text", placeholder: relabeling() ? "note (required here)" : "note (optional)", value: d.note });
   note.oninput = (e) => { d.note = e.target.value; };
   note.onkeydown = (e) => { if (e.key === "Enter" && !e.repeat) { e.preventDefault(); save(idx); } if (e.key === "Escape") note.blur(); };
   const status = el("span", { class: "status" });
@@ -284,7 +298,16 @@ function paintCard(idx) {
   c.classList.toggle("is-noise", !!(it.label && it.label.noise));
   c.style.display = visible(idx) ? "" : "none";
 }
+function auditMatch(item) {
+  const found = issuesOf(item);
+  if (!auditFilter) return true;
+  if (!item.label) return false;
+  if (auditFilter === "attention") return found.length > 0;
+  if (auditFilter === "complete") return found.length === 0;
+  return found.includes(auditFilter);
+}
 function visible(idx) {
+  if (!auditMatch(items[idx])) return false;
   if (relabeling()) return filter === "all" || !items[idx].done;
   return (view === "all" || inQueue.has(items[idx].id)) && (filter === "all" || !items[idx].label);
 }
@@ -329,6 +352,7 @@ async function save(idx) {
   if (requiresBad(it) && typeof d.bad_extraction !== "boolean") {
     setStatus(idx, "Answer Bad extraction: Yes or No  [x]", "err"); return;
   }
+  if (relabeling() && !(d.note || "").trim()) { setStatus(idx, "Add a note (required in the relabel queue)  [/]", "err"); return; }
   const changed = relabeling() ? changedFields(it.prefill, d) : [];
   if (changed.length && !d.revision_reason.trim()) {
     setStatus(idx, "You changed " + changed.join(", ") + ": say why in Why changed", "err"); return;
@@ -337,9 +361,11 @@ async function save(idx) {
   saving = true;
   try {
     it.label = await api("/api/labels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    it.issues = it.label.issues || [];
     if (relabeling()) {
       it.done = true; it.prefill = { ...d }; d.revision_reason = "";
     }
+    updateAudit();
     refreshCard(idx);
     setStatus(idx, relabeling() ? (changed.length ? "Saved ✓ changed " + changed.join(", ") : "Confirmed ✓") : "Saved ✓", "ok");
     updateProgress(); updateBuckets(); loadStats();
@@ -428,6 +454,7 @@ function changedFields(prev, d) {
   return COMPARED.filter((f) => {
     let a = prev[f], b = d[f];
     if ((f === "basis" || f === "bad_extraction") && (a === null || a === undefined)) return false;
+    if (f === "note" && !a) return false;  // filling an empty note is no change
     if (f === "note") { a = a || ""; b = b || ""; }
     return a !== b;
   });
@@ -445,11 +472,34 @@ function jfrogPanel(j) {
   }
   return box;
 }
+function issueName(code) { return ((META && META.issue_names) || {})[code] || code; }
+// filter chips: needs attention, one per issue code, complete; counts over the labeled cards of this view
+function updateAudit() {
+  const box = $("audit"); box.textContent = "";
+  const labeled = items.filter((i) => i.label);
+  if (!labeled.length) return;
+  const chip = (key, text, n, cls) => box.append(el("button", { class: (cls || "") + (auditFilter === key ? " on" : ""),
+    onclick: () => setAuditFilter(auditFilter === key ? null : key) }, text + " (" + n + ")"));
+  chip("attention", "Needs attention", labeled.filter((i) => issuesOf(i).length).length, "attn");
+  for (const code of Object.keys((META && META.issue_names) || {})) {
+    const n = labeled.filter((i) => issuesOf(i).includes(code)).length;
+    if (n) chip(code, issueName(code), n);
+  }
+  chip("complete", "Complete", labeled.filter((i) => !issuesOf(i).length).length, "ok");
+}
+function setAuditFilter(f) {
+  auditFilter = f;
+  updateAudit();
+  cards.forEach((_, i) => paintCard(i));
+  if (active < 0 || !visible(active)) setActive(nextVisible(-1, 1), false);
+}
 async function loadRelabel(queueId) {
   const list = $("list");
   list.innerHTML = '<div class="empty">Loading…</div>';
   RELABEL = await api("/api/relabel/" + encodeURIComponent(queueId));
   view = "relabel"; QUEUE = null; inQueue = new Map();
+  auditFilter = "attention"; filter = "all";  // default: every card that is not yet complete, in queue order
+  $("f-un").classList.remove("on"); $("f-all").classList.add("on");
   $("v-seg").style.display = "none";
   items = RELABEL.items;
   items.forEach((it) => { it.draft = draftFrom(it); it.prefill = { ...it.draft }; });
@@ -457,10 +507,10 @@ async function loadRelabel(queueId) {
   cards = items.map((it, i) => renderCard(it, i));
   if (!items.length) list.append(el("div", { class: "empty" }, "This relabel queue has no cards."));
   layout();
-  updateProgress(); updateBuckets();
+  updateProgress(); updateBuckets(); updateAudit();
 }
 async function loadRun(runId) {
-  RELABEL = null;
+  RELABEL = null; auditFilter = null;
   if (view === "relabel") view = "queue";
   $("v-seg").style.display = "";
   const list = $("list");
@@ -479,7 +529,7 @@ async function loadRun(runId) {
     $("v-q").classList.remove("on"); $("v-all").classList.add("on");
   }
   layout();
-  updateProgress(); updateBuckets(queueError);
+  updateProgress(); updateBuckets(queueError); updateAudit();
 }
 // queue view: queue order; all items: run file order
 function layout() {

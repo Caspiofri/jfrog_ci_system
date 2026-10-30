@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from ci import config
 from ci import rank as rank_mod
-from ci.labeling import relabel, stratified
+from ci.labeling import audit, relabel, stratified
 from ci.packet import NON_COMPETITOR
 from config.settings import EVALS_DIR, OUTPUT_DIR
 from modules.reader import FULL_TEXT_MIN_CHARS
@@ -250,7 +250,8 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
             default = usable[0] if usable else (runs[0] if runs else None)
         return {"rubric": rubric_meanings(),
                 "runs": runs, "run_status": status, "default_run": default, "competitors": competitors,
-                "categories": CATEGORIES, "relabel_queues": relabel.list_queues(relabel_dir)}
+                "categories": CATEGORIES, "relabel_queues": relabel.list_queues(relabel_dir),
+                "issue_names": audit.ISSUES}
 
     @app.get("/api/runs")
     def list_runs() -> list[dict]:
@@ -261,8 +262,28 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
     def items(run_id: str) -> list[dict]:
         labels = latest_labels(labels_path)
         side = read_mentions(runs_dir / f"{run_id}.mentions.json")
+        ctx = audit_ctx()
         return [{**blind(item), "mentions": item.get("mentions") or side.get(item.get("id")),
-                 "label": labels.get(item.get("id"))} for item in load_run(run_id)]
+                 "label": labels.get(item.get("id")), "issues": ctx.issues(labels.get(item.get("id")))}
+                for item in load_run(run_id)]
+
+    def audit_ctx() -> audit.Context:
+        return audit.Context(runs_dir, relabel_dir)
+
+    @app.get("/api/audit")
+    def audit_totals(run_id: str | None = None, relabel_queue: str | None = None) -> dict:
+        """Issue counts under the current standard: the whole golden set, or the labels of one run or queue."""
+        labels = latest_labels(labels_path)
+        if run_id is not None:
+            ids = {it.get("id") for it in load_run(run_id)}
+        elif relabel_queue is not None:
+            q = relabel.load(relabel_dir, relabel_queue)
+            if q is None:
+                raise HTTPException(404, f"unknown relabel queue {relabel_queue}")
+            ids = {e["id"] for e in q["entries"]}
+        else:
+            ids = set(labels)
+        return audit.audit_labels([labels[i] for i in sorted(ids) if i in labels], audit_ctx())
 
     def queue_for(run_id: str, rebuild: bool) -> dict:
         run_items = load_run(run_id)
@@ -290,6 +311,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
             raise HTTPException(404, f"unknown relabel queue {queue_id}")
         labels = latest_labels(labels_path)
         cells = relabel.jfrog_cells(changes_db)
+        ctx = audit_ctx()
         runs: dict[str, dict[str, dict]] = {}
         cards = []
         for e in q["entries"]:
@@ -300,9 +322,11 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
                 continue  # the run file lost it; nothing to show
             label = labels.get(e["id"])
             cards.append({**relabel.card_item(blind(item)), "run_id": e["run_id"], "label": label,
-                          "done": relabel.is_done(label, q), "jfrog": relabel.jfrog_baseline(label, cells)})
+                          "done": relabel.is_done(label, q), "jfrog": relabel.jfrog_baseline(label, cells),
+                          "issues": ctx.issues(label)})
         return {"queue_id": queue_id, "built_at": q["built_at"], "cutoff": q["cutoff"], "total": len(cards),
-                "done": sum(c["done"] for c in cards), "items": cards}
+                "done": sum(c["done"] for c in cards), "items": cards,
+                "audit": audit.summarize([c["issues"] for c in cards if c["label"]])}
 
     @app.get("/api/stats")
     def stats() -> dict:
@@ -326,22 +350,38 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         item = next((it for it in load_run(label.run_id) if it.get("id") == label.id), None)
         if item is None:
             raise HTTPException(404, f"item {label.id} not in run {label.run_id}")
+        in_relabel = bool(relabel.queues_holding(relabel_dir, label.id))
+        if in_relabel:  # the relabel queue saves to the current standard: every field answered
+            missing = [f for f, ok in (("basis", label.basis in ("full", "partial")),
+                                       ("bad_extraction", label.bad_extraction is not None),
+                                       ("note", bool(label.note.strip()))) if not ok]
+            if missing:
+                raise HTTPException(422, f"the relabel queue requires {', '.join(missing)}")
+        topup_required = label.id in stratified.requires_bad_extraction(runs_dir, label.run_id)
         if label.bad_extraction is None:
-            if label.id in stratified.requires_bad_extraction(runs_dir, label.run_id):
+            if topup_required:
                 raise HTTPException(422, "this queue requires an explicit bad_extraction answer (true or false)")
             label.bad_extraction = False
-        row = {**label.model_dump(), "labeled_at": datetime.now(UTC).isoformat(), "item": snapshot(item)}
+        now = datetime.now(UTC).isoformat()
+        row = {**label.model_dump(), "labeled_at": now, "item": snapshot(item)}
+        if in_relabel or topup_required:
+            row["bad_extraction_explicit"] = True  # a required Yes/No, not the page default
+        ctx = audit_ctx()
         with write_lock:  # relabeling replaces the id's line; the file stays one line per id
             previous = latest_labels(labels_path).get(label.id)
             queues = relabel.queues_holding(relabel_dir, label.id) if previous is not None else []
             if queues:  # a relabel-queue item: a change needs a reason, an unchanged save is a confirmation
-                changed = relabel.changed_fields(previous, row)
+                unset = {"bad_extraction"} if "bad_extraction_unanswered" in ctx.issues(previous) else set()
+                changed = relabel.changed_fields(previous, row, unset)
                 if changed and not label.revision_reason.strip():
                     raise HTTPException(422, f"changed {', '.join(changed)}: say why in revision_reason")
                 row["relabel"] = {"queue_id": queues[0]["queue_id"], "changed": changed}
+            if in_relabel:  # reviewed under the current standard, a confirmation included
+                row["standard"] = audit.STANDARD
+                row["reviewed_at"] = now
             if previous is not None:  # a relabel: keep what it was, so the reason has context
                 row["revised_from"] = {k: previous.get(k) for k in REVISED_FIELDS}
             upsert_label(labels_path, row)
-        return row
+        return {**row, "issues": ctx.issues(row)}
 
     return app

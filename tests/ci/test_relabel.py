@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from ci.labeling import relabel
+from ci.labeling import audit, relabel
 from ci.labeling.app import RUNS_DIR, create_app
 
 COMPETITORS = ["snyk", "sonatype", "github", "aws", "industry"]
@@ -125,7 +125,8 @@ def test_no_prediction_fields_in_the_payload(env):
     card = next(c for c in client.get("/api/relabel/v2").json()["items"] if c["id"] == "a2")
     for k in ("mentions", "mentions_jfrog", "extraction_reasons", "prefilter", "teaser", "competitor"):
         assert k not in card
-    assert set(card) <= set(relabel.ITEM_FIELDS) | {"label", "done", "jfrog"}
+    assert set(card) <= set(relabel.ITEM_FIELDS) | {"label", "done", "jfrog", "issues"}
+    assert set(card["issues"]) <= set(audit.ISSUES)  # audit of Ofri's own label, not a prediction
 
 
 def test_jfrog_cell_only_on_scores_3_and_4(env):
@@ -151,7 +152,8 @@ def _save(client, card_id, run_id, **kw):
     cur = {k: v for k, v in next(c for c in client.get("/api/relabel/v2").json()["items"]
                                  if c["id"] == card_id)["label"].items()}
     body = {k: cur.get(k) for k in ("competitor", "category", "score", "noise", "mentions_jfrog", "note")}
-    body |= {"id": card_id, "run_id": run_id, "basis": "full", "bad_extraction": False} | kw
+    body |= {"id": card_id, "run_id": run_id, "basis": "full", "bad_extraction": False,
+             "note": cur.get("note") or "reviewed"} | kw
     return client.post("/api/labels", json=body)
 
 

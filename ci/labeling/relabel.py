@@ -122,13 +122,13 @@ def is_done(label: dict | None, queue: dict) -> bool:
     return bool(label) and _utc(label["labeled_at"]) > _utc(queue["built_at"])
 
 
-def changed_fields(previous: dict, new: dict) -> list[str]:
-    """Fields the save changes. Filling a field the old label never had (basis, bad_extraction) is no change;
-    bad_extraction False and None both mean "not flagged"."""
+def changed_fields(previous: dict, new: dict, unset: frozenset[str] | set[str] = frozenset()) -> list[str]:
+    """Fields the save changes. Filling a field the old label never had (basis, bad_extraction, an empty note, or
+    any field in `unset`, e.g. a bad_extraction that was only the page default) is no change."""
     out = []
     for f in COMPARED_FIELDS:
         old, val = previous.get(f), new.get(f)
-        if f in ("basis", "bad_extraction") and old is None:
+        if f in unset or (f in ("basis", "bad_extraction") and old is None) or (f == "note" and not old):
             continue
         if f == "note":
             old, val = old or "", val or ""
