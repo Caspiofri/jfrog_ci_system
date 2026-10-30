@@ -1,0 +1,414 @@
+# Coverage ground truth: real competitor events of 16-30 Oct 2026, curated by hand from OFFICIAL sources only
+# (vendor changelogs, blogs, docs release notes, and for the Industry channel the project's own advisory or CISA).
+# Read by ci/coverage.py, which reports how many of these a collection run captured (coverage recall).
+#
+# Per event:
+#   competitor           key from config/competitors.yaml (or "industry")
+#   date                 the official publication date (YYYY-MM-DD)
+#   category             one of the 7 D11 categories
+#   expected_importance  1-5 per D14, with `why`
+#   match.urls           extra URLs that count as the same event (official_url always counts)
+#   match.title_keywords keyword groups; an item matches when its TITLE contains ALL keywords of ANY one group,
+#                        case-insensitive, on word boundaries. A trailing * matches a word prefix ("exploit*"
+#                        matches "exploited"). Keep groups specific enough to miss unrelated items.
+#   verified             what was fetched to confirm the event and its date
+#
+# Curated on 30 Oct 2026. Coverage checked for every competitor; findings per competitor:
+#   aws_codeartifact: no CodeArtifact announcement in the window (What's New feed, CodeArtifact docs, search). The
+#     AWS events below are Amazon Inspector and an AWS blog post, the adjacent products the config tracks.
+#   sonatype: the only press release near the window, Nexus Repository Pro+ (14 Oct), predates it and is left out.
+#     One official event remains, the eMudhra assessment.
+# Left out on purpose: news without an official page (GitLab's India office, reported only by press); the AOMEI
+# supply-chain attack (disclosed 15 Oct, before the range); Snyk's Evo Agentic AppSec launch (15 Oct, before it).
+
+events:
+  # ---------------------------------------------------------------- Cloudsmith
+  - id: cloudsmith-trivy-deprecation
+    competitor: cloudsmith
+    date: 2026-10-29
+    title: Deprecating Trivy vulnerability scanning
+    official_url: https://cloudsmith.com/changelog/deprecating-trivy-vulnerability-scanning
+    category: Product & Features
+    expected_importance: 3
+    why: Swaps its scanner for OSV-based continuous risk detection; a routine product change, not a new capability.
+    match:
+      urls: []
+      title_keywords:
+        - [Deprecating Trivy]
+        - [Cloudsmith, Trivy]
+    verified: Fetched the changelog entry and cloudsmith.com/rss/changelog.xml on 30 Oct; pubDate 29 Oct 2026.
+
+  - id: cloudsmith-npm-provenance
+    competitor: cloudsmith
+    date: 2026-10-26
+    title: Verify npm provenance through your Cloudsmith registry
+    official_url: https://cloudsmith.com/changelog/verify-npm-provenance-through-your-cloudsmith-registry
+    category: Security
+    expected_importance: 3
+    why: Supply-chain verification feature in a direct registry competitor; incremental, npm only.
+    match:
+      urls: []
+      title_keywords:
+        - [npm provenance, Cloudsmith]
+    verified: Listed in cloudsmith.com/rss/changelog.xml, fetched 30 Oct; pubDate 26 Oct 2026.
+
+  - id: cloudsmith-cli-password-login-retired
+    competitor: cloudsmith
+    date: 2026-10-22
+    title: Username and password login on the Cloudsmith CLI stops working on November 20, 2026
+    official_url: https://cloudsmith.com/changelog/username-and-password-login-on-the-cloudsmith-cli-stops-working-on-november-20-2026
+    category: Security
+    expected_importance: 2
+    why: Auth hardening in their CLI (shipped with CLI v1.30.0); related, no competitive impact.
+    match:
+      urls:
+        - https://cloudsmith.com/changelog/cli-v1-30-0-error-reporting-tls-intercepting-proxy-support-and-a-username-and-password-login
+      title_keywords:
+        - [Cloudsmith, username and password]
+        - [Cloudsmith, CLI v1.30.0]
+    verified: Fetched the changelog entry and the changelog feed on 30 Oct; feed pubDate 22 Oct 2026 (the page shows the 20 Nov cut-off date).
+
+  - id: cloudsmith-mumbai-region
+    competitor: cloudsmith
+    date: 2026-10-22
+    title: Mumbai is now a supported storage region
+    official_url: https://cloudsmith.com/changelog/mumbai-is-now-a-supported-storage-region
+    category: Product & Features
+    expected_importance: 2
+    why: New storage region; related, no competitive impact.
+    match:
+      urls: []
+      title_keywords:
+        - [Cloudsmith, Mumbai]
+        - [Mumbai is now a supported storage region]
+    verified: Listed in cloudsmith.com/rss/changelog.xml, fetched 30 Oct; pubDate 22 Oct 2026.
+
+  # ---------------------------------------------------------------- Sonatype
+  - id: sonatype-emudhra-assessment
+    competitor: sonatype
+    date: 2026-10-21
+    title: "eMudhra CA Incident: Sonatype's Assessment and Guidance"
+    official_url: https://www.sonatype.com/blog/emudhra-ca-incident-sonatypes-assessment-and-guidance
+    category: Security
+    expected_importance: 3
+    why: Nexus Repository and IQ Server affected by the compromised eMudhra intermediates; relevant security news.
+    match:
+      urls: []
+      title_keywords:
+        - [eMudhra, Sonatype]
+        - [eMudhra, Nexus]
+    verified: Fetched the blog post on 30 Oct; published 21 Oct 2026 (also in sonatype.com/blog/rss.xml).
+
+  # ---------------------------------------------------------------- GitHub
+  - id: github-package-firewall-preview
+    competitor: github
+    date: 2026-10-20
+    title: GitHub package firewall in public preview
+    official_url: https://github.blog/changelog/2026-10-20-github-package-firewall-in-public-preview
+    category: Security
+    expected_importance: 5
+    why: A registry-side firewall blocking malicious npm packages for coding agents and CI; head-on with JFrog Curation.
+    match:
+      urls: []
+      title_keywords:
+        - [GitHub, package firewall]
+        - [GitHub, npm firewall]
+    verified: Fetched the changelog entry on 30 Oct; dated 20 Oct 2026.
+
+  - id: github-enterprise-includes-copilot
+    competitor: github
+    date: 2026-10-28
+    title: GitHub Enterprise now includes access to GitHub Copilot
+    official_url: https://github.blog/changelog/2026-10-28-github-enterprise-now-includes-access-to-github-copilot
+    category: Pricing & Packaging
+    expected_importance: 4
+    why: Bundles Copilot into the Enterprise seat with usage-based AI credits; a packaging change on the platform deal.
+    match:
+      urls: []
+      title_keywords:
+        - [GitHub Enterprise, includes, Copilot]
+        - [Copilot, without a separate subscription]
+    verified: Fetched the changelog entry on 30 Oct; dated 28 Oct 2026 (also announced in the Universe 2026 post).
+
+  - id: github-copilot-fusion
+    competitor: github
+    date: 2026-10-28
+    title: Route and orchestrate models with GitHub Copilot Fusion
+    official_url: https://github.blog/changelog/2026-10-28-route-and-orchestrate-models-with-github-copilot-fusion
+    category: AI & Agents
+    expected_importance: 4
+    why: GA multi-model routing in Copilot; a change on the AI-capability axis.
+    match:
+      urls: []
+      title_keywords:
+        - [Copilot Fusion]
+    verified: Fetched the changelog entry on 30 Oct; dated 28 Oct 2026, says Fusion is generally available.
+
+  - id: github-agentic-workflows-ga
+    competitor: github
+    date: 2026-10-28
+    title: GitHub Agentic Workflows generally available
+    official_url: https://github.blog/changelog/2026-10-28-github-agentic-workflows-generally-available
+    category: AI & Agents
+    expected_importance: 4
+    why: Coding agents inside GitHub Actions go GA; agents in the CI/CD pipeline JFrog sits next to.
+    match:
+      urls: []
+      title_keywords:
+        - [GitHub Agentic Workflows]
+    verified: Fetched the changelog entry on 30 Oct; dated 28 Oct 2026.
+
+  - id: github-code-scanning-ai-apps
+    competitor: github
+    date: 2026-10-28
+    title: Code scanning for AI applications in public preview
+    official_url: https://github.blog/changelog/2026-10-28-code-scanning-for-ai-applications-in-public-preview
+    category: Security
+    expected_importance: 4
+    why: Flags prompt injection and over-privileged agents in code; AI/agent security is a matrix axis.
+    match:
+      urls: []
+      title_keywords:
+        - [code scanning, AI applications]
+    verified: Fetched the changelog entry on 30 Oct; dated 28 Oct 2026.
+
+  - id: github-dependabot-reachability
+    competitor: github
+    date: 2026-10-28
+    title: Prioritize Dependabot alerts with reachability analysis
+    official_url: https://github.blog/changelog/2026-10-28-prioritize-dependabot-alerts-with-reachability-analysis
+    category: Security
+    expected_importance: 4
+    why: Reachability in free-tier SCA; the contextual-analysis differentiator JFrog Xray and Snyk sell.
+    match:
+      urls: []
+      title_keywords:
+        - [Dependabot, reachability]
+    verified: Fetched the changelog entry on 30 Oct; dated 28 Oct 2026.
+
+  - id: github-ai-scan-repositories
+    competitor: github
+    date: 2026-10-28
+    title: AI Scan for repositories in public preview
+    official_url: https://github.blog/changelog/2026-10-28-ai-scan-for-repositories-in-public-preview
+    category: Security
+    expected_importance: 4
+    why: AI-driven vulnerability scanning over whole repositories, beyond CodeQL's languages; an AI-capability change.
+    match:
+      urls: []
+      title_keywords:
+        - [AI Scan, repositories]
+    verified: Fetched the changelog entry on 30 Oct; dated 28 Oct 2026.
+
+  - id: github-actions-workflow-lockfiles
+    competitor: github
+    date: 2026-10-28
+    title: GitHub Actions workflow lockfiles are generally available
+    official_url: https://github.blog/changelog/2026-10-28-github-actions-workflow-lockfiles-are-generally-available
+    category: Security
+    expected_importance: 4
+    why: Pins Actions and their transitive dependencies with a require-lockfile policy; CI supply-chain integrity.
+    match:
+      urls: []
+      title_keywords:
+        - [workflow lockfiles]
+        - [actions-lock]
+    verified: Fetched the changelog entry on 30 Oct; dated 28 Oct 2026 (not in the 10-entry changelog feed snapshot).
+
+  # ---------------------------------------------------------------- GitLab
+  - id: gitlab-critical-patch-19-5-1
+    competitor: gitlab
+    date: 2026-10-21
+    title: "GitLab Critical Patch Release: 19.5.1, 19.4.3, 19.3.6, 19.2.9, 19.1.9, 19.0.10, 18.11.13"
+    official_url: https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/
+    category: Security
+    expected_importance: 3
+    why: CVSS 10.0 RCE (CVE-2026-110264) in a competitor's platform; relevant security news, no change to the map.
+    match:
+      urls: []
+      title_keywords:
+        - [GitLab, CVE-2026-110264]
+        - [GitLab, "19.5.1"]
+        - [GitLab Critical Patch Release]
+        - [GitLab, patch*, critical]
+    verified: Fetched the release page and docs.gitlab.com/releases/patch-releases.xml on 30 Oct; dated 21 Oct 2026.
+
+  - id: gitlab-cve-2026-97229-kev
+    competitor: gitlab
+    date: 2026-10-29
+    title: CISA adds GitLab CVE-2026-97229 to the Known Exploited Vulnerabilities catalog
+    official_url: https://www.cisa.gov/news-events/alerts/2026/10/29/cisa-adds-two-known-exploited-vulnerabilities-catalog
+    category: Security
+    expected_importance: 3
+    why: Active exploitation of a CVSS 10 GitLab flaw; relevant security news.
+    match:
+      urls: []
+      title_keywords:
+        - [CISA, GitLab, exploit*]
+        - [Known Exploited, GitLab]
+    verified: Fetched the CISA alert on 30 Oct; released 29 Oct 2026, lists CVE-2026-97229 (GitLab CE/EE) and a Cisco CVE.
+
+  - id: gitlab-orbit-ga
+    competitor: gitlab
+    date: 2026-10-29
+    title: "GitLab Orbit is GA: Higher agent accuracy, lower token cost"
+    official_url: https://about.gitlab.com/blog/gitlab-orbit-ga/
+    category: AI & Agents
+    expected_importance: 4
+    why: GA of a context graph for AI agents across code, pipelines and vulnerabilities; an AI-capability change.
+    match:
+      urls:
+        - https://about.gitlab.com/blog/find-vulnerability-blast-radius-with-gitlab-orbit/
+      title_keywords:
+        - [GitLab Orbit]
+    verified: Fetched the blog post on 30 Oct; published 29 Oct 2026 (also in about.gitlab.com/atom.xml).
+
+  - id: gitlab-patch-19-5-3
+    competitor: gitlab
+    date: 2026-10-29
+    title: "GitLab Patch Release and Security Update: 19.5.3, 19.4.5, 19.3.7, 19.2.10, 19.1.10, 19.0.11, 18.11.14"
+    official_url: https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-3-released/
+    category: Security
+    expected_importance: 2
+    why: Routine patch that removes trust in the compromised eMudhra intermediates; no competitive impact.
+    match:
+      urls: []
+      title_keywords:
+        - [GitLab, "19.5.3"]
+    verified: Listed in docs.gitlab.com/releases/patch-releases.xml (dated 29 Oct 2026), and the page fetched 30 Oct.
+
+  # ---------------------------------------------------------------- Snyk
+  - id: snyk-evo-remediation-agent
+    competitor: snyk
+    date: 2026-10-22
+    title: Turn Your Vulnerability Backlog Into Pull Requests With Agentic Remediation
+    official_url: https://snyk.io/blog/evo-remediation-agent-open-preview/
+    category: AI & Agents
+    expected_importance: 4
+    why: Agentic dependency remediation campaigns (open preview); a change on the AI-capability axis.
+    match:
+      urls: []
+      title_keywords:
+        - [Evo Remediation Agent]
+        - [Snyk, Agentic Remediation]
+    verified: Fetched the blog post on 30 Oct; published 22 Oct 2026 (also in snyk.io/blog/feed/).
+
+  - id: snyk-secrets-inventory
+    competitor: snyk
+    date: 2026-10-19
+    title: Added Secrets in Inventory and centrally manage Secrets scan frequency
+    official_url: https://updates.snyk.io/secrets-repository-monitoring-inventory/
+    category: Product & Features
+    expected_importance: 2
+    why: Secrets-scan scheduling and inventory view (early access); related, no competitive impact.
+    match:
+      urls: []
+      title_keywords:
+        - [Secrets in Inventory]
+        - [Secrets scan frequency]
+    verified: Fetched the changelog entry on 30 Oct; dated 19 Oct 2026.
+
+  - id: snyk-python-3-15
+    competitor: snyk
+    date: 2026-10-29
+    title: Python 3.15 support is now available
+    official_url: https://updates.snyk.io/python-3-15-support-is-now-available/
+    category: Product & Features
+    expected_importance: 2
+    why: Language-version support; related, no competitive impact.
+    match:
+      urls: []
+      title_keywords:
+        - [Snyk, Python 3.15]
+        - [Python 3.15 support is now available]
+    verified: Listed in updates.snyk.io/rss/, fetched 30 Oct; dated 29 Oct 2026.
+
+  # ---------------------------------------------------------------- AWS (no CodeArtifact events found)
+  - id: aws-inspector-ecr-rescan-default
+    competitor: aws_codeartifact
+    date: 2026-10-21
+    title: Amazon Inspector updates the default Amazon ECR re-scan duration to 7 days
+    official_url: https://docs.aws.amazon.com/inspector/latest/user/doc-history.html
+    category: Product & Features
+    expected_importance: 2
+    why: Default setting change in container-image scanning; related, no competitive impact.
+    match:
+      urls: []
+      title_keywords:
+        - [Inspector, re-scan duration]
+    verified: Fetched the Amazon Inspector document history on 30 Oct; entry "Updated default Amazon ECR re-scan duration" dated 21 Oct 2026.
+
+  - id: aws-nitro-supply-chain-attestation
+    competitor: aws_codeartifact
+    date: 2026-10-27
+    title: Verify software supply chain security using AWS Nitro cryptographic verification
+    official_url: https://aws.amazon.com/blogs/publicsector/verify-software-supply-chain-security-using-aws-nitro-cryptographic-verification/
+    category: Security
+    expected_importance: 2
+    why: Guidance post on attesting build hosts; related, no competitive impact.
+    match:
+      urls: []
+      title_keywords:
+        - [Nitro, supply chain]
+    verified: Fetched the AWS Public Sector Blog post on 30 Oct; published 27 Oct 2026.
+
+  # ---------------------------------------------------------------- Industry
+  - id: industry-litellm-pypi-compromise
+    competitor: industry
+    date: 2026-10-21
+    title: "Contained: Oct 21, 2026 LiteLLM release v1.107.0 Compromised"
+    official_url: https://docs.litellm.ai/blog/security-incident-oct-21-2026
+    category: Security
+    expected_importance: 4
+    why: Credential-stealing release of a widely used AI gateway on PyPI and Docker; the attack class JFrog sells against.
+    match:
+      urls: []
+      title_keywords:
+        - [LiteLLM, "1.107.0"]
+        - [LiteLLM, supply chain]
+        - [LiteLLM, compromise*]
+    verified: Fetched LiteLLM's own incident post on 30 Oct; published 21 Oct 2026.
+
+  - id: industry-php2shell
+    competitor: industry
+    date: 2026-10-21
+    title: "Security advisory: Critical remote code execution vulnerabilities, update now (PHP2Shell)"
+    official_url: https://www.php.net/archive/2026.php#2026-10-21-5
+    category: Security
+    expected_importance: 3
+    why: Two critical unauthenticated PHP RCEs (CVE-2026-109618/109619), added to CISA KEV on 26 Oct; relevant industry news.
+    match:
+      urls: []
+      title_keywords:
+        - [PHP2Shell]
+        - [CVE-2026-109618]
+    verified: Fetched php.net's 2026 news archive on 30 Oct; advisory dated 21 Oct 2026. CISA KEV alert of 26 Oct also fetched.
+
+  - id: industry-ruby-onigmo-gitlab-cves
+    competitor: industry
+    date: 2026-10-23
+    title: Regexp compilation fixes related to GitLab's CVE-2026-89078, CVE-2026-93577, CVE-2026-97229 and CVE-2026-110264
+    official_url: https://www.ruby-lang.org/en/news/2026/10/23/regexp-fixes-for-gitlab-cves/
+    category: Security
+    expected_importance: 3
+    why: Ruby 4.0.9/3.4.12/3.3.13 fix the Onigmo bugs behind four GitLab RCEs; relevant industry news.
+    match:
+      urls: []
+      title_keywords:
+        - [Ruby, regex*, GitLab]
+        - [Onigmo]
+    verified: Fetched the ruby-lang.org announcement on 30 Oct; dated 23 Oct 2026.
+
+  - id: industry-emudhra-ca-compromise
+    competitor: industry
+    date: 2026-10-20
+    title: Protecting Chrome and Android Users from Compromised eMudhra Intermediate CA Certificates
+    official_url: https://blog.google/security/protecting-chrome-and-android-users-from-compromised-emudhra-intermediate-ca-certificates/
+    category: Security
+    expected_importance: 3
+    why: Eight CA intermediate keys compromised; trust-store updates ripple through registries and tooling.
+    match:
+      urls: []
+      title_keywords:
+        - [eMudhra]
+    verified: Fetched Google's post on 30 Oct; published 20 Oct 2026 (root removal effective 27 Oct).
