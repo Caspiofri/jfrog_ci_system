@@ -1,0 +1,354 @@
+# Newsletter Agent
+
+An end-to-end multi-source AI pipeline. Parallel collectors gather articles from your Gmail newsletters, Medium tag feeds and Hacker News; a reader fetches the full text of a shortlist; an LLM ranker picks the best; and a personalized Hebrew digest is delivered to your inbox — fully automated, daily.
+
+Built with LangGraph and Google Gemini 2.5. Each run is judged by Claude Haiku 4.5, a different model family from the writer and ranker, and traced in LangSmith. A multi-criteria LLM-as-judge eval harness covers offline checks.
+
+---
+
+## Demo
+
+| Top of digest | Full issue |
+|---|---|
+| ![Newsletter top](docs/demo_1.png) | ![Newsletter full](docs/demo_2.png) |
+
+---
+
+## Architecture
+
+The pipeline is a **stateful LangGraph graph**. Three collectors run **in parallel** from `START` and join in `merge`; the rest is a sequential funnel that narrows hundreds of candidates to the few stories worth sending.
+
+The inbox collector keeps its retry loop. Two independent knobs control it: `max_days_back` (how far back in time to search) and `max_tries` (transient failure retries). If neither limit is reached and no emails are found, the window widens by one day and it retries. When the inbox stays empty the run continues with the other collectors instead of stopping.
+
+```mermaid
+flowchart TD
+    START --> fetch
+    START --> collect_medium
+    START --> collect_hackernews
+
+    fetch --> check{emails?}
+    check -->|yes or limits reached| extract
+    check -->|no, window not exhausted| expand_search
+    expand_search -->|days_back plus 1| fetch
+
+    extract --> merge
+    collect_medium --> merge
+    collect_hackernews --> merge
+
+    merge -->|links checked, bad links swapped| check2{any articles?}
+    check2 -->|no| no_content
+    check2 -->|yes| dedupe
+
+    dedupe -->|drop recently sent| check3{any unseen?}
+    check3 -->|no| no_content
+    check3 -->|yes| shortlist
+
+    shortlist -->|per-source title screen| reader
+    reader -->|full text| rank
+    rank -->|top_k by score| check4{any worth sending?}
+    check4 -->|no| no_content
+    check4 -->|yes| summarize
+
+    summarize -->|HTML and NewsletterData| send_email
+    send_email -->|success, store in ChromaDB| END
+    send_email -->|failed, skip store| END
+    no_content --> END
+```
+
+### Node responsibilities
+
+| Node | What it does |
+|---|---|
+| `fetch` | Gmail API → decode MIME parts → `list[Article]` (one per email) |
+| `extract` | Parallel Gemini calls — explodes each email into sub-articles. Links are read from the HTML in code and Gemini picks from a numbered list, so a URL can never be invented |
+| `expand_search` | Widens the inbox search window (`days_back + 1`) when no emails found |
+| `collect_medium` | Polls Medium tag RSS feeds (`medium.com/feed/tag/<tag>`); Medium has no API |
+| `collect_hackernews` | Recent, well-voted Hacker News stories for the configured queries (Algolia API) |
+| `merge` | Join point: de-duplicates by URL, classifies every link, and replaces a bad link with a direct link to the same story from another source |
+| `dedupe` | Drops articles already sent, before they can take a shortlist slot: the same URL at any age still stored (14 days), or a similar story by ChromaDB vector search within the last 7 days |
+| `shortlist` | Gemini title screen run separately per source (quota per source), so one noisy source cannot crowd out the others. Gemini picks articles by integer id, so a title can no longer be invented or mismatched. Each article also carries a short teaser of its text (`SHORTLIST_TEASER_CHARS`, 300) as a hint, so the screen does not judge on the title alone |
+| `reader` | Fetches full article text for the shortlist in parallel (`trafilatura`). Marks each `full`, `partial` or `snippet` |
+| `rank` | One Gemini call scores each candidate 0-10 on its content and source (curated newsletter, unvetted Medium feed, HN points). The ranker reads up to `RANK_TEXT_CHARS` (6000) characters of each article, HTML stripped. Articles read only as a snippet are capped at 6 in code |
+| `summarize` | Gemini reads up to `READ_MAX_CHARS` (6000) characters of each article (via the shared `article_text()`) and writes full newsletter JSON → rendered to HTML. Cards reference articles by integer id and `card_resolver.resolve_cards` maps each id to the real URL, so a URL cannot be invented. Cards of Medium or Hacker News articles that were only read as a snippet are demoted to one-line brief items (inbox articles are exempt). A link that is dead or cannot be verified renders as a gray, disabled button |
+| `send_email` | Gmail API sends the HTML digest; stores articles in ChromaDB only on success |
+| `no_content` | Terminal node when no sendable articles exist |
+
+### Link handling
+
+Every article link is classified in `merge`: `ok`, `dead` (404/410), or `unverified` (a Cloudflare bot challenge, so a script cannot tell). A story whose link is not `ok` gets the URL of the same story from another newsletter when one exists (embedding similarity, the same model as dedupe). The shortlist prefers stories with working links. If only a bad link remains, the card shows a gray "link unavailable" button instead of a link that may 404.
+
+---
+
+---
+
+## Newsletter structure
+
+Each digest is compiled into three sections by the LLM:
+
+- **עיקרי הגיליון** (Top stories) — articles scoring ≥ 6/10 relevance. Each card has:
+  - *השורה התחתונה* — 1–2 sentence factual summary, no fluff
+  - *איך זה פוגש אותך* — personalized angle connecting to the reader's stack (RAG, LangGraph, multi-agent)
+- **עוד כותרות בקצר** (Brief) — lower-relevance articles as one-liners
+- **המלצות לביצוע** (Actions) — 1–2 specific, executable recommendations grounded in today's articles
+
+The LLM is given a structured output schema (Pydantic → JSON) so the HTML renderer never touches raw prose.
+
+---
+
+## Eval harness
+
+`evals/eval.py` runs three nodes against fixture data — **no Gmail required** — and produces a quality report.
+
+**Fixture set:** 6 AI-engineering articles + 2 deliberately off-topic (startup funding, health study) to test filter discrimination.
+
+### Structural checks (rule-based)
+
+| Check | What fails it |
+|---|---|
+| HTML parseable | BeautifulSoup parse error |
+| has header | `.header` class missing |
+| has full card | no `.card` element |
+| has brief section | no `.brief-section` element |
+| has actions section | no `.actions-section` element |
+| no `dir=ltr` elements | RTL layout broken |
+
+### LLM-as-judge scores (1–5 each)
+
+| Criterion | Rubric |
+|---|---|
+| **Faithfulness** | Every factual claim traceable to source articles; no hallucination |
+| **Hebrew quality** | Fluent prose; technical terms (RAG, LLM, API) kept in English |
+| **Personalization** | Advice is concrete and specific to the target audience's stack |
+| **Actionability** | 1–2 immediately executable actions tied to today's articles |
+
+The third eval suite covers the `dedupe` node — four cases: empty store passes all, seen articles are blocked, genuinely new articles pass through, and mixed batches return only the unseen subset.
+
+Run it:
+
+```bash
+python -m evals.eval
+# Results printed as a table and saved to output/eval_<timestamp>.json
+```
+
+### Ranking ground truth (labeling report)
+
+Every run writes `output/ranking_<profile>_<timestamp>.html` (plus a `.json`): every candidate the ranker scored, plus a seeded random sample of articles it never saw, so false negatives are visible. Open the page in a browser and rate each article **Must-read / Worth it / Skip** with an optional reason (including `full text mattered`, for articles whose title or opening did not show their value). It hides the ranker's scores until you tick "show ranker score and picks", so your labels are not anchored by them, and it shows the text snapshot the ranker saw. The random sample rows instead carry the article text fetched for the report (their `text:` chip shows full/partial/snippet), so labels for the sample can be judged from the article itself. Progress is kept in the browser. "Export labels" downloads a JSON file, which you merge into the golden set:
+
+```bash
+python -m evals.import_labels output/ranking_labels_ai_<run>.json
+# -> evals/ranking_golden.json (keyed by URL, with a text snapshot so labels survive link rot)
+```
+
+#### Labeling hub
+
+To grade articles from every report in one place instead of one page per run:
+
+```bash
+python -m evals.label_hub [--target 80] [--out output/label_hub.html]
+# -> "N items (M already labeled) -> output/label_hub.html"
+```
+
+The page gathers every `output/ranking_*.json` (the newest report wins when an article appears twice) plus the labels already in `evals/ranking_golden.json`. It shows one article at a time with its stored text; label with the buttons or the keys `1` must-read, `2` worth it, `3` skip, move with `n` / `p`, jump to the next unlabeled with `u`. Tick "I read the full article" when you judged from the article rather than the snapshot. A progress bar tracks labels against the target and warns when skips are under 15 percent or random-sample items under 25 percent of your labels. Labels are kept in the browser (regenerating the hub keeps them). "Export labels" downloads `ranking_labels_hub_<timestamp>.json`; "Load labels file" restores a previous export. Import it like any other export:
+
+```bash
+python -m evals.import_labels ~/Downloads/ranking_labels_hub_<timestamp>.json
+```
+
+If a loaded file holds labels that match no article in the page, a message says how many ("N loaded labels match no article in this page (their addresses may be old redirect links); run `python -m evals.canonicalize_labels` on the file first"). Old exports from the per-run pages may hold Substack redirect URLs; run `python -m evals.canonicalize_labels <file>` once on each before importing, so those labels match the real article URLs the hub shows. Keep the original exported file after canonicalising: loaded labels that match no article stay only in the browser and are not exported.
+
+Manual check (no automated test covers the page itself): label three articles with `1`, `2`, `3` and move with `n`, `p`, `u`; confirm the shortcuts do not fire while typing in the note or choosing a tag; export; clear the browser's site data for the page; load the file and confirm every label returns; load the same file a second time (it works again, the page resets the file input).
+
+#### Rating in Telegram
+
+After each run the bot posts about 8 articles to Telegram: the digest picks plus `TELEGRAM_EXTRA` (3) non-picks that fill the gaps in the golden set (a dropped article within 1 of `RANK_MIN_SCORE`, a low-scored drop, one from the random sample the ranker never saw; marked `🔍 not in today's digest`). Articles already in the golden set are not asked again. One tap on `⭐ Must-read` / `👍 Worth it` / `👎 Skip` labels the article: the message shows `✅ <label>` (tap again to change it), the tap is appended to `evals/telegram_labels.jsonl` and merged into `evals/ranking_golden.json` with `import_labels.merge` (`labeled_with: "snapshot"`). Reply to an article message to store a note; `/progress` answers `N / 80 · must a · worth b · skip c`. `/more` (or `/more N`, up to 20) sends more articles from all past reports, rotating picks, near-cutoff drops, low-scored drops and never-ranked samples; `/more low` (or `/more low N`) sends only dropped articles, lowest score first, the quickest way to collect 👎 skips. About once a week (`TELEGRAM_RECHECK_EVERY_DAYS`) one labeled article is re-sent as `🔁 re-check`; its answer goes to `evals/telegram_recheck.jsonl` and never changes the golden row. Only the chat in `TELEGRAM_CHAT_ID` is served.
+
+Setup, once:
+
+```bash
+# 1. In Telegram, message @BotFather: /newbot, then put the token in .env as TELEGRAM_BOT_TOKEN=<token>
+python -m evals.telegram_rater setup     # 2. press Start in the bot chat; the bot replies with your chat id
+# 3. put TELEGRAM_CHAT_ID=<id> in .env, then install the poller as a user service:
+mkdir -p ~/.config/systemd/user && cp deploy/telegram-rater.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now telegram-rater
+sudo loginctl enable-linger $USER        # keep it running without a login session
+journalctl --user -u telegram-rater -f   # logs
+```
+
+`main.py` posts the articles at the end of every run (skipped with one line when no token or chat id is set; a bot failure never fails the digest). `python -m evals.telegram_rater send` posts today's reports by hand; a run already sent is not sent again. The state (`evals/telegram_state.json`, sent message ids and the update offset) and both `.jsonl` files are your data: keep them out of git.
+
+A tap on a digest pick also posts your verdict on that run's picks to LangSmith, on its `digest_run` root run (the latest one started up to 60 minutes before the report was saved): `human.picks_precision` (share of rated picks labeled must or worth) and `count.human_picks_rated`. Each (run, key) has a fixed feedback id, so a later tap updates the score; skipped without `LANGSMITH_API_KEY`, and a LangSmith error never fails the tap. `python -m evals.human_feedback` backfills every run in the golden set that has rated picks.
+
+#### Ranking eval
+
+Once labels are in `evals/ranking_golden.json`, measure the ranker against them, in this order:
+
+```bash
+python -m evals.import_labels <export.json>          # 1. merge the labels into the golden set
+python -m evals.label_audit                          # 2. check the set is fit to measure with
+python -m evals.rank_eval                            # 3. dry run: prints the plan, calls no model
+python -m evals.rank_eval --run                      # 4. scores with Gemini -> output/rank_eval_<timestamp>.json
+python -m evals.rank_compare <baseline.json> <candidate.json>   # 5. did a change help?
+```
+
+- **Label audit** (`evals/label_audit.py`): counts by label, source, group, `labeled_with`, read status and report, the train/test split sizes, articles labeled twice (same normalized title and source), and warnings when skips are under 15 percent, random-sample rows under 25 percent, labels come from fewer than 4 reports, fewer than half were judged from the full article, the set is under the target (80, `--target`), or duplicates exist. `--relabel <export.json>` compares a later labeling of some of the same articles: the share with the same label (shown once at least 5 are compared; aim for at least 80 percent) and a must/worth/skip confusion matrix.
+- **Replay** (`evals/rank_eval.py`): for each report (`source_run`) in the golden set, all its labeled articles are the candidate pool. They are scored with the production ranker prompt (`modules.nodes.score_candidates`, the same prompt and snippet cap as `rank_articles`) from the stored text snapshot, `--repeats` times (default 3), because the ranker is not deterministic. Options: `--split train|test|all` (default `train`), `--k 5`, `--text-chars` (default `RANK_TEXT_CHARS`), `--golden`, `--profile AI` (reads `<PROFILE>_SUBJECT`, `_AUDIENCE`, `_EXPERIENCE` from the environment). It prints a table per report and overall (mean ± spread, the population standard deviation over repeats), and precision of the picks per source.
+- **Cost**: without `--run` nothing is called; it prints the number of reports, labeled articles, model calls (reports x repeats) and a rough input size in characters. `--run` makes exactly that many Gemini calls. A repeat whose reply is unusable or scores fewer articles than it was given is counted as failed and left out of the means, never as 0.
+- **Metrics**: precision@k = picks labeled must-read or worth it, divided by the labeled picks in the top k. Recall@k is capped by what k can hold: must-reads in the top k divided by min(k, must-reads in the report), so a perfect ranker scores 1.0 even when a report has more must-reads than k. When k exceeds the report's articles, all of them are picks. A metric that is undefined for a report (no must-reads, or no labeled picks) prints `n/a` and is skipped in the overall mean. Most reports hold 5 or fewer labeled articles, so with k=5 everything is picked and precision/recall cannot show a ranking change there. Two pooled metrics use every labeled article instead: **pairwise accuracy** (within each report, the share of pairs with different labels where the better label scored higher; a tie counts half, random is about 0.5), also shown without teaser-only (`snippet`) articles since the snippet cap holds their score down, and the **mean score per label** (teaser-only articles listed separately). Every article's score is saved per repeat in the result file, and `rank_compare` compares the pooled metrics too (an older result without them shows `n/a`).
+- **Train/test**: each label is assigned to train (75 percent) or test (25 percent; 60/20 of 80) by a stable hash of its normalized title and source, so the same article under two addresses stays on one side. Tune on `train` (the default). Score `--split test` once at the end of a tuning round, never to guide edits.
+- **Settings recorded**: each result file stores `settings` (k, repeats, text_chars, split, model, golden row count, profile, snippet cap, date). `rank_compare` prints, per metric, the difference of the overall means and whether it is `clear` (larger than the larger of the two spreads) or `within noise`, plus the settings that changed; it refuses two results with a different split, k or golden row count.
+
+### Live trace judging (`modules/trace_judge.py`)
+
+`evals/eval.py` tests nodes in isolation against fixtures. `modules/trace_judge.py` complements it by judging a **real pipeline run** end-to-end — called automatically after every successful `graph.ainvoke()`.
+
+The judge sees exactly the text the summarizer saw (the same `article_text()`), judges each card against its own source article by id, and runs on Claude (`JUDGE_MODEL_DAILY`, `claude-haiku-4-5`) rather than Gemini. Its scores and reasoning are posted to LangSmith as feedback (see Monitoring). `JUDGE_MODEL_EVAL` (`claude-sonnet-5-5`) is the stronger judge for on-demand evals.
+
+It scores three stages on a 1–5 scale:
+
+| Stage | Method | What it measures |
+|---|---|---|
+| `fetch_health` | Rule-based | Loop efficiency — how many retries before articles were found; penalises stagnation and hard-limit hits |
+| `filter_quality` | LLM judge | Whether the selected top-k articles are genuinely the most relevant to the configured subject |
+| `content_faithfulness` | LLM judge | Whether every factual claim in the generated cards is traceable to a source article — no hallucinated details |
+
+After each run the report is printed to stdout as a scored bar chart and saved to `output/trace_<profile>_<timestamp>.json`:
+
+```json
+{
+  "profile": "AI",
+  "overall": 4.3,
+  "stages": [
+    { "stage": "fetch_health",       "score": 5, "reasoning": "Fetched 24 articles on the first attempt." },
+    { "stage": "filter_quality",     "score": 4, "reasoning": "Selected articles closely match the AI engineering subject." },
+    { "stage": "content_faithfulness","score": 4, "reasoning": "All card claims supported by source snippets." }
+  ]
+}
+```
+
+> This pattern — attaching a lightweight LLM judge to every live trace rather than only to offline evals — aligns with LangChain's [Building a 100x Cheaper Trace Judge](https://blog.langchain.dev/building-a-100x-cheaper-llm-judge/) (June 15, 2025).
+
+---
+
+## Reliability
+
+Every Gemini call is wrapped in **tenacity** — 3 retries with exponential backoff (2 s → 4 s → 8 s). The full graph execution runs inside a **600-second asyncio timeout** so a hanging API call never blocks the daily run.
+
+---
+
+## Monitoring
+
+The pipeline runs unattended via cron (`0 7 * * *`, daily). Two layers catch failures:
+
+- **LangSmith tracing** — every graph run is traced end-to-end (`LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT` in `.env`; the legacy `LANGCHAIN_TRACING`, `LANGCHAIN_API_KEY` and `LANGCHAIN_PROJECT` names are still read by the SDK), so a run's node-by-node behavior is inspectable after the fact.
+- **healthchecks.io dead-man's-switch** — `main.py` pings `HEALTHCHECK_PING_URL` after every run: a plain ping on success, `/fail` (with the error or failed profile) on a crash, graph timeout, or `email_status == "failed"`. The check has a 60-minute grace period, so if the run never happens at all — for example the host machine is down — healthchecks.io alerts on the *missing* ping, which nothing running on the host itself could otherwise detect.
+
+### What you can see in LangSmith
+
+- **One `digest_run` trace per day**, tagged `digest_run` and the profile. It contains the node runs, the dedupe lookup (a retriever run named `dedupe_lookup`, with the matched sent titles and their similarity as documents), every `gemini` call, and the `trace_judge` run. The Claude call is the run named `judge_llm` (run type `llm`), tagged with the judge model id.
+- **Feedback on that root run:** `judge.filter_quality`, `judge.content_faithfulness`, `judge.fetch_health` (always posted) and `judge.overall` (the judge's scores, with reasoning as the comment), plus one entry per pipeline stage counter: `count.articles_collected_merged`, `count.articles_after_dedupe`, `count.articles_dedupe_dropped`, `count.dedupe_matches`, `count.dedupe_url_matches`, `count.dedupe_near_misses`, `count.dedupe_batch_duplicates`, `metric.dedupe_max_similarity`, `count.articles_shortlisted`, `count.articles_read_full`, `count.articles_read_partial`, `count.articles_read_snippet`, `count.articles_ranked`, `count.final_picked_articles`, `count.cards`, `count.brief_items`. Counts are `count.*` and similarity measurements `metric.*`, so they are not read as judge scores. Old runs keep their `stat.*` feedback (LangSmith cannot rename it), so dashboards must use the new names from the first run after this change. Add the feedback keys as columns in the runs table.
+- **Root run metadata `run_summary`:** the picked titles, the ranker's scores and reasons for every candidate, and the dedupe drops.
+
+`count.articles_dedupe_dropped` counts every article the dedupe step removed, including duplicates within one batch. `count.dedupe_matches` and `count.dedupe_near_misses` count the matches against sent stories (by URL or strictly above the threshold) and the near-misses (between 0.70 and the threshold), `count.dedupe_url_matches` the matches by exact URL, `count.dedupe_batch_duplicates` the duplicates within one batch, and `metric.dedupe_max_similarity` the highest similarity among the embedding matches (0.0 when there are none; URL matches are left out). `run_summary.dedupe_drops` lists only matches against previously sent stories and near-misses, each with its similarity, the matched sent article, its send date and `matched_by` (`url` or `embedding`); `dropped: true` means the URL matched or the similarity was strictly above the threshold. A URL match records similarity 1.0. Articles stored before URLs were kept match by embedding only.
+
+Prompts are recorded, so article and newsletter text is uploaded to LangSmith.
+
+---
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Orchestration | LangGraph | Stateful graph with parallel fan-out/fan-in, conditional edges and checkpointing |
+| LLM | Gemini 2.5 Flash | Extended thinking budget for the summarize step; cost-effective for daily runs |
+| Trace judge | Claude Haiku 4.5 (`claude-haiku-4-5`) | A different model family from the writer and ranker, so the judge does not grade its own work; cheap enough for every run |
+| Observability | LangSmith | One `digest_run` trace per day with judge scores and stage counts as feedback |
+| Email | Gmail API (OAuth 2.0) | Native read + send from an existing inbox, no extra infra |
+| Data modeling | Pydantic | Structured LLM output that fails loudly on schema violations |
+| Deduplication | ChromaDB + sentence-transformers | Exact-URL check over the 14-day store plus vector similarity over the last 7 days prevent resending a story |
+| Fault tolerance | tenacity + asyncio timeout | Handles transient LLM failures without manual intervention |
+| Full-text reading | trafilatura | Extracts the main article text from a fetched page |
+
+---
+
+## Setup
+
+### Prerequisites
+
+- Python 3.10+
+- Google Cloud project with Gmail API enabled
+- `config/credentials.json` (OAuth 2.0 Desktop App) from the Cloud Console
+- Gemini API key
+- Anthropic API key (for the Claude trace judge)
+- LangSmith API key (optional, for tracing)
+
+### Install
+
+```bash
+pip install -r requirements.txt
+```
+
+### Configure
+
+Copy `.env.example` and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+`.env.example` also lists `ANTHROPIC_API_KEY` (the trace judge) and the LangSmith variables `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT`. `requirements.txt` includes `anthropic` and `langsmith`.
+
+The active collectors have defaults in `config/settings.py`. Override them per profile in `.env` with comma-separated lists, for example `AI_MEDIUM_TAGS=ai-agents,llm,rag` and `AI_HN_QUERIES=LLM,AI agents`. Shortlist quotas, the minimum rank score and the snippet cap are in the same file.
+
+### First run — Gmail auth
+
+The first run opens a browser for OAuth consent and saves `config/token.json` for subsequent runs.
+
+```bash
+python main.py
+```
+
+---
+
+## Project structure
+
+```
+├── main.py               # Entry point — invokes the compiled graph (cron runs this)
+├── modules/              # Application code
+│   ├── graph.py          # LangGraph node wiring and conditional edges
+│   ├── nodes.py          # Node implementations (fetch, extract, collect, merge, dedupe, shortlist, rank, summarize, send)
+│   ├── collectors/       # Active sources: medium.py (tag RSS), hackernews.py (Algolia API)
+│   ├── reader.py         # Full-text fetching for shortlisted articles
+│   ├── article_text.py   # article_text(): the one text view of an article, shared by the summarizer and the judge
+│   ├── card_resolver.py  # Maps summarizer ids to real URLs, drops bad/duplicate ids, demotes snippet-only external cards
+│   ├── judge_llm.py      # Claude transport for the trace judge (JUDGE_MODEL_DAILY / JUDGE_MODEL_EVAL)
+│   ├── tracing.py        # LangSmith feedback and run_summary metadata for the digest_run root run
+│   ├── ranking_report.py # Ranking report + HTML labeling page
+│   ├── state.py          # DigestState TypedDict — shared across all nodes
+│   ├── models.py         # Article, ArticleCard, NewsletterData Pydantic models
+│   ├── gmail_client.py   # Gmail API wrapper (auth, read, send)
+│   ├── link_utils.py     # Real-link extraction from email HTML, tracking unwrap, dead-link check
+│   ├── article_store.py  # ChromaDB vector store — deduplication and article retention
+│   └── trace_judge.py    # Per-run LLM-as-judge with 3-stage scoring
+├── config/               # settings.py (all paths) + credentials.json, token.json, service_account.json (git-ignored)
+├── evals/                # Offline eval harness — eval.py, eval_golden.py, golden_set.json, import_labels.py
+│   ├── label_hub.py      # Labeling hub: one HTML page to grade articles from every ranking report (python -m evals.label_hub)
+│   ├── label_hub_template.html # The hub page (inline CSS/JS, pure-function logic tested through node)
+│   ├── canonicalize_labels.py  # Rewrites redirect URLs in an exported labels file to the real article URLs
+│   ├── rank_split.py     # Stable 75/25 train/test split of the ranking labels
+│   ├── rank_metrics.py   # precision@k and capped recall@k
+│   ├── rank_eval.py      # Replays the labeled articles through the ranker (python -m evals.rank_eval [--run])
+│   ├── rank_compare.py   # Baseline vs candidate rank_eval result
+│   ├── label_audit.py    # Label counts, warnings and relabel agreement
+│   ├── telegram_api.py   # Minimal Telegram Bot API client
+│   ├── telegram_select.py # What the rating bot sends each day, and the article message format
+│   ├── telegram_rater.py # Telegram rating bot: send / poll / setup (python -m evals.telegram_rater)
+│   └── human_feedback.py # Picks precision from your ratings, posted to LangSmith; backfill (python -m evals.human_feedback)
+├── tests/                # Offline unit tests — python -m tests.test_link_utils, test_collectors, test_article_text, test_card_resolver, test_summarize_ids, test_shortlist_ids, test_text_levers, test_trace_judge, test_judge_llm, test_pipeline_evidence, test_tracing, test_eval_golden, test_canonicalize_labels, test_label_hub, test_reader_arxiv, test_rank_split, test_rank_metrics, test_rank_eval, test_rank_compare, test_label_audit, test_telegram_rater, test_human_feedback (each via `python -m tests.<name>`)
+├── data/                 # Runtime data: chroma_db/ (git-ignored)
+├── deploy/               # telegram-rater.service (systemd --user unit for the rating bot poller)
+├── output/               # Logs, trace reports, eval reports (git-ignored)
+├── docs/                 # Screenshots
+└── requirements.txt
+```
+
+Run everything from the repo root. All file locations come from `config/settings.py`, so the working directory no longer matters for data and credentials.

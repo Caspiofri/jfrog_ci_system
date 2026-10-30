@@ -1,0 +1,38 @@
+# Environment variables
+.env
+
+# Google OAuth tokens and service account keys (contain sensitive credentials)
+config/token.json
+config/credentials.json
+config/service_account.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Planning / design docs (not production code)
+PRD.md
+docs/PRD-upgrade.md
+docs/superpowers/
+
+# Runtime data (Chroma DB, learned weights) and run output (logs, traces, eval reports)
+data/
+output/
+docs/EVAL-IMPROVEMENTS.md
+docs/ranking_labels_*.json
+
+# User labels (copied article text) and Telegram rating bot state
+evals/ranking_golden.json
+evals/telegram_state.json*
+evals/telegram_labels.jsonl
+evals/telegram_recheck.jsonl
