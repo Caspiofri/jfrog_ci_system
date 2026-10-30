@@ -442,3 +442,33 @@ def test_no_hint_without_a_named_competitor_or_with_two():
         {**_industry("Malware spreads via GitHub and GitLab runners"), "id": "b"},
         {**_industry("GitLab stock rallies after earnings beat"), "id": "c"}])  # chatter guard still wins
     assert all("hint" not in row for row in _payload(llm))
+
+
+HINT = "Competitor named in title: github — company or platform?"
+
+
+@pytest.mark.parametrize("title,expected", [
+    ("GitHub’s repositories abused to host malware", "hint"),  # a venue after the possessive
+    ("GitHub's repositories abused to host malware", "hint"),
+    ("GitHub made headlines after malware found in repos", "hint"),  # weak verb
+    ("GitHub brings bad news for maintainers", "hint"),
+    ("GitHub updates: attackers abuse workflow triggers", "hint"),  # a heading, not a verb
+    ("GitHub's users targeted by phishing", "hint"),
+    ("GitHub's new policy angers maintainers", "hint"),  # anything else after 's never settles by default
+    ("GitHub's npm firewall can block brand-new versions", "github"),
+    ("GitHub’s Copilot gets a security review mode", "github"),
+    ("GitHub's Advanced Security adds AI autofix", "github"),
+    ("GitHub Launches npm Firewall to Block Malicious Packages Before Installation", "github"),
+    ("Hackers Hide Malware in 42 GitHub Repositories", "hint"),
+])
+def test_reviewer_title_examples(title, expected):
+    llm = FakeLLM(_answer_all(competitor="industry"))
+    clf = Classifier(llm, GH_CFG, runs_dir=None)
+    item = _industry(title)
+    (c,) = clf.classify([item])
+    if expected == "github":
+        assert clf.title_competitor(item) == "github" and c.competitor == "github"
+        assert c.reason.startswith("title names github")
+    else:
+        assert clf.title_competitor(item) is None and c.competitor == "industry" and c.method == "llm"
+        assert _payload(llm)[0]["hint"] == HINT

@@ -139,17 +139,24 @@ def _alias_re(names: Iterable[str]) -> re.Pattern:
     return re.compile(r"\b(?:" + "|".join(re.escape(n) for n in names) + r")\b", re.IGNORECASE)
 
 
-# the title's subject: it opens with the competitor (after a short lead such as "Exclusive:"), followed by an action
-# verb or in possessive form ("GitHub's npm firewall"); "Malware hidden in GitHub repos" only names a venue
+# the title's subject: it opens with the competitor (after a short lead such as "Exclusive:"), followed by a strong
+# action verb (not "makes"/"brings", not a "GitHub updates:" heading), or by "'s" and one of its products ("GitHub's
+# npm firewall"). Anything else after "'s" is not settled by rule: "GitHub's repositories abused to host malware"
+# names a venue (repositories, users, accounts, platform, marketplace, ...), and the LLM gets a hint instead.
 TITLE_LEAD = r"(?:[^:\s][^:]{0,24}:\s+)?(?:the\s+)?"
 SUBJECT_VERBS = (r"launch(?:es|ed)?|adds?|added|introduc(?:es|ed)|unveil(?:s|ed)?|announc(?:es|ed)|releas(?:es|ed)|"
                  r"acquir(?:es|ed)|preview(?:s|ed)?|debut(?:s|ed)?|expand(?:s|ed)?|updat(?:es|ed)|ship(?:s|ped)?|"
-                 r"roll(?:s|ed)?\s+out|brings?|brought|makes?|made|patch(?:es|ed)|fix(?:es|ed)")
+                 r"roll(?:s|ed)?\s+out|patch(?:es|ed)|fix(?:es|ed)")
+PRODUCT_WORDS = ["Copilot", "Actions", "Advanced Security", "Dependabot", "CodeQL", "Packages", "npm", "registry",
+                 "firewall", "MCP", "agent", "agents", "Duo", "Orbit", "Nexus", "CLI", "scanner", "AI"]
 
 
 def _subject_re(names: Iterable[str]) -> re.Pattern:
+    names = list(names)
     alias = "|".join(re.escape(n) for n in names)
-    return re.compile(rf"^{TITLE_LEAD}(?:{alias})(?:['’]s\b|\s+(?:{SUBJECT_VERBS})\b)", re.IGNORECASE)
+    products = "|".join(r"\s+".join(map(re.escape, w.split())) for w in [*PRODUCT_WORDS, *names])
+    return re.compile(rf"^{TITLE_LEAD}(?:{alias})(?:['’]s\s+(?:{products})\b|\s+(?:{SUBJECT_VERBS})\b(?!\s*:))",
+                      re.IGNORECASE)
 
 
 def title_mention_hint(key: str) -> str:
