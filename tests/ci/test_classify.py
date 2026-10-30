@@ -1,0 +1,315 @@
+"""Classifier (D11) offline: rules settle clear items without the LLM, ambiguous ones go in id-keyed batches,
+and a bad LLM answer degrades to low confidence instead of crashing."""
+import json
+import re
+
+import pytest
+
+from ci.classify import CATEGORIES, LOW_CONFIDENCE, Classifier, aliases, mentions_jfrog, rule_category
+from ci.config import CIConfig, Competitor
+from ci.llm import FakeLLM, LLMError
+
+CFG = CIConfig(competitors=[
+    Competitor(key="snyk", name="Snyk", feeds=[{"url": "https://updates.snyk.io/rss/"},
+                                               {"url": "https://www.snyk.io/blog/feed/"}],
+               github_repos=["snyk/cli"]),
+    Competitor(key="gitlab", name="GitLab"),
+    Competitor(key="aws_codeartifact", name="AWS CodeArtifact"),
+    Competitor(key="industry", name="Industry"),
+])
+
+
+SNYK_FEED = "https://updates.snyk.io/rss/"
+
+
+def _item(i, title, competitor="snyk", text="", source="google_news", origin="q"):
+    if origin == "q" and source == "vendor_feed":
+        origin = SNYK_FEED
+    if origin == "q" and source == "github_releases":
+        origin = "snyk/cli"
+    return {"id": f"id{i}", "title": title, "competitor": competitor, "text": text, "source": source,
+            "origin": origin, "text_status": "full"}
+
+
+def _ids(schema):
+    return schema["properties"]["items"]["items"]["properties"]["id"]["enum"]
+
+
+def _answer_all(**fields):
+    """A responder that answers every id in the batch with the given fields."""
+    def respond(prompt, schema):
+        return {"items": [{"id": i, "competitor": "industry", "category": "Security", "noise": False,
+                           "confidence": 0.9, **fields} for i in _ids(schema)]}
+    return respond
+
+
+def test_aliases_are_derived_from_name_and_key():
+    assert set(aliases(CFG.by_key()["aws_codeartifact"])) == {"aws codeartifact", "codeartifact"}
+    assert set(aliases(CFG.by_key()["snyk"])) == {"snyk"}
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Compared with JFrog Artifactory", True), ("JFrog Xray found it", True), ("an x-ray of the market", False),
+    ("nothing here", False), ("frogs jump", False),
+    ("We migrated off Artifactory last year", True),  # Artifactory alone counts
+    ("ARTIFACTORY and Nexus compared", True),
+    ("Scanned with Xray inside Artifactory", True),  # Xray next to Artifactory
+    ("Xray and V2Ray proxy configuration guide", False),  # bare Xray is a different tool
+    ("An X-ray of the supply chain market", False),
+    ("artifactory-like caching", True), ("jfrogging", False)])
+def test_mentions_jfrog_regex(text, expected):
+    assert mentions_jfrog({"title": "", "text": text}) is expected
+
+
+@pytest.mark.parametrize("title,expected", [
+    ("Snyk raises $100M Series F", "Funding/M&A/Partnerships"),
+    ("Snyk patches critical vulnerability", "Security"),
+    ("Snyk launches new MCP server", None),  # exactly one category must match
+    ("Snyk adds MCP server", None),
+    ("GitLab's new rate limit has a fatal flaw", None),  # no bare "flaw"
+    ("Security extension for the GitHub Copilot app", None),  # Copilot in a security story is not AI & Agents
+    ("Shadow AI Across Government: It's Three Problems, Not One", None),  # no bare "AI"
+    ("Snyk CLI v1.2.3 released", "Product & Features"),
+    ("Snyk appoints new CEO", "Leadership & Org"),
+    ("A quiet Tuesday", None),
+    ("AI agent exploits malicious packages", None),  # several topics: ambiguous
+])
+def test_rule_category(title, expected):
+    assert rule_category(title)[0] == expected
+
+
+def test_clear_items_are_settled_by_rules_without_an_llm_call():
+    llm = FakeLLM()
+    items = [_item(1, "Snyk patches critical vulnerability"),
+             _item(2, "cli v1.1308.3", source="github_releases"),  # first-party repo, no name in the title
+             _item(3, "Snyk pricing per seat changes"),
+             _item(4, "We now support JFrog Artifactory", source="vendor_feed")]
+    out = Classifier(llm, CFG).classify(items)
+    assert llm.calls == []
+    assert [c.method for c in out] == ["rules"] * 4
+    assert [c.category for c in out] == ["Security", "Product & Features", "Pricing & Packaging",
+                                         "Product & Features"]
+    assert all(c.competitor == "snyk" and not c.noise for c in out)
+    assert [c.mentions_jfrog for c in out] == [False, False, False, True]
+
+
+@pytest.mark.parametrize("item,why", [
+    (_item(1, "AI coding tool flaws found"), "not in the title"),  # Snyk named nowhere
+    (_item(1, "New pricing plans announced", text="Snyk said... Snyk will"), "not in the title"),  # text only
+    (_item(1, "Pricing update", text="Snyk once. GitLab GitLab GitLab"), "dominates"),
+    (_item(1, "GitLab and Snyk ship a release", text="GitLab GitLab"), "dominates"),
+    (_item(1, "Snyk stock hits 52-week high"), "chatter"),
+    (_item(1, "Snyk at the summit"), "marketing"),
+    (_item(1, "Snyk on a quiet Tuesday"), "no category keywords"),
+    (_item(1, "Supply chain attack", competitor="industry"), "industry"),
+])
+def test_ambiguous_items_are_not_settled_by_rules(item, why):
+    result, reason = Classifier(FakeLLM(), CFG).apply_rules(item)
+    assert result is None and why in reason
+
+
+def test_ambiguous_items_go_to_the_llm_once_per_batch():
+    llm = FakeLLM(_answer_all())
+    items = [_item(i, f"Story {i} about nothing") for i in range(23)] + [_item(99, "Snyk patches a CVE")]
+    out = Classifier(llm, CFG, batch_size=10).classify(items)
+    assert len(llm.calls) == 3  # 23 ambiguous items in batches of 10
+    assert [len(_ids(s)) for _, s in llm.calls] == [10, 10, 3]
+    assert [c.id for c in out] == [it["id"] for it in items]  # input order kept
+    assert {c.method for c in out[:23]} == {"llm"} and out[23].method == "rules"
+    assert out[0].competitor == "industry" and out[0].confidence == 0.9
+    prompt = llm.calls[0][0]
+    assert "id0" in prompt and "id10" not in prompt
+    for category in CATEGORIES:
+        assert category in prompt  # D11 definitions are in the prompt
+
+
+def test_prompt_is_valid_json_payload_with_truncated_text():
+    llm = FakeLLM(_answer_all())
+    Classifier(llm, CFG).classify([_item(1, "Hello", text="x" * 5000)])
+    payload = json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+    assert payload[0]["id"] == "id1" and len(payload[0]["text"]) == 1500
+
+
+def test_llm_noise_and_none_are_accepted():
+    llm = FakeLLM(_answer_all(competitor="none", noise=True, category="Customers & Market"))
+    (c,) = Classifier(llm, CFG).classify([_item(1, "Unrelated")])
+    assert (c.competitor, c.noise, c.category) == ("none", True, "Customers & Market")
+
+
+@pytest.mark.parametrize("answer", [
+    LLMError("timeout"),
+    {"nope": 1},
+    {"items": "not a list"},
+    {"items": []},
+    {"items": [{"id": "id1", "competitor": "jfrog", "category": "Security", "noise": False, "confidence": 0.9}]},
+    {"items": [{"id": "id1", "competitor": "snyk", "category": "Gossip", "noise": False, "confidence": 0.9}]},
+    {"items": [{"id": "id1", "competitor": "snyk", "category": "Security", "noise": "no", "confidence": 0.9}]},
+    {"items": [{"id": "id1", "competitor": "snyk", "category": "Security", "noise": False}]},
+    {"items": ["garbage", None]},
+])
+def test_malformed_answer_degrades_to_low_confidence(answer):
+    (c,) = Classifier(FakeLLM([answer]), CFG).classify([_item(1, "Some story")])
+    assert c.method == "fallback" and c.confidence == LOW_CONFIDENCE
+    assert c.competitor == "snyk" and c.noise is False
+    assert "unusable" in c.reason
+
+
+def test_partial_answer_degrades_only_the_missing_item_and_ignores_invented_ids():
+    answer = {"items": [
+        {"id": "id1", "competitor": "gitlab", "category": "Security", "noise": False, "confidence": 1.7},
+        {"id": "invented", "competitor": "snyk", "category": "Security", "noise": False, "confidence": 0.9},
+        {"id": "id1", "competitor": "snyk", "category": "AI & Agents", "noise": True, "confidence": 0.1},
+    ]}
+    llm = FakeLLM([answer])
+    out = Classifier(llm, CFG).classify([_item(1, "Story one"), _item(2, "Story two")])
+    assert [c.id for c in out] == ["id1", "id2"]
+    assert (out[0].competitor, out[0].category, out[0].confidence) == ("gitlab", "Security", 1.0)  # first wins
+    assert (out[1].confidence, out[1].method) == (LOW_CONFIDENCE, "fallback")
+
+
+def test_schema_restricts_ids_competitors_and_categories():
+    schema = Classifier(FakeLLM(), CFG).schema(["a", "b"])
+    props = schema["properties"]["items"]["items"]["properties"]
+    assert props["id"]["enum"] == ["a", "b"]
+    assert props["competitor"]["enum"] == ["snyk", "gitlab", "aws_codeartifact", "industry", "none"]
+    assert props["category"]["enum"] == CATEGORIES
+
+
+# Titles from the Oct 30 run that the first rules settled wrongly; each must now go to the LLM.
+@pytest.mark.parametrize("item", [
+    _item(1, "GitLab's new 60 req/HR rate limit has a fatal flaw: It blocks the login page", competitor="gitlab"),
+    _item(2, "Researchers broke the browsers built into VS Code, Cursor, Copilot, Codex and Claude",
+          competitor="gitlab", text="GitLab GitLab GitLab"),
+    _item(3, "Octoverse: Commits, pushes, reach new highs in 2026 as developers build with agents",
+          competitor="gitlab", source="vendor_feed"),
+    _item(4, "PHP2Shell, LiteLLM, GitLab: Find What You Need to Patch", competitor="gitlab", source="hackernews"),
+    _item(5, "Shadow AI Across Government: It's Three Problems, Not One", competitor="snyk", source="vendor_feed"),
+    _item(6, "Snyk UNFILTERED: Inside Our First-Ever Customer Summit"),
+    _item(7, "Snyk vs GitLab: which scanner wins"),
+    _item(8, "Agoda consolidates DevSecOps toolchain with GitLab, improving security", competitor="gitlab"),
+    _item(9, "Deprecating Trivy vulnerability scanning", source="vendor_feed"),
+])
+def test_regressions_go_to_the_llm(item):
+    result, reason = Classifier(FakeLLM(), CFG).apply_rules(item)
+    assert result is None, reason
+
+
+def test_first_party_or_title_still_settles_clear_items():
+    c = Classifier(FakeLLM(), CFG)
+    for item, category in [(_item(1, "GitLab patches critical vulnerability that allows code execution",
+                                  competitor="gitlab"), "Security"),
+                           (_item(2, "Python 3.15 support is now available", source="vendor_feed"),
+                            "Product & Features")]:
+        result, reason = c.apply_rules(item)
+        assert result is not None and result.category == category, reason
+
+
+@pytest.mark.parametrize("item,first_party", [
+    (_item(1, "x", source="vendor_feed"), True),
+    (_item(2, "x", source="vendor_feed", origin="https://snyk.io/blog/feed/"), True),  # www. stripped
+    (_item(3, "x", source="github_releases"), True),
+    (_item(4, "x", source="vendor_feed", origin="https://research.example.com/feed.xml"), False),  # not Snyk's host
+    (_item(5, "x", source="vendor_feed", origin="https://about.gitlab.com/atom.xml"), False),  # someone else's feed
+    (_item(6, "x", source="github_releases", origin="someone/fork-of-cli"), False),
+    (_item(7, "x", source="vendor_feed", competitor="industry", origin=SNYK_FEED), False),  # never for Industry
+    (_item(8, "x", source="google_news", origin=SNYK_FEED), False),
+])
+def test_first_party_only_for_the_competitors_own_feed_or_repo(item, first_party):
+    assert Classifier(FakeLLM(), CFG).is_first_party(item) is first_party
+
+
+def test_a_foreign_feed_does_not_confirm_the_competitor():
+    c = Classifier(FakeLLM(), CFG)
+    own, _ = c.apply_rules(_item(1, "Python 3.15 support is now available", source="vendor_feed"))
+    foreign, why = c.apply_rules(_item(1, "Python 3.15 support is now available", source="vendor_feed",
+                                       origin="https://research.example.com/feed.xml"))
+    assert own is not None and foreign is None and "not a first-party source" in why
+    industry, _ = c.apply_rules(_item(1, "Python 3.15 support is now available", source="vendor_feed",
+                                      competitor="industry"))
+    assert industry is None
+
+
+def test_rules_work_with_a_single_tracked_competitor():
+    solo = CIConfig(competitors=[Competitor(key="snyk", name="Snyk"), Competitor(key="industry", name="Industry")])
+    result, reason = Classifier(FakeLLM(), solo).apply_rules(_item(1, "Snyk patches critical vulnerability"))
+    assert result is not None and result.category == "Security", reason
+    only = CIConfig(competitors=[Competitor(key="snyk", name="Snyk")])
+    assert Classifier(FakeLLM(), only).apply_rules(_item(2, "Snyk on a quiet Tuesday"))[0] is None
+
+
+def _with_mentions(item, mentions, jfrog=False):
+    return {**item, "mentions": {"snyk": 0, "gitlab": 0, "aws_codeartifact": 0, **mentions}, "mentions_jfrog": jfrog}
+
+
+def test_full_page_mentions_drive_dominance():
+    c = Classifier(FakeLLM(), CFG)
+    item = _item(1, "Snyk patches critical vulnerability", text="Snyk short teaser")
+    assert c.apply_rules(item)[0] is not None  # stored text: Snyk only
+    result, why = c.apply_rules(_with_mentions(item, {"snyk": 2, "gitlab": 9}))  # the full page is about GitLab
+    assert result is None and "GitLab dominates" in why
+
+
+def test_without_mentions_the_classifier_counts_the_stored_text():
+    c = Classifier(FakeLLM(), CFG)
+    item = _item(1, "Snyk patches critical vulnerability", text="GitLab GitLab GitLab GitLab")
+    result, why = c.apply_rules(item)
+    assert result is None and "GitLab dominates (4 vs 3)" in why
+
+
+def test_full_page_jfrog_flag_is_used():
+    llm = FakeLLM(_answer_all())
+    plain = _item(1, "Top 5 SCA tools", text="no vendor named here")
+    (a, b) = Classifier(llm, CFG).classify([plain, _with_mentions({**plain, "id": "id2"}, {"snyk": 1}, jfrog=True)])
+    assert (a.mentions_jfrog, b.mentions_jfrog) == (False, True)
+
+
+def test_full_text_mentions_hint_reaches_the_llm():
+    llm = FakeLLM(_answer_all())
+    items = [_with_mentions(_item(1, "Top 5 SCA tools", competitor="industry"), {"aws_codeartifact": 3, "snyk": 1}),
+             _item(2, "Another list", competitor="industry")]
+    Classifier(llm, CFG).classify(items)
+    payload = json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+    assert payload[0]["full_text_mentions"] == "aws_codeartifact×3, snyk×1"
+    assert "full_text_mentions" not in payload[1]
+    assert "full_text_mentions" in llm.calls[0][0].split("Items (JSON)")[0]  # explained in the instructions
+
+
+@pytest.mark.parametrize("title,text", [
+    ("Snyk patches critical vulnerability", "Snyk said GitLab and Snyk agree. Snyk!"),
+    ("GitLab and Snyk ship", "AWS CodeArtifact and CodeArtifact, then GitLab"),
+    ("Nothing named", "plain text"),
+])
+def test_weights_are_identical_with_and_without_stored_mentions(title, text):
+    from ci.classify import MentionCounter
+
+    c = Classifier(FakeLLM(), CFG)
+    item = _item(1, title, text=text)
+    counts, _ = MentionCounter(CFG)(text)
+    assert c._mention_weights({**item, "mentions": counts}) == c._mention_weights(item)
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("see https://github.com/snyk/cli for details", 0),
+    ("clone github.com/gitlab-org/gitlab and snyk.io/docs", 0),
+    ("read about.gitlab.com/blog and www.snyk.io", 0),
+    ("Snyk and GitLab compared; source on https://gitlab.com/x", 2),
+])
+def test_urls_are_not_mentions(text, expected):
+    from ci.classify import MentionCounter
+
+    counts, jfrog = MentionCounter(CFG)(text + " https://jfrog.com/artifactory/")
+    assert sum(counts.values()) == expected and jfrog is False
+
+
+def test_stale_stored_counts_never_zero_a_competitor():
+    c = Classifier(FakeLLM(), CFG)
+    # counts taken before aws_codeartifact was tracked: the key is missing, but the stored text names it
+    item = {**_item(1, "x", text="CodeArtifact and CodeArtifact, Snyk"), "mentions": {"snyk": 4, "gitlab": 1}}
+    assert c.text_counts(item) == {"snyk": 4, "gitlab": 1, "aws_codeartifact": 2}
+
+
+def test_mention_config_hash_tracks_the_name_rules():
+    from ci.classify import MentionCounter
+
+    other = CIConfig(competitors=[*CFG.competitors, Competitor(key="cloudsmith", name="Cloudsmith")])
+    assert MentionCounter(CFG).config_hash == MentionCounter(CFG).config_hash != MentionCounter(other).config_hash
