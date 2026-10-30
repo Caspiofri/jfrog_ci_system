@@ -2,9 +2,11 @@
 import json
 import sqlite3
 
+import pytest
 from fastapi.testclient import TestClient
 
 from ci import config, coverage, eval_golden, mentions
+from ci.changes.diff import CellStore
 from ci.classify import aliases
 from ci.config import Competitor, canonical_counts, canonical_item, canonical_key
 from ci.labeling import stratified
@@ -194,3 +196,36 @@ def test_unpublished_change_items_are_migrated_and_published_ones_kept(tmp_path)
     rows = dict(store._db.execute("SELECT id, item FROM changes").fetchall())
     assert json.loads(rows["x"])["competitor"] == "aws"
     assert json.loads(rows["y"])["competitor"] == OLD  # already written out: its file is never rewritten either
+
+
+def test_unreadable_change_items_are_skipped_and_logged(tmp_path, caplog):
+    item = {"id": "x", "competitor": OLD}
+    db = tmp_path / "c.sqlite"
+    _seed(db, changes=[("x", item, "")])
+    with sqlite3.connect(db) as con:
+        for change_id, raw in (("bad", "{not json"), ("list", "[1, 2]"), ("null", "null")):
+            con.execute("INSERT INTO changes VALUES (?, ?, ?, '')", (change_id, RUN, raw))
+        con.execute("INSERT INTO changes VALUES ('sqlnull', ?, NULL, '')", (RUN,))
+    with caplog.at_level("WARNING", logger="ci.changes.diff"):
+        store = CellStore(db)
+    rows = dict(store._db.execute("SELECT id, item FROM changes").fetchall())
+    assert json.loads(rows["x"])["competitor"] == "aws"
+    assert (rows["bad"], rows["list"], rows["null"], rows["sqlnull"]) == ("{not json", "[1, 2]", "null", None)
+    assert sum("left as it is" in r.message for r in caplog.records) == 4
+
+
+def test_a_failed_item_migration_rolls_back_every_row(tmp_path):
+    item = {"id": "x", "competitor": OLD}
+    db = tmp_path / "c.sqlite"
+    _seed(db)  # tables only; the rows go in after, so the next CellStore is the one that migrates them
+    with sqlite3.connect(db) as con:  # the second write fails
+        for change_id in ("x", "y"):
+            row = (change_id, RUN, json.dumps({**item, "id": change_id}))
+            con.execute("INSERT INTO changes VALUES (?, ?, ?, '')", row)
+        con.execute("CREATE TRIGGER boom BEFORE UPDATE ON changes WHEN NEW.id = 'y' "
+                    "BEGIN SELECT RAISE(ABORT, 'boom'); END")
+    with pytest.raises(sqlite3.IntegrityError, match="boom"):
+        CellStore(db)
+    with sqlite3.connect(db) as con:
+        items = [json.loads(r[0]) for r in con.execute("SELECT item FROM changes ORDER BY rowid")]
+    assert [i["competitor"] for i in items] == [OLD, OLD]  # x was renamed first, then rolled back

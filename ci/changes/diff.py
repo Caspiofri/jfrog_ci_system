@@ -7,6 +7,7 @@ and number or currency formatting ("$1,950.00/mo" vs "1950 USD per month") do no
 import difflib
 import hashlib
 import json
+import logging
 import re
 import sqlite3
 from datetime import datetime
@@ -17,6 +18,8 @@ from pydantic import BaseModel
 from ci import config as ci_config
 from ci.changes.config import AXES
 from ci.changes.extract import AxisField, Tier, price_text
+
+log = logging.getLogger(__name__)
 
 DIFF_CONTEXT_LINES = 2
 DIFF_MAX_LINES = 60
@@ -223,11 +226,20 @@ class CellStore:
         self._migrate_unpublished_items()
 
     def _migrate_unpublished_items(self) -> None:
-        """Legacy competitor keys inside Changes items not yet written out (published files are never rewritten)."""
-        rows = self._db.execute("SELECT id, item FROM changes WHERE published_in = ''").fetchall()
+        """Legacy competitor keys inside Changes items not yet written out (published files are never rewritten).
+        An item that is not a JSON object is logged and left as it is: it must not block change detection. One
+        transaction: a failure part-way leaves every row as it was."""
+        rows = self._db.execute("SELECT id, item FROM changes WHERE published_in = '' ORDER BY rowid").fetchall()
         with self._db:
             for change_id, raw in rows:
-                item = json.loads(raw)
+                try:
+                    item = json.loads(raw)
+                except (TypeError, ValueError) as e:
+                    log.warning("changes item %s is not JSON (%s); left as it is", change_id, e)
+                    continue
+                if not isinstance(item, dict):
+                    log.warning("changes item %s is a %s, not an object; left as it is", change_id, type(item).__name__)
+                    continue
                 if ci_config.canonical_key(item.get("competitor")) != item.get("competitor"):
                     item["competitor"] = ci_config.canonical_key(item["competitor"])
                     self._db.execute("UPDATE changes SET item = ? WHERE id = ?", (json.dumps(item), change_id))
