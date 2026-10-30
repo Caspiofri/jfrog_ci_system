@@ -524,3 +524,37 @@ def test_the_same_tiers_in_another_order_and_wording_are_no_change(env):
     res = go(T2, llm=FakeLLM(shuffled))
     assert res.items == [] and statuses(res)["pricing"] == "same_fields"
 
+
+def test_a_second_change_detection_run_exits_2_while_one_holds_the_lock(tmp_path, monkeypatch, capsys):
+    import ci.changes.__main__ as cli
+    import ci.runlock
+    from ci.runlock import run_lock
+
+    monkeypatch.setattr(ci.runlock, "LOCK_DIR", tmp_path)
+    monkeypatch.setattr(cli, "run", lambda *a, **k: pytest.fail("must not run while locked"))
+    with run_lock("changes", tmp_path):
+        with pytest.raises(SystemExit) as exc:
+            cli.main(["--live"])
+    assert exc.value.code == 2
+    assert "another run is in progress (pid" in capsys.readouterr().err
+
+
+def test_a_change_detection_run_holds_the_lock_while_it_runs(tmp_path, monkeypatch):
+    import ci.changes.__main__ as cli
+    import ci.runlock
+    from ci.runlock import RunLocked, run_lock
+
+    monkeypatch.setattr(ci.runlock, "LOCK_DIR", tmp_path)
+
+    def fake_run(*a, **k):
+        with pytest.raises(RunLocked):  # a concurrent run would be turned away here
+            with run_lock("changes", tmp_path):
+                pass
+        return type("R", (), {"report": {"status": "ok", "run_id": "r", "live": False}, "paths": {}})()
+
+    monkeypatch.setattr(cli, "run", fake_run)
+    monkeypatch.setattr(cli, "format_report", lambda report: "report")
+    cli.main([])
+    with run_lock("changes", tmp_path):  # released afterwards
+        pass
+

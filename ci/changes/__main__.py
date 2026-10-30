@@ -11,10 +11,15 @@ import sys
 from ci import config as ci_config
 from ci.changes import config
 from ci.changes.run import format_report, run
+from ci.runlock import RunLocked, run_lock
+
+# one change-detection run at a time: two concurrent --live runs would make the same Gemini calls and publish
+# the same Changes items twice
+LOCK_NAME = "changes"
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Exits 1 when every page failed."""
+    """Exits 1 when every page failed, and 2 when another change-detection run holds the "changes" lock."""
     ap = argparse.ArgumentParser(prog="python -m ci.changes", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--competitors", help="comma-separated competitor keys from config/tracked_pages.yaml")
@@ -31,7 +36,12 @@ def main(argv: list[str] | None = None) -> None:
     if args.live:
         from ci.llm import GeminiLLM
         llm = GeminiLLM()
-    result = run(pages, llm=llm, names=names, competitors=chosen)
+    try:
+        with run_lock(LOCK_NAME):
+            result = run(pages, llm=llm, names=names, competitors=chosen)
+    except RunLocked as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(2)
     print(format_report(result.report))
     for path in result.paths.values():
         print(f"wrote {path}")
