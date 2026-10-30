@@ -44,9 +44,10 @@ is a 4.
 
 Anchor examples:
 - "Amazon ECR now supports replication backfill for existing container images" = 3 (improves an existing capability)
-- "GitHub package firewall in public preview" = 5 (a head-on competing product to JFrog Curation)
+- "GitHub package firewall in public preview" = 5 (head-on vs a JFrog core product at GitHub's distribution scale;
+  a preview does not lower a core-capability move)
 - "5 Best SCA Tools" (a vendor listicle) = 2 (marketing, no event)
-- "GitLab vs SonarQube - 2026 Comparison" (a review-site page) = 1, noise"""
+- "GitLab vs SonarQube - 2026 Comparison" (a review-site page) = noise, no score"""
 
 
 class Ranked(BaseModel):

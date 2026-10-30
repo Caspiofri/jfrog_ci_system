@@ -41,10 +41,12 @@ def test_rubric_states_impact_not_size_with_ofris_anchors():
     assert "| 3 | A competitor improves a capability it already had" in prompt
     assert "vendor marketing with no event" in prompt
     for anchor in ('"Amazon ECR now supports replication backfill for existing container images" = 3',
-                   '"GitHub package firewall in public preview" = 5',
+                   '"GitHub package firewall in public preview" = 5 (head-on vs a JFrog core product',
+                   "a preview does not lower a core-capability move",
                    '"5 Best SCA Tools" (a vendor listicle) = 2',
-                   '"GitLab vs SonarQube - 2026 Comparison" (a review-site page) = 1, noise'):
+                   '"GitLab vs SonarQube - 2026 Comparison" (a review-site page) = noise, no score'):
         assert anchor in prompt
+    assert "= 1, noise" not in prompt  # a noise item gets no score
 
 
 @pytest.mark.parametrize("raw,status,jfrog,noise,expected", [
