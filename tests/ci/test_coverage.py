@@ -206,3 +206,39 @@ def test_curated_list_reflects_ofris_oct_30_review():
     for eid in ("industry-emudhra-ca-compromise", "industry-php2shell", "sonatype-emudhra-assessment"):
         assert by_id[eid].expected_importance == 2 and raw[eid]["note"] == "lowered to 2 by Ofri, Oct 30"
     assert "aws_codeartifact" not in {e.competitor for e in by_id.values()}
+
+
+def _sources_cfg():
+    from ci.config import CIConfig, Competitor, Feed
+
+    return CIConfig(competitors=[
+        Competitor(key="cloudsmith", name="Cloudsmith", feeds=[Feed(url="https://cloudsmith.com/rss/changelog.xml")],
+                   github_repos=["cloudsmith-io/cloudsmith-cli"]),
+        Competitor(key="github", name="GitHub", feeds=[Feed(url="https://github.blog/changelog/feed/")]),
+        Competitor(key="industry", name="Industry")])
+
+
+@pytest.mark.parametrize("url,kind", [
+    ("https://cloudsmith.com/changelog/verify-npm-provenance", "feed"),
+    ("https://www.cloudsmith.com/blog/x", "feed"),  # www. is ignored, as in the classifier
+    ("https://github.blog/changelog/workflow-lockfiles", "feed"),
+    ("https://github.com/cloudsmith-io/cloudsmith-cli/releases/tag/v1.30.1", "feed"),
+    ("https://github.com/someone/else/releases", "external"),
+    ("https://about.gitlab.com/blog/gitlab-orbit-ga/", "external"),
+    ("https://www.cisa.gov/known-exploited-vulnerabilities-catalog", "external"),
+])
+def test_source_kind_follows_the_configured_feed_hosts_and_repos(url, kind):
+    assert coverage.source_kind(url, _sources_cfg()) == kind
+
+
+def test_recall_is_reported_per_source_kind(fixture_run, tmp_path):
+    runs, events = tmp_path / "runs", tmp_path / "events.yaml"  # written by fixture_run
+    report = run(RUN_ID, runs_dir=runs, events_path=events, out_dir=tmp_path / "out2", cfg=_sources_cfg())
+    kinds = {e["id"]: e["source_kind"] for e in report["events"]}
+    assert kinds["url-event"] == "feed" and kinds["keyword-event"] == "external"
+    by = report["by_source_kind"]
+    assert set(by) == {"feed", "external"}
+    assert sum(v["events"] for v in by.values()) == report["overall"]["events"]
+    assert by["feed"]["events"] == sum(1 for e in report["events"] if e["in_window"] and e["source_kind"] == "feed")
+    table = coverage.format_report(report)
+    assert "source" in table and "feed" in table and "external" in table

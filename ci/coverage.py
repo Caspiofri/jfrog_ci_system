@@ -27,10 +27,12 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import yaml
 
-from ci.classify import CATEGORIES
+from ci import config as ci_config
+from ci.classify import CATEGORIES, _host, own_sources
 from ci.config import canonical_item, canonical_key
 from ci.dedupe import normalize_url
 from config.settings import EVALS_DIR, OUTPUT_DIR
@@ -141,8 +143,23 @@ def _recall_rows(rows: list[dict], key) -> dict:
             for k, v in sorted(groups.items(), key=lambda kv: str(kv[0]))}
 
 
-def evaluate(events: list[Event], kept: list[dict], dropped: list[dict], window: tuple[date, date]) -> dict:
+def source_kind(url: str, cfg: ci_config.CIConfig) -> str:
+    """"feed" when the event's official page is on a source the tool collects from (a configured feed's host, or
+    one of the configured GitHub repos; the same own-source logic as the classifier), else "external"."""
+    sources = set().union(*(own_sources(c) for c in cfg.competitors))
+    host = _host(url)
+    if host in sources:
+        return "feed"
+    parts = urlsplit(url).path.strip("/").split("/")
+    if host == "github.com" and len(parts) >= 2 and f"repo:{parts[0]}/{parts[1]}".lower() in sources:
+        return "feed"
+    return "external"
+
+
+def evaluate(events: list[Event], kept: list[dict], dropped: list[dict], window: tuple[date, date],
+             cfg: ci_config.CIConfig | None = None) -> dict:
     first, last = window
+    cfg = cfg or ci_config.load()
     rows = []
     for ev in events:
         hits = []
@@ -155,7 +172,8 @@ def evaluate(events: list[Event], kept: list[dict], dropped: list[dict], window:
                                  "reason": reason})
         statuses = {h["status"] for h in hits}
         rows.append({"id": ev.id, "competitor": ev.competitor, "date": ev.date.isoformat(), "title": ev.title,
-                     "official_url": ev.official_url, "category": ev.category,
+                     "official_url": ev.official_url, "source_kind": source_kind(ev.official_url, cfg),
+                     "category": ev.category,
                      "expected_importance": ev.expected_importance, "in_window": first <= ev.date <= last,
                      "captured": bool(hits), "kept": "kept" in statuses,
                      "dropped_only": statuses == {"dropped"}, "matches": hits})
@@ -173,6 +191,9 @@ def evaluate(events: list[Event], kept: list[dict], dropped: list[dict], window:
                             "recall": _ratio(sum(r["captured"] for r in high), len(high))},
         "by_competitor": _recall_rows(scored, lambda r: r["competitor"]),
         "by_importance": _recall_rows(scored, lambda r: r["expected_importance"]),
+        # "feed": the event's page is on a source the tool reads, so a miss is a pipeline miss; "external": the tool
+        # can only see it through news search or HN
+        "by_source_kind": _recall_rows(scored, lambda r: r["source_kind"]),
         "missed": [{k: r[k] for k in ("id", "title", "competitor", "expected_importance", "official_url")}
                    for r in scored if not r["captured"]],
         "dropped_only": [{"id": r["id"], "title": r["title"]} for r in scored if r["dropped_only"]],
@@ -196,9 +217,9 @@ def format_report(report: dict) -> str:
            f"{'competitor':<18}{'events':>7}{'captured':>9}{'recall':>8}"]
     out += [f"{k:<18}{v['events']:>7}{v['captured']:>9}{_pct(v['recall']):>8}"
             for k, v in report["by_competitor"].items()]
-    out += ["", f"{'importance':<18}{'events':>7}{'captured':>9}{'recall':>8}"]
-    out += [f"{k:<18}{v['events']:>7}{v['captured']:>9}{_pct(v['recall']):>8}"
-            for k, v in report["by_importance"].items()]
+    for title, key in (("importance", "by_importance"), ("source", "by_source_kind")):
+        out += ["", f"{title:<18}{'events':>7}{'captured':>9}{'recall':>8}"]
+        out += [f"{k:<18}{v['events']:>7}{v['captured']:>9}{_pct(v['recall']):>8}" for k, v in report[key].items()]
     out += ["", "missed:"] + ([f"  [{m['expected_importance']}] {m['id']}: {m['title']}" for m in report["missed"]]
                               or ["  (none)"])
     out += ["", "captured only in dropped items (deduped):"]
@@ -210,7 +231,7 @@ def format_report(report: dict) -> str:
 
 
 def run(run_id: str, runs_dir: Path = RUNS_DIR, events_path: Path = EVENTS_PATH,
-        out_dir: Path = COVERAGE_DIR) -> dict:
+        out_dir: Path = COVERAGE_DIR, cfg: ci_config.CIConfig | None = None) -> dict:
     kept_path = runs_dir / f"{run_id}.jsonl"
     if not kept_path.exists():
         raise FileNotFoundError(f"no kept items for run {run_id} in {runs_dir}")
@@ -218,7 +239,7 @@ def run(run_id: str, runs_dir: Path = RUNS_DIR, events_path: Path = EVENTS_PATH,
     kept = [canonical_item(r) for r in read_jsonl(kept_path)]  # old runs carry aws_codeartifact
     dropped = [canonical_item(r) for r in read_jsonl(runs_dir / f"{run_id}.dropped.jsonl")]
     report = {"run_id": run_id, "runs_dir": str(runs_dir), "events_file": str(events_path), "window_days": days,
-              **evaluate(load_events(events_path), kept, dropped, (first, last))}
+              **evaluate(load_events(events_path), kept, dropped, (first, last), cfg)}
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{run_id}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n",
                                             encoding="utf-8")
