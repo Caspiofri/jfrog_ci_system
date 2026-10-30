@@ -28,7 +28,7 @@ import numpy as np
 
 from ci import classify as classify_mod
 from ci import config as ci_config
-from ci import extraction_quality
+from ci import extraction_quality, prefilter
 from ci import mentions as side_mentions
 from ci import rank as rank_mod
 from ci.classify import Classification, Classifier
@@ -249,6 +249,8 @@ def fingerprint(cfg: ci_config.CIConfig | None = None, side_hashes: dict[str, st
         "classify.source": inspect.getsource(classify_mod),
         "rank.source": inspect.getsource(rank_mod),
         "extraction_quality.source": inspect.getsource(extraction_quality),
+        "prefilter.source": inspect.getsource(prefilter),
+        **{f"prefilter.{k}": _frozen(v) for k, v in sorted(vars(prefilter).items()) if k.isupper()},
         **{f"extraction_quality.{k}": _frozen(v) for k, v in sorted(vars(extraction_quality).items())
            if k.isupper()},
         "config": cfg.model_dump(mode="json"),
@@ -389,6 +391,17 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
                       "missing": len(rows) - len(rows_scored)},
         }
 
+    # the noise pre-filter (shadow or on): what it flags, against the labels; it must never flag a relevant item
+    pf = [row for row in labels if cls[row["id"]].shadow_prefilter]
+    pf_noise = sum(row["noise"] for row in pf)
+    labeled_noise = sum(row["noise"] for row in labels)
+    prefilter_stats = {
+        "flagged": len(pf), "noise_caught": pf_noise, "labeled_noise": labeled_noise,
+        "precision": _ratio(pf_noise, len(pf)), "precision_n": len(pf),
+        "recall": _ratio(pf_noise, labeled_noise), "recall_n": labeled_noise,
+        "relevant_flagged": [{"id": row["id"], "reason": cls[row["id"]].shadow_prefilter} for row in pf
+                             if not row["noise"]]}
+
     # errors by what the labeler read before labeling (labels without basis predate the field)
     by_basis = {b: errors_for([row for row in labels if label_basis(row) == b]) for b in BASES}
     # errors by whether the labeler saw junk instead of the article (labels without the flag predate it)
@@ -411,6 +424,7 @@ def evaluate(labels: list[dict], classifications: list[Classification], ranked: 
         "important": {"min": IMPORTANT_MIN, "n": len(scored), "missing": len(labels) - len(scored),
                       **_pr(i_tp, i_fp, i_fn)},
         "by_method": by_method,
+        "prefilter": prefilter_stats,
         "confusion": {"competitor": _confusions(comp_pairs), "category": _confusions(cat_pairs),
                       "noise": {"tp": tp, "fp": fp, "fn": fn, "tn": tn}},
     }
@@ -474,6 +488,7 @@ def run(split: str = "train", live: bool = False, labels_path: Path | None = Non
     if llm is None:
         llm = GeminiLLM() if live else abstaining_llm()
     report = {"created_at": datetime.now(UTC).isoformat(), "split": split, "live": live,
+              "prefilter_mode": prefilter.PREFILTER_MODE,
               "fingerprint": fingerprint(cfg, side_hashes), "mention_side_files": side_hashes,
               "model": getattr(llm, "model", "fake (abstains)"), "labels_total": len(all_labels),
               "split_counts": dict(Counter(side.values())), "split_conflicts": conflicts,
@@ -613,6 +628,12 @@ def format_report(report: dict) -> str:
                                                                               "score")]
             cells.append(f"{_rate(v['score']['off_by_2_plus_rate'], v['score']['n']):>16}")
             lines.append(f"  {group:<27} {v['n']:>6}  " + "  ".join(cells))
+    pf = m.get("prefilter")
+    if pf:
+        lines.append(f"\n  Noise pre-filter ({report.get('prefilter_mode', '?')}): flags {pf['flagged']} items; "
+                     f"precision {_rate(pf['precision'], pf['precision_n'])}, "
+                     f"recall {_rate(pf['recall'], pf['recall_n'])}; relevant items flagged "
+                     f"{len(pf['relevant_flagged'])} (n={pf['flagged']})")
     det = m.get("extraction_detector")
     if det and det["n"]:
         lines.append("\n  Junk detector vs Bad extraction flags: "

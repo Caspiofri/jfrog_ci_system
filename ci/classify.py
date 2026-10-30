@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from ci import config as ci_config
 from ci import mentions as side_mentions
+from ci import prefilter
 from ci.llm import JsonLLM, LLMError
 from ci.packet import INDUSTRY, NON_COMPETITOR
 from config.settings import OUTPUT_DIR
@@ -43,6 +44,7 @@ PRODUCT = "Product & Features"
 RUNS_DIR = OUTPUT_DIR / "runs"
 BATCH_SIZE = 10
 LLM_TEXT_CHARS = 1500  # of each item's text shown to the model
+PREFILTER_CONFIDENCE = 0.9  # a stock-chatter title or a review site, with no event word anywhere
 LOW_CONFIDENCE = 0.2  # given when the LLM answer for an item is missing or invalid
 RULES_CONFIDENCE = 0.85  # competitor in the title or a first-party source, and one category keyword match
 TITLE_WEIGHT = 3  # a title mention counts as this many text mentions when comparing competitors
@@ -98,7 +100,8 @@ CATEGORY_DEFINITIONS = {
     "Leadership & Org": "executive hires and departures, layoffs, reorganizations",
 }
 
-Method = Literal["rules", "llm", "fallback"]  # fallback: the LLM answer for this item was unusable
+# fallback: the LLM answer for this item was unusable; prefilter: noise by ci.prefilter, no LLM call
+Method = Literal["rules", "llm", "fallback", "prefilter"]
 
 
 class Classification(BaseModel):
@@ -115,6 +118,7 @@ class Classification(BaseModel):
     competitor_confirmed: bool = True
     needs_review: bool = False
     review_reason: str = ""
+    shadow_prefilter: str = ""  # what ci.prefilter would decide (its reason), recorded in shadow mode
 
 
 MIN_NAME_CHARS = 4  # a name or key shorter than this ("AWS") would match every story about the company
@@ -252,9 +256,12 @@ def title_hint(title: str) -> str | None:
 
 class Classifier:
     def __init__(self, llm: JsonLLM, cfg: ci_config.CIConfig | None = None, batch_size: int = BATCH_SIZE,
-                 runs_dir: Path | None = RUNS_DIR):
+                 runs_dir: Path | None = RUNS_DIR, prefilter_mode: str | None = None):
         self.llm = llm
         self.runs_dir = runs_dir  # where <run_id>.mentions.json side files are read from; None to skip
+        self.prefilter_mode = prefilter_mode or prefilter.PREFILTER_MODE
+        if self.prefilter_mode not in prefilter.MODES:
+            raise ValueError(f"prefilter_mode must be one of {prefilter.MODES}")
         self.cfg = cfg or ci_config.load()
         self.batch_size = batch_size
         tracked = [c for c in self.cfg.competitors if c.key != INDUSTRY]
@@ -464,7 +471,16 @@ Items (JSON):
             tagged.append(item)
         out: dict[str, Classification] = {}
         ambiguous, why = [], {}
+        flagged = {it["id"]: r for it in items if (r := prefilter.check(it, content_text(it)))}
+        for item in items:  # mode "on": stock chatter and review sites are noise without the model
+            if self.prefilter_mode == "on" and item["id"] in flagged:
+                out[item["id"]] = Classification(
+                    id=item["id"], competitor=item.get("competitor") or NON_COMPETITOR, category=None, noise=True,
+                    mentions_jfrog=mentions_jfrog(item), confidence=PREFILTER_CONFIDENCE, method="prefilter",
+                    reason=f"prefilter: {flagged[item['id']]}")
         for item in tagged:
+            if item["id"] in out:
+                continue
             result, reason = self.apply_rules(item)
             if result is not None:
                 out[item["id"]] = result
@@ -476,7 +492,10 @@ Items (JSON):
                 out[c.id] = c
         for item_id, key in from_title.items():  # the title settles the competitor, whatever the LLM said
             c = out[item_id]
-            out[item_id] = c.model_copy(update={"competitor": key, "reason": f"title names {key}; {c.reason}"})
+            if c.method != "prefilter":
+                out[item_id] = c.model_copy(update={"competitor": key, "reason": f"title names {key}; {c.reason}"})
+        for item_id, reason in flagged.items():  # recorded in either mode; in shadow, it changed nothing else
+            out[item_id] = out[item_id].model_copy(update={"shadow_prefilter": reason})
         return [out[item["id"]] for item in items]
 
 
