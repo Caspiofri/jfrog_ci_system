@@ -167,10 +167,20 @@ def test_real_change_emits_a_reviewed_changes_item_with_a_diff(env):
     store.close()
 
 
-def test_cosmetic_change_calls_the_llm_but_emits_no_item(env):
+def test_a_date_edited_in_the_footer_element_is_stripped_so_the_hash_is_unchanged(env):
+    site, llm, go, _ = env
+    go(T1)
+    site.pages[PRICING_URL] = html("pricing_footer_tag_edit")
+    assert html("pricing_footer_tag_edit") != html("pricing_v1")
+    calls = len(llm.calls)
+    res = go(T2)
+    assert len(llm.calls) == calls and statuses(res)["pricing"] == "unchanged" and res.items == []
+
+
+def test_cosmetic_change_in_the_article_calls_the_llm_but_emits_no_item(env):
     site, llm, go, tmp = env
     go(T1)
-    site.pages[PRICING_URL] = html("pricing_footer_edit")
+    site.pages[PRICING_URL] = html("pricing_article_date_edit")
     calls = len(llm.calls)
     res = go(T2)
     assert len(llm.calls) == calls + 1  # the hash differs, so the page is re-extracted
@@ -191,7 +201,7 @@ def test_cosmetic_change_calls_the_llm_but_emits_no_item(env):
 def test_formatting_only_difference_in_the_extracted_value_is_not_a_change(env):
     site, _, go, _ = env
     go(T1)
-    site.pages[PRICING_URL] = html("pricing_footer_edit")
+    site.pages[PRICING_URL] = html("pricing_article_date_edit")
 
     def reformatted(prompt, schema):
         out = answer(prompt, schema)
@@ -252,7 +262,7 @@ def test_every_page_failing_marks_the_run_failed(env):
 
 def test_snapshot_retention_through_runs(env):
     site, _, go, tmp = env
-    versions = ["pricing_v1", "pricing_price_edit", "pricing_footer_edit", "pricing_v1"]
+    versions = ["pricing_v1", "pricing_price_edit", "pricing_article_date_edit", "pricing_v1"]
     for i, name in enumerate(versions):
         site.pages[PRICING_URL] = html(name)
         go(T1 + timedelta(hours=i), keep=2)
