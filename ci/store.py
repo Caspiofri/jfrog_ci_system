@@ -1,7 +1,7 @@
 """The CI store (PRD D6): data/ci/ci.sqlite, one file for runs, items and the model output per item.
 
 This is the first slice of the store in the events/freshness plan (1.10): runs, items, sightings, classifications,
-rankings, rejections, settings and skips. Events, routing and analyst actions come later.
+rankings, rejections, insights, settings and skips. Events, routing and analyst actions come later.
 
 - An item's discovered_at is the started_at of the earliest run that saw it. A later sighting never moves it, and an
   older run imported later moves it back, so a re-collected item never looks new again.
@@ -90,6 +90,17 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,            -- autonomy_level (D34): strict | balanced | relaxed
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS insights (  -- Brief insights (ci.insights); every generation is kept, the latest is shown
+    brief_date TEXT NOT NULL,        -- Israel date of the Brief
+    generated_at TEXT NOT NULL,
+    trigger TEXT NOT NULL,           -- daily | refresh (D37: after analyst approvals)
+    level TEXT NOT NULL,
+    status TEXT NOT NULL,            -- ok | partial | none | failed
+    fingerprint TEXT NOT NULL,
+    model TEXT NOT NULL,
+    data TEXT NOT NULL,
+    PRIMARY KEY (brief_date, generated_at)
 );
 CREATE TABLE IF NOT EXISTS skips (
     item_id TEXT NOT NULL,
@@ -215,6 +226,25 @@ class Store:
         for item_id, stage, reason in self._db.execute("SELECT item_id, stage, reason FROM rejections ORDER BY rowid"):
             out.setdefault(item_id, []).append(f"{stage}: {reason}")
         return out
+
+    # ---- insights ------------------------------------------------------------------------------------------------
+
+    def save_insights(self, brief_date: str, result: dict) -> None:
+        with self._db:
+            self._db.execute("INSERT INTO insights VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                             (brief_date, result["generated_at"], result["trigger"], result["level"],
+                              result["status"], result["fingerprint"], result["model"],
+                              json.dumps(result, ensure_ascii=False)))
+
+    def latest_insights(self, brief_date: str) -> dict | None:
+        row = self._db.execute("SELECT data FROM insights WHERE brief_date = ? ORDER BY generated_at DESC LIMIT 1",
+                               (brief_date,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def insights_history(self, brief_date: str) -> list[dict]:
+        rows = self._db.execute("SELECT generated_at, trigger, level, status FROM insights WHERE brief_date = ?"
+                                " ORDER BY generated_at", (brief_date,))
+        return [dict(r) for r in rows]
 
     # ---- settings ------------------------------------------------------------------------------------------------
 
