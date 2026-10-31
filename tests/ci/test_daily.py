@@ -225,3 +225,17 @@ def test_invalid_model_output_is_rejected_logged_and_sent_to_review(paths, caplo
     assert out[A["id"]]["ranking"]["needs_review"]
     assert any(r.startswith("invalid output (classifier)") for r in out[A["id"]]["ranking"]["review_reasons"])
     assert res.report["funnel"]["totals"]["rejected"] >= 1
+
+
+def test_the_fetch_status_reaches_the_store_and_the_item_payload(paths):
+    """D39: a daily run stores why an item's text is missing, and the API shows it as the text basis reason.
+    (The 31 Oct 13:45Z run predates a78fd35, so its items say not_recorded; this pins the path end to end.)"""
+    from ci.api import service as svc
+
+    blocked = {**row("https://thehackernews.com/x", "Teaser only story", run_id="20261101T0400Z-bbbbbb"),
+               "fetch_status": "cloudflare_challenge", "fetch_http_status": 403}
+    assert run(paths, collect=fake_collect([blocked])).status == "ok"
+    with Store(paths["store_path"]) as s:
+        raw = json.loads(s.item(blocked["id"])["raw"])
+    assert (raw["fetch_status"], raw["fetch_http_status"]) == ("cloudflare_challenge", 403)
+    assert svc.text_basis(raw)["reason"] == "cloudflare_challenge"
