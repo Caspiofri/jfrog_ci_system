@@ -5,8 +5,10 @@ Not wired into the daily run yet (D37: it waits for Ofri's expected-insights fil
 Inputs and rules, all enforced in code:
 - Only items **published** at the current autonomy level (ci.route) feed insights, so an insight never rests on an
   unreviewed item. An analyst approval can add held items; "Refresh insights" regenerates with them (D37).
-- The window is the 7 days of publication up to the anchor, widened to 14 when it holds fewer than MIN_STORIES
-  stories. The window used is stated on every insight.
+- The window is the items published in the 7 days up to the anchor (14 when that holds fewer than MIN_STORIES
+  stories) OR discovered since the previous Brief, whatever their publication date, so a late discovery (D31: the
+  firewall changelog, published Oct 20, found Oct 30) still reaches the insights. The window is stated on every
+  insight.
 - Items are grouped into **stories** with the same rule as event linking (D33): best similarity to any member of a
   story >= 0.82 on the dedupe embedding, richer items first, github_releases alone. An insight must cite >= 2 stories,
   so near-copies of one story never look like a pattern.
@@ -127,9 +129,23 @@ def _when(item: dict) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
-def in_window(items: list[dict], anchor: datetime, days: int) -> list[dict]:
+def _discovered(item: dict) -> datetime | None:
+    value = item.get("discovered_at")
+    if not value:
+        return None
+    dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
+def in_window(items: list[dict], anchor: datetime, days: int, prev_anchor: datetime | None = None) -> list[dict]:
+    """Published in (anchor - days, anchor], or discovered in (prev_anchor, anchor] whatever the publication date."""
     start = anchor - timedelta(days=days)
-    return [it for it in items if start < _when(it) <= anchor]
+
+    def late(it: dict) -> bool:
+        found = _discovered(it)
+        return prev_anchor is not None and found is not None and prev_anchor < found <= anchor
+
+    return [it for it in items if start < _when(it) <= anchor or late(it)]
 
 
 # ---- stories -----------------------------------------------------------------------------------------------------
@@ -304,18 +320,23 @@ def check(raw: dict, by_id: dict[str, dict], story_of: dict[str, str]) -> tuple[
 
 # ---- entry point -------------------------------------------------------------------------------------------------
 
-def generate(items: list[dict], llm: JsonLLM, embed_fn: EmbedFn, *, anchor: datetime, level: str = route.DEFAULT_LEVEL,
-             trigger: str = "daily", now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> Result:
-    """Insights over published items (see published()), as of the anchor (the Brief's daily run start)."""
+def generate(items: list[dict], llm: JsonLLM, embed_fn: EmbedFn, *, anchor: datetime,
+             prev_anchor: datetime | None = None, level: str = route.DEFAULT_LEVEL, trigger: str = "daily",
+             now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> Result:
+    """Insights over published items (see published()), as of the anchor (the Brief's daily run start); prev_anchor
+    is the previous Brief's anchor (None for the first Brief: no late-discovery extension)."""
     days = WINDOW_DAYS
-    win_items = in_window(items, anchor, days)
+    win_items = in_window(items, anchor, days, prev_anchor)
     story_of = stories(win_items, embed_fn)
     if len(set(story_of.values())) < MIN_STORIES:
         days = WIDE_WINDOW_DAYS
-        win_items = in_window(items, anchor, days)
+        win_items = in_window(items, anchor, days, prev_anchor)
         story_of = stories(win_items, embed_fn)
-    window = {"from": (anchor - timedelta(days=days)).date().isoformat(), "to": anchor.date().isoformat(),
-              "days": days, "items": len(win_items), "stories": len(set(story_of.values()))}
+    start = anchor - timedelta(days=days)
+    late = [it["item_id"] for it in win_items if not start < _when(it) <= anchor]
+    window = {"from": start.date().isoformat(), "to": anchor.date().isoformat(), "days": days,
+              "discovered_since": prev_anchor.isoformat() if prev_anchor else None, "late_items": late,
+              "items": len(win_items), "stories": len(set(story_of.values()))}
     groups = candidate_groups(win_items, story_of)
     res = Result(status="none", window=window, candidates=groups, input_item_ids=[it["item_id"] for it in win_items],
                  level=level, trigger=trigger, model=getattr(llm, "model", type(llm).__name__),

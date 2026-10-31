@@ -1,6 +1,6 @@
 """Daily run: collect, store every kept item with its discovery time, classify and rank what is new, store the output.
 
-    python -m ci.daily                     the scheduled run (cron, 06:00 Asia/Jerusalem, scripts/ci_daily_cron.sh)
+    python -m ci.daily                     the scheduled run (cron, 06:00 Asia/Jerusalem, ci/daily_cron.sh)
     python -m ci.daily --from-run RUN_ID   no collection: import an existing run from output/runs/; its items keep
                                            that run's started_at as their discovery time
 

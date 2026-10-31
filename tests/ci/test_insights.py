@@ -163,3 +163,17 @@ def test_each_generation_is_stored_and_the_latest_is_shown(tmp_path):
 
 def test_fingerprint_is_stable():
     assert insights.fingerprint() == insights.fingerprint() and len(insights.fingerprint()) == 12
+
+
+def test_a_late_discovery_enters_the_window_whatever_its_publication_date():
+    """D31: the firewall changelog was published Oct 20 and found Oct 30; it must reach the insights."""
+    late = {**it("chg", "Changelog firewall public preview", "github", "Security", days_ago=30),
+            "discovered_at": (ANCHOR - timedelta(hours=2)).isoformat()}
+    stale = {**it("stl", "Stale older story", "github", "Security", days_ago=30),
+             "discovered_at": (ANCHOR - timedelta(days=3)).isoformat()}  # found before the previous Brief
+    prev = ANCHOR - timedelta(hours=24)
+    res, _ = gen({"insights": []}, items=[*ITEMS, late, stale], prev_anchor=prev)
+    assert "chg" in res.input_item_ids and "stl" not in res.input_item_ids
+    assert res.window["late_items"] == ["chg"] and res.window["discovered_since"] == prev.isoformat()
+    res, _ = gen({"insights": []}, items=[*ITEMS, late])  # first Brief: no previous anchor, no extension
+    assert "chg" not in res.input_item_ids
