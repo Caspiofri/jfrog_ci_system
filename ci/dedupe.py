@@ -1,5 +1,6 @@
 """Dedupe for the CI run: normalized-URL matching (sqlite seen-URL store) and embedding similarity (ChromaDB)."""
 import logging
+import re
 import sqlite3
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -13,6 +14,11 @@ SIMILARITY_THRESHOLD = 0.82  # cosine similarity; chroma's cosine distance = 1 -
 MAX_DISTANCE = 1 - SIMILARITY_THRESHOLD
 EMBED_TEXT_CHARS = 300
 COLLECTION = "ci_items"
+# D38 CVE veto: two items that both name CVE IDs with none in common are different events (and never duplicates of
+# each other), however similar the text. Items naming no CVE behave as before. The IDs are read from the title and the
+# whole stored text (the 300-char embedding text often misses them).
+CVE_RE = re.compile(r"\bCVE-\d{4}-\d{4,}\b", re.IGNORECASE)
+HISTORY_CANDIDATES = 5  # nearest earlier items checked, so a vetoed nearest one doesn't hide an allowed match
 _DROP_PARAMS = {"ref", "source"}  # plus every utm_* param
 
 # which copy of a story is kept: full text first; junk (the fetched page was not the article) holds less than a
@@ -87,6 +93,20 @@ def url_dedupe(packets: list[Packet], seen: SeenUrls | None) -> tuple[list[Packe
     return kept, dropped
 
 
+def cve_ids(text: str) -> frozenset[str]:
+    return frozenset(m.upper() for m in CVE_RE.findall(text or ""))
+
+
+def packet_cves(p: Packet) -> frozenset[str]:
+    """CVE IDs in the title and the stored text (the teaser when the page text is junk, as content_text does)."""
+    return cve_ids(f"{p.title}\n{p.teaser if p.text_status == 'junk' else p.text}")
+
+
+def cve_veto(a: frozenset[str], b: frozenset[str]) -> bool:
+    """True when both name CVE IDs and share none: never the same event (D38)."""
+    return bool(a) and bool(b) and not (a & b)
+
+
 def embed_text(p: Packet) -> str:
     return f"{p.title}. {p.text[:EMBED_TEXT_CHARS]}"
 
@@ -125,17 +145,40 @@ class EmbeddingDeduper:
         self._vectors.update(zip((p.id for p in packets), emb, strict=True))
         return emb
 
-    def _history_matches(self, emb: np.ndarray) -> list[tuple[str, str, float] | None]:
-        """Per packet: (earlier id, earlier run_id, similarity) of the closest earlier item within threshold."""
+    def _history_matches(self, emb: np.ndarray, cves: list[frozenset[str]]) -> list[tuple[str, str, float] | None]:
+        """Per packet: (earlier id, earlier run_id, similarity) of the closest earlier item within threshold that the
+        CVE veto allows. An earlier item stored before D38 has no "cves" metadata; its IDs are then read from the
+        stored document (title + 300 chars), so run backfill_cves once to give old history the full-text IDs."""
         col = self._collection()
-        if col.count() == 0:
+        count = col.count()
+        if count == 0:
             return [None] * len(emb)
-        res = col.query(query_embeddings=emb.tolist(), n_results=1, include=["distances", "metadatas"])
+        res = col.query(query_embeddings=emb.tolist(), n_results=min(HISTORY_CANDIDATES, count),
+                        include=["distances", "metadatas", "documents"])
         out = []
-        for ids, dists, metas in zip(res["ids"], res["distances"], res["metadatas"], strict=True):
-            hit = ids and dists[0] <= 1 - self._threshold
-            out.append((ids[0], metas[0].get("run_id", "?"), 1 - dists[0]) if hit else None)
+        for mine, ids, dists, metas, docs in zip(cves, res["ids"], res["distances"], res["metadatas"],
+                                                 res["documents"], strict=True):
+            hit = None
+            for old_id, dist, meta, doc in zip(ids, dists, metas, docs, strict=True):
+                if dist > 1 - self._threshold:
+                    break
+                theirs = frozenset(filter(None, meta["cves"].split(","))) if "cves" in meta else cve_ids(doc)
+                if cve_veto(mine, theirs):
+                    continue
+                hit = (old_id, meta.get("run_id", "?"), 1 - dist)
+                break
+            out.append(hit)
         return out
+
+    def backfill_cves(self, cves_by_id: dict[str, frozenset[str]]) -> int:
+        """Set the "cves" metadata of earlier items (stored before D38) from their full text; returns how many."""
+        col = self._collection()
+        known = col.get(ids=list(cves_by_id), include=["metadatas"])
+        if not known["ids"]:
+            return 0
+        col.update(ids=known["ids"], metadatas=[{**m, "cves": ",".join(sorted(cves_by_id[i]))}
+                                                for i, m in zip(known["ids"], known["metadatas"], strict=True)])
+        return len(known["ids"])
 
     def dedupe(self, packets: list[Packet], use_history: bool = True) -> tuple[list[Packet], list[Drop]]:
         """History first (so a repeat of an old story never survives through its in-run twin), then within the run,
@@ -145,8 +188,9 @@ class EmbeddingDeduper:
         order = sorted(range(len(packets)), key=lambda i: richness(packets[i]))
         packets = [packets[i] for i in order]
         emb = self._embed(packets)
+        cves = [packet_cves(p) for p in packets]
         dropped: list[Drop] = []
-        history = self._history_matches(emb) if use_history else [None] * len(packets)
+        history = self._history_matches(emb, cves) if use_history else [None] * len(packets)
         kept_idx: list[int] = []
         for i, p in enumerate(packets):
             if history[i]:
@@ -155,9 +199,12 @@ class EmbeddingDeduper:
                 continue
             if kept_idx:
                 sims = emb[kept_idx] @ emb[i]
-                j = int(np.argmax(sims))
-                if sims[j] >= self._threshold:
-                    dropped.append((p, f"similar ({sims[j]:.2f}) to item in this run", packets[kept_idx[j]].id))
+                # the most similar kept item the CVE veto allows (D38)
+                match = next((j for j in np.argsort(-sims) if sims[j] >= self._threshold
+                              and not cve_veto(cves[i], cves[kept_idx[j]])), None)
+                if match is not None:
+                    dropped.append((p, f"similar ({sims[match]:.2f}) to item in this run",
+                                    packets[kept_idx[match]].id))
                     continue
             kept_idx.append(i)
         return [packets[i] for i in kept_idx], dropped
@@ -173,7 +220,8 @@ class EmbeddingDeduper:
             ids=[p.id for p in packets],
             embeddings=[self._vectors[p.id].tolist() for p in packets],
             documents=[embed_text(p) for p in packets],
-            metadatas=[{"run_id": p.run_id, "url": p.url, "title": p.title} for p in packets],
+            metadatas=[{"run_id": p.run_id, "url": p.url, "title": p.title, "cves": ",".join(sorted(packet_cves(p)))}
+                       for p in packets],
         )
 
 

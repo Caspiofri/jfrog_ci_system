@@ -10,8 +10,8 @@ Inputs and rules, all enforced in code:
   firewall changelog, published Oct 20, found Oct 30) still reaches the insights. The window is stated on every
   insight.
 - Items are grouped into **stories** with the same rule as event linking (D33): best similarity to any member of a
-  story >= 0.82 on the dedupe embedding, richer items first, github_releases alone. An insight must cite >= 2 stories,
-  so near-copies of one story never look like a pattern.
+  story >= 0.82 on the dedupe embedding, richer items first, github_releases alone, plus the CVE veto (D38). An
+  insight must cite >= 2 stories, so near-copies of one story never look like a pattern.
 - Candidates are pre-grouped in code, so the model writes but does not search blindly; groups under 2 stories are
   dropped before the call:
     competitor_momentum  one tracked competitor
@@ -37,7 +37,15 @@ import numpy as np
 
 from ci import route
 from ci.classify import content_text
-from ci.dedupe import EMBED_TEXT_CHARS, SIMILARITY_THRESHOLD, STATUS_RANK, UNKNOWN_STATUS_RANK, EmbedFn
+from ci.dedupe import (
+    EMBED_TEXT_CHARS,
+    SIMILARITY_THRESHOLD,
+    STATUS_RANK,
+    UNKNOWN_STATUS_RANK,
+    EmbedFn,
+    cve_ids,
+    cve_veto,
+)
 from ci.llm import JsonLLM
 from ci.packet import INDUSTRY, NON_COMPETITOR
 from ci.pipeline import NO_EMBEDDING_DEDUPE
@@ -154,9 +162,11 @@ def _richness(item: dict) -> tuple[int, int]:
     return (STATUS_RANK.get(item.get("text_status"), UNKNOWN_STATUS_RANK), 0 if item.get("url_resolved", True) else 1)
 
 
-def stories(items: list[dict], embed_fn: EmbedFn, threshold: float = SIMILARITY_THRESHOLD) -> dict[str, str]:
+def stories(items: list[dict], embed_fn: EmbedFn, threshold: float = SIMILARITY_THRESHOLD,
+            veto: bool = True) -> dict[str, str]:
     """item_id -> story id (the id of the story's first, richest item). D33's rule: an item joins the story with the
-    highest best-member similarity at or above the threshold; stories never merge."""
+    highest best-member similarity at or above the threshold; stories never merge. D38: an item never joins a story
+    holding a member that names CVE IDs it shares none of (both must name some)."""
     linkable = [it for it in items if it["source"] not in NO_EMBEDDING_DEDUPE]
     out = {it["item_id"]: it["item_id"] for it in items if it["source"] in NO_EMBEDDING_DEDUPE}
     if not linkable:
@@ -165,10 +175,13 @@ def stories(items: list[dict], embed_fn: EmbedFn, threshold: float = SIMILARITY_
     texts = [f"{linkable[i]['title']}. {(linkable[i].get('text') or '')[:EMBED_TEXT_CHARS]}" for i in order]
     emb = np.array(embed_fn(texts), dtype=float)
     emb /= np.maximum(np.linalg.norm(emb, axis=1, keepdims=True), 1e-9)
+    cves = [cve_ids(f"{linkable[i]['title']}\n{linkable[i].get('text') or ''}") for i in order]
     groups: list[list[int]] = []
     for i in range(len(order)):
         best, best_sim = None, threshold
         for g, members in enumerate(groups):
+            if veto and any(cve_veto(cves[i], cves[m]) for m in members):
+                continue
             sim = float(np.max(emb[members] @ emb[i]))
             if sim >= best_sim and (best is None or sim > best_sim):
                 best, best_sim = g, sim
