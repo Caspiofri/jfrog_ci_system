@@ -160,6 +160,7 @@ class Snapshot:
         anchor = parse_ts(anchors[i][1]["started_at"])
         prev = parse_ts(anchors[i - 1][1]["started_at"]) if i else anchor - timedelta(hours=24)
         return {"date": date, "anchor": anchor, "prev_anchor": prev, "anchor_run_id": anchors[i][1]["run_id"],
+                "anchor_kind": anchors[i][1]["kind"],  # daily | import (a backfill Brief)
                 "prev_date": dates[i - 1] if i else None}
 
     def brief_ids(self, w: dict, level: str | None = None) -> list[str]:

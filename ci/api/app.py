@@ -214,7 +214,8 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             rows = []
             for date, run in reversed(s.anchors()):
                 c = brief_counts(s, s.window(date))
-                rows.append({"date": date, "anchor_run_id": run["run_id"], "items": c["items"],
+                rows.append({"date": date, "anchor_run_id": run["run_id"], "anchor_kind": run["kind"],
+                             "items": c["items"],
                              "found_late": c["found_late"], "awaiting_review": c["awaiting_review"]})
         return ok(page(rows, limit, offset))
 
@@ -248,7 +249,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 ins = {"status": "not_generated", "items": [], "enabled": insights_enabled()}
             body = {"date": date, "status": "ok",
                     "window": {"prev_anchor": svc.iso(w["prev_anchor"]), "anchor": svc.iso(w["anchor"]),
-                               "anchor_run_id": w["anchor_run_id"],
+                               "anchor_run_id": w["anchor_run_id"], "anchor_kind": w["anchor_kind"],
                                "hours": round((w["anchor"] - w["prev_anchor"]).total_seconds() / 3600, 2),
                                "tz": "Asia/Jerusalem"},
                     "counts": counts, "kpis": kpis, "insights": ins, "intensity": intensity(s, w),

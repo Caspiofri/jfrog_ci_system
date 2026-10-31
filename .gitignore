@@ -33,6 +33,7 @@ evals/ranking_golden.json
 .claude/
 CLAUDE.md
 docs/specs/
+docs/design/
 docs/plans/
 docs/superpowers/
 PRD*.md

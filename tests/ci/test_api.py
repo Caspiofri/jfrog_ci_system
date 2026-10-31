@@ -102,6 +102,7 @@ def test_brief_window_badges_order_and_published_only(env):
     c, _, _ = env
     b = c.get("/api/v1/brief", params={"date": "2026-10-30"}).json()
     assert b["window"]["anchor"] == "2026-10-30T13:12:00Z" and b["window"]["prev_anchor"] == "2026-10-29T13:12:00Z"
+    assert b["window"]["anchor_kind"] == "import"  # the backfill Brief: the UI labels it and hides "Found late"
     items = b["items"]["items"]
     assert ids(items) == ["pub1", "late"]  # uv, uv4 (unvetted) and jf held at strict; noise dropped; test split out
     assert [x["badge"] for x in items] == ["new", "late"]
@@ -117,6 +118,7 @@ def test_brief_since_previous_brief_and_kpis_against_it(env):
     b = c.get("/api/v1/brief").json()
     assert b["date"] == "2026-10-31"
     assert b["window"]["prev_anchor"] == "2026-10-30T13:12:00Z" and b["window"]["hours"] == 14.8
+    assert b["window"]["anchor_kind"] == "daily"
     assert ids(b["items"]["items"]) == ["new2"]
     assert {k["key"]: (k["value"], k["prev"]) for k in b["kpis"]}["items"] == (1, 2)
 
@@ -124,7 +126,8 @@ def test_brief_since_previous_brief_and_kpis_against_it(env):
 def test_brief_for_a_day_without_a_run(env):
     c, _, _ = env
     assert c.get("/api/v1/brief", params={"date": "2026-10-25"}).json()["status"] == "missing"
-    assert [r["date"] for r in c.get("/api/v1/briefs").json()["items"]] == ["2026-10-31", "2026-10-30"]
+    rows = c.get("/api/v1/briefs").json()["items"]
+    assert [(r["date"], r["anchor_kind"]) for r in rows] == [("2026-10-31", "daily"), ("2026-10-30", "import")]
 
 
 def test_no_article_text_leaves_the_api(env):
