@@ -177,3 +177,13 @@ def test_a_late_discovery_enters_the_window_whatever_its_publication_date():
     assert res.window["late_items"] == ["chg"] and res.window["discovered_since"] == prev.isoformat()
     res, _ = gen({"insights": []}, items=[*ITEMS, late])  # first Brief: no previous anchor, no extension
     assert "chg" not in res.input_item_ids
+
+
+def test_the_schema_has_no_item_id_enums_so_a_large_window_is_accepted():
+    """D24: Gemini answered 400 INVALID_ARGUMENT to a 228-id enum (Oct 31); ids are checked in code instead."""
+    claim = insights.schema([f"id{n}" for n in range(300)])["properties"]["insights"]["items"]["properties"][
+        "claims"]["items"]["properties"]
+    assert "enum" not in claim["item_ids"]["items"] and "enum" not in claim["quote_item_id"]
+    bad = claim("x", ["fw1", "nope0000"], "blocks malicious npm packages", "fw1")
+    res, _ = gen({"insights": [{**MOMENTUM, "claims": [bad]}]})
+    assert res.insights == [] and "unknown item ids" in res.rejected[0]["reason"]

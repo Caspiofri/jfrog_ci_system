@@ -231,11 +231,13 @@ def candidate_groups(items: list[dict], story_of: dict[str, str]) -> list[dict]:
 # ---- the call ----------------------------------------------------------------------------------------------------
 
 def schema(item_ids: list[str]) -> dict:
+    """Item ids are plain strings, not enums: Gemini rejects a schema with hundreds of enum values (400
+    INVALID_ARGUMENT on the 228-item, 14-day window, Oct 31). check() rejects any insight citing an unknown id."""
     claim = {"type": "object", "properties": {
         "text": {"type": "string"},
-        "item_ids": {"type": "array", "items": {"type": "string", "enum": item_ids}},
+        "item_ids": {"type": "array", "items": {"type": "string"}},
         "quote": {"type": "string"},
-        "quote_item_id": {"type": "string", "enum": item_ids},
+        "quote_item_id": {"type": "string"},
         "jfrog_quote": {"type": "string"}},
         "required": ["text", "item_ids", "quote", "quote_item_id", "jfrog_quote"]}
     return {"type": "object", "properties": {"insights": {"type": "array", "items": {"type": "object", "properties": {
