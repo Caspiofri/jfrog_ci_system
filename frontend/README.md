@@ -28,3 +28,10 @@ For `npm run build && npm start`, set `CI_API_URL` at **build** time: Next.js wr
   `innerHTML`, and links open only for `http(s)` URLs.
 - Every API call has loading, empty and error states (`src/components/ci.tsx`, `Async`).
 - Fields the UI needs and the API lacks go to `BACKEND_REQUESTS.md`.
+
+## Roadmap screenshots
+
+The Roadmap tab (`/roadmap`) shows concept screens from the design prototype, each labeled "Concept, sample data".
+Add each screenshot as `public/roadmap/<slug>.png`; until then the card shows a placeholder naming the file.
+Slugs: `market-view`, `topics`, `emerging`, `reactions`, `deal-extraction`, `strength-radar`, `convergence`,
+`team-chips`, `battlefield`.
