@@ -159,8 +159,8 @@ export function Async<T>({ data, error, isLoading, retry, empty, isEmpty, rows, 
 }
 
 /** Horizontal bars (prototype .hb). */
-export function HBars({ rows, color = "var(--bar)" }: { rows: { label: string; value: number; color?: string; title?: string }[]; color?: string }) {
-  const max = Math.max(1, ...rows.map((r) => r.value));
+export function HBars({ rows, color = "var(--bar)", max: fixedMax }: { rows: { label: string; value: number; color?: string; title?: string }[]; color?: string; max?: number }) {
+  const max = fixedMax ?? Math.max(1, ...rows.map((r) => r.value));
   return (
     <div>
       {rows.map((r) => (
