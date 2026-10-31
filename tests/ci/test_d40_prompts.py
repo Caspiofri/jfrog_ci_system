@@ -24,10 +24,35 @@ def test_a_security_products_launch_is_left_to_the_llm():
     assert rule_category("Critical CVE patched in GitLab")[0] == "Security"
 
 
-def test_category_definitions_state_the_security_vs_product_line():
-    assert "central value is detecting, preventing, analyzing or reducing security risk" in \
-        CATEGORY_DEFINITIONS["Security"]
-    assert "without security as its central value" in CATEGORY_DEFINITIONS["Product & Features"]
+def test_category_definitions_read_exactly_as_approved_in_d40():
+    assert CATEGORY_DEFINITIONS["Security"] == \
+        "the development's central value is detecting, preventing, analyzing or reducing security risk"
+    assert CATEGORY_DEFINITIONS["Product & Features"] == \
+        "it improves product capabilities, infrastructure, compatibility, performance or interfaces, without " \
+        "security as its central value"
+
+
+def test_d41_category_rules_are_in_the_prompt_word_for_word():
+    p = prompt_of([item("a", "A story", "Text.")])
+    assert ("Pricing & Packaging: a change in price, what's included, tiers, seats or licensing is Pricing & "
+            "Packaging, even when the product is AI.") in p
+    assert ("AI & Agents vs Security: a product or capability for AI agents, MCP or models is AI & Agents, even when "
+            "its value is security. An attack on, or a vulnerability in, any tool, AI tools included, is "
+            "Security.") in p
+    assert "even when launched or released" not in p  # the unapproved D40 addition is gone
+
+
+def test_a_packaging_change_named_by_one_categorys_keywords_goes_to_the_llm():
+    category, why = rule_category("GitHub Enterprise now includes access to GitHub Copilot")
+    assert category is None and "D41" in why  # was ruled AI & Agents and skipped the Pricing review (D9)
+    assert rule_category("Copilot agents reach general availability")[0] is None  # several categories, as before
+    assert rule_category("New pricing for GitLab Premium")[0] == "Pricing & Packaging"
+
+
+def test_ranker_states_the_vulnerability_news_vs_explainer_line():
+    p = rank.Ranker.prompt([])
+    assert "news reporting a new vulnerability is 3" in p
+    assert "A third party's explainer or analysis of an already-published vulnerability is 2" in p
 
 
 def prompt_of(items):

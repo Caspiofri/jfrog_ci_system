@@ -158,6 +158,8 @@ scanning), Curation, and AI/MCP tooling. Score each item 1-5 on this rubric:
 The 2-vs-3 line (D40): 2 = content without an event (marketing, opinion, a listicle, a comparison or buyer's guide,
 commentary or research): it can reveal positioning, but nothing happened. 3 = a relevant event: something a
 competitor or the market actually did (a release, a feature, a partnership, a customer win, an incident).
+Vulnerabilities (D41): news reporting a new vulnerability is 3.
+A third party's explainer or analysis of an already-published vulnerability is 2 (commentary on someone else's event).
 
 Items judged noise are filtered out before this step and are never sent to you, so give every item below a score
 from 1 to 5; never answer "Noise". Score the content against the rubric only; code applies its own adjustments

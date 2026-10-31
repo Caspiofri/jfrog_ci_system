@@ -76,6 +76,16 @@ CATEGORY_PATTERNS = {
              r"introduc\w*|new feature|public preview|beta|adds|announces|changelog|deprecat\w*|sunset\w*|"
              r"v?\d+\.\d+(?:\.\d+)?",
 }
+# D41 category rules, word for word; they follow the definitions in the classifier prompt
+CATEGORY_RULES = [
+    "Pricing & Packaging: a change in price, what's included, tiers, seats or licensing is Pricing & Packaging, even "
+    "when the product is AI.",
+    "AI & Agents vs Security: a product or capability for AI agents, MCP or models is AI & Agents, even when its value "
+    "is security. An attack on, or a vulnerability in, any tool, AI tools included, is Security.",
+]
+# D41: a packaging word next to one category's keywords ("GitHub Enterprise now includes access to GitHub Copilot",
+# ruled AI & Agents, skipped the review D9 forces on Pricing): the rules leave it to the LLM and its D41 rule
+PACKAGING_RE = re.compile(r"\b(?:includes?|included|including access|seats?|tiers?|bundl\w*|add-ons?)\b", re.IGNORECASE)
 CATEGORY_RES = {c: re.compile(rf"\b(?:{p})\b", re.IGNORECASE) for c, p in CATEGORY_PATTERNS.items()}
 # D40: a launch/release title about a security product is Security or Product by its central value, which a keyword
 # can't tell: the rules leave it to the LLM (D24: "GitHub package firewall in public preview" was ruled Product)
@@ -95,15 +105,12 @@ ROUNDUP_RE = re.compile(r",\s+[^\W\d]")
 
 # Definitions the LLM works from (D11 categories, D10 scope, and the noise/none semantics of the labeling page)
 CATEGORY_DEFINITIONS = {
-    # D40: Security vs Product & Features is decided by the development's central value
-    "Product & Features": "improves product capabilities, infrastructure, compatibility, performance or interfaces "
-                          "(a new or changed product, feature, integration, release, GA/preview), without security "
-                          "as its central value",
+    # D40 wording, word for word (D41 reverted an unapproved addition)
+    "Product & Features": "it improves product capabilities, infrastructure, compatibility, performance or interfaces, "
+                          "without security as its central value",
     "Pricing & Packaging": "prices, plans, tiers, licensing, free-tier or bundling changes",
     "AI & Agents": "AI features, coding assistants, agents, MCP servers, LLM capabilities in the product",
-    "Security": "the development's central value is detecting, preventing, analyzing or reducing security risk: "
-                "vulnerabilities, CVEs, attacks, malicious packages, breaches, security research, and security "
-                "products or features (scanning, firewalls, secret detection) even when launched or released",
+    "Security": "the development's central value is detecting, preventing, analyzing or reducing security risk",
     "Funding/M&A/Partnerships": "funding rounds, acquisitions, mergers, IPOs, strategic partnerships",
     "Customers & Market": "customer wins, analyst reports, market share, surveys, adoption and market positioning",
     "Leadership & Org": "executive hires and departures, layoffs, reorganizations",
@@ -267,6 +274,8 @@ def rule_category(title: str) -> tuple[str | None, str]:
     hits = [c for c, rx in CATEGORY_RES.items() if rx.search(title)]
     if hits == [PRODUCT] and SECURITY_PRODUCT_RE.search(title):
         return None, "a security product's launch or release: Security vs Product is the LLM's call (D40)"
+    if len(hits) == 1 and hits[0] != "Pricing & Packaging" and PACKAGING_RE.search(title):
+        return None, "a packaging change (what's included, tiers, seats): Pricing & Packaging is the LLM's call (D41)"
     if len(hits) == 1:
         return hits[0], f"title keywords: {hits[0]}"
     if hits:
@@ -398,6 +407,7 @@ class Classifier:
         comps = "\n".join(f"- {c.key}: {c.name}" + (f" ({', '.join(c.aliases)})" if c.aliases else "")
                            for c in self.cfg.competitors if c.key != INDUSTRY)
         cats = "\n".join(f"- {c}: {d}" for c, d in CATEGORY_DEFINITIONS.items())
+        cats += "\n   Category rules:\n" + "\n".join(f"   - {r}" for r in CATEGORY_RULES)
         payload = [{"id": it["id"], "prefilled_competitor": it.get("competitor"), "source": it.get("source"),
                     "found_by": it.get("origin"), "publisher": it.get("publisher") or "",
                     "title": it.get("title") or "", "text": content_text(it)[:LLM_TEXT_CHARS],
