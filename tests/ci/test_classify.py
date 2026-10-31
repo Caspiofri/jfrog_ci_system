@@ -1,11 +1,17 @@
 """Classifier (D11) offline: rules settle clear items without the LLM, ambiguous ones go in id-keyed batches,
 and a bad LLM answer degrades to low confidence instead of crashing."""
-import json
-import re
 
 import pytest
 
-from ci.classify import CATEGORIES, LOW_CONFIDENCE, Classifier, aliases, mentions_jfrog, rule_category
+from ci.classify import (
+    CATEGORIES,
+    LOW_CONFIDENCE,
+    Classifier,
+    aliases,
+    mentions_jfrog,
+    read_delimited_items,
+    rule_category,
+)
 from ci.config import CIConfig, Competitor
 from ci.llm import FakeLLM, LLMError
 
@@ -133,7 +139,7 @@ def test_ambiguous_items_go_to_the_llm_once_per_batch():
 def test_prompt_is_valid_json_payload_with_truncated_text():
     llm = FakeLLM(_answer_all())
     Classifier(llm, CFG).classify([_item(1, "Hello", text="x" * 5000)])
-    payload = json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+    payload = read_delimited_items(llm.calls[0][0])
     assert payload[0]["id"] == "id1" and len(payload[0]["text"]) == 1500
 
 
@@ -279,10 +285,10 @@ def test_full_text_mentions_hint_reaches_the_llm():
     items = [_with_mentions(_item(1, "Top 5 SCA tools", competitor="industry"), {"aws": 3, "snyk": 1}),
              _item(2, "Another list", competitor="industry")]
     Classifier(llm, CFG).classify(items)
-    payload = json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+    payload = read_delimited_items(llm.calls[0][0])
     assert payload[0]["full_text_mentions"] == "aws×3, snyk×1"
     assert "full_text_mentions" not in payload[1]
-    assert "full_text_mentions" in llm.calls[0][0].split("Items (JSON)")[0]  # explained in the instructions
+    assert "full_text_mentions" in llm.calls[0][0].split("\nItems:\n")[0]  # explained in the instructions
 
 
 @pytest.mark.parametrize("title,text", [
@@ -356,7 +362,7 @@ def test_an_industry_item_whose_title_names_github_is_tagged_github():
     (c,) = Classifier(llm, GH_CFG, runs_dir=None).classify([item])
     assert c.competitor == "github" and c.reason.startswith("title names github")
     assert c.category == "Security" and c.method == "llm"  # category and noise still come from rules/LLM
-    payload = json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+    payload = read_delimited_items(llm.calls[0][0])
     assert payload[0]["prefilled_competitor"] == "github"
 
 
@@ -389,7 +395,7 @@ def test_a_title_named_competitor_can_be_settled_by_the_rules_too():
 
 
 def _payload(llm) -> list[dict]:
-    return json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+    return read_delimited_items(llm.calls[0][0])
 
 
 @pytest.mark.parametrize("title", [

@@ -1,10 +1,10 @@
+
 """Mentions backfill and its side file, offline: a fake fetch stands in for reader.fetch_text."""
 import json
-import re
 from datetime import UTC, datetime
 
 from ci.backfill_mentions import backfill
-from ci.classify import Classifier
+from ci.classify import Classifier, read_delimited_items
 from ci.config import CIConfig, Competitor
 from ci.llm import FakeLLM
 from ci.mentions import attach
@@ -64,7 +64,7 @@ def test_classifier_reads_the_side_file(tmp_path):
     item = _row(1, "Snyk patches critical vulnerability", "Snyk short text", competitor="snyk")
     (c,) = Classifier(llm, CFG, runs_dir=runs).classify([item])
     assert c.method == "fallback" and c.mentions_jfrog  # Sonatype dominates the full page -> LLM, not rules
-    payload = json.loads(re.search(r"Items \(JSON\):\n(.*)", llm.calls[0][0], re.S).group(1))
+    payload = read_delimited_items(llm.calls[0][0])
     assert payload[0]["full_text_mentions"] == "sonatype×6, snyk×1"
     (plain,) = Classifier(FakeLLM(), CFG, runs_dir=None).classify([item])  # no side file: stored text, rules
     assert plain.method == "rules" and not plain.mentions_jfrog
