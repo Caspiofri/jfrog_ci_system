@@ -20,6 +20,8 @@ The CI tool's web UI: Next.js + Tailwind + shadcn/ui + Recharts (PRD D3). Every 
    npm run dev -- -p 3011        # or: CI_API_URL=http://127.0.0.1:8010 npm run dev
    ```
 
+For `npm run build && npm start`, set `CI_API_URL` at **build** time: Next.js writes the rewrite into the build.
+
 ## Rules
 
 - API strings are untrusted (D32): rendered as React text only. ESLint fails on `dangerouslySetInnerHTML` and
