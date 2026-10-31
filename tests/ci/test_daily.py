@@ -55,6 +55,7 @@ def paths(tmp_path):
 
 def run(paths, **kw):
     kw.setdefault("llm", FakeLLM(answer))
+    kw.setdefault("sheet_path", paths["data_dir"] / "no-sheet.md")  # no lens unless a test gives a sheet
     return daily.run_daily(cfg=CFG, embed_fn=fake_embed, fingerprint="fp-test", **paths, **kw)
 
 

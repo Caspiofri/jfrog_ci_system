@@ -16,6 +16,11 @@ Every model answer and every final output is validated (ci.validate, D32): score
 category from the config lists, existing item ids. A rejection is logged with the item id and the reason, stored in
 the rejections table, and its item is routed to review.
 
+After ranking, the JFrog lens (ci.lens, D42) explains each non-noise item against the capability sheet, and, when
+the store setting insights_enabled is "true" (D37), the Brief's insights are generated for the run's day from the
+items published at the current level (ci.insights, with the sheet). Both record their own fingerprints in the report;
+the classifier and ranker fingerprint is unchanged by them.
+
 Exit codes: 0 ok; 1 failed (collection failed, the split file is missing, or a stage raised); 2 another collection
 run holds the lock; 3 finished, but some classifier or ranker batches fell back, outputs were rejected, or a history
 write failed.
@@ -28,11 +33,11 @@ import traceback
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ci import config as ci_config
-from ci import eval_golden, validate
+from ci import eval_golden, insights, lens, validate
 from ci.classify import Classifier
 from ci.dedupe import EmbeddingDeduper, SeenUrls
 from ci.llm import GeminiLLM, JsonLLM
@@ -170,7 +175,8 @@ class CountingLLM:
 def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = None, llm: JsonLLM | None = None,
               store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, data_dir: Path = CI_DATA_DIR,
               split_path: Path = SPLIT_PATH, collect: Callable[..., RunResult] = collect_run,
-              embed_fn=None, days: int | None = None, fingerprint: str | None = None) -> DailyResult:
+              embed_fn=None, days: int | None = None, fingerprint: str | None = None,
+              sheet_path: Path = lens.SHEET_PATH) -> DailyResult:
     cfg = cfg or ci_config.load()
     test_ids = held_out_ids(split_path)  # before any collection or LLM call
     errors: list[str] = []
@@ -213,6 +219,8 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
             classifications, ranked = validate.route_to_review(rejections, classifications, ranked)
             store.save_outputs(run_id, fp, classifications, ranked)
             store.save_rejections(run_id, rejections)
+            extra = explain_and_summarize(store, run_id, started_at, to_model, classifications, ranked, counting,
+                                          cfg, sheet_path, embed_fn, errors)
         except Exception as e:
             out = {"run_id": run_id, "kind": kind, "status": "failed", "error": f"{type(e).__name__}: {e}",
                    "traceback": traceback.format_exc()}
@@ -227,12 +235,67 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
         status = "degraded" if errors else "ok"
         out = {"run_id": run_id, "kind": kind, "status": status, "started_at": started_at,
                "finished_at": datetime.now(UTC).isoformat(), "fingerprint": fp, "model": counting.model,
-               "llm_calls": counting.calls, "errors": errors,
+               "llm_calls": counting.calls, "errors": errors, **extra,
                "rejections": [vars(r) for r in rejections],
                "funnel": funnel(rows, report, new, skips, to_model, classifications, ranked, rejections)}
         store.finish_run(run_id, status, out, "; ".join(errors))
     (runs_dir / f"{run_id}.daily.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     return DailyResult(run_id, status, out, errors)
+
+
+def explain_and_summarize(store: Store, run_id: str, started_at: str, to_model: list[dict], classifications: list,
+                          ranked: list, llm: JsonLLM, cfg: ci_config.CIConfig, sheet_path: Path, embed_fn,
+                          errors: list[str]) -> dict:
+    """The JFrog lens on this run's non-noise items, then the Brief's insights when enabled. Never raises: a failure
+    is an error in the report (the run is then degraded), not a lost run."""
+    out: dict = {"lens": {"status": "skipped"}, "insights": {"status": "disabled"}}
+    sheet = lens.load_sheet(sheet_path)
+    noise = {c.id for c in classifications if c.noise}
+    items = [r for r in to_model if r["id"] not in noise]
+    if sheet is None:
+        out["lens"] = {"status": "skipped", "reason": f"no capability sheet at {sheet_path}"}
+    elif items:
+        try:
+            got = lens.explain(items, llm, sheet)
+            store.save_lens(run_id, lens.fingerprint(), [lens.to_row(x) for x in got])
+            counts = Counter(x.status for x in got)
+            out["lens"] = {"status": "ok", "fingerprint": lens.fingerprint(), "items": len(got), **counts,
+                           "rejected_reasons": [x.reason for x in got if x.status == "rejected"]}
+            if counts["failed"]:
+                errors.append(f"lens: {counts['failed']} of {len(got)} items in failed batches")
+        except Exception as e:
+            errors.append(f"lens failed: {type(e).__name__}: {e}")
+            out["lens"] = {"status": "failed", "error": str(e)[:200]}
+    if store.setting("insights_enabled", "false") != "true":
+        return out
+    try:
+        out["insights"] = generate_insights(store, run_id, llm, cfg, sheet, embed_fn, trigger="daily")
+        if out["insights"]["status"] == "failed":
+            errors.append(f"insights failed: {out['insights'].get('error', '')}")
+    except Exception as e:
+        errors.append(f"insights failed: {type(e).__name__}: {e}")
+        out["insights"] = {"status": "failed", "error": str(e)[:200]}
+    return out
+
+
+def generate_insights(store: Store, run_id: str, llm: JsonLLM, cfg: ci_config.CIConfig, sheet, embed_fn,
+                      trigger: str) -> dict:
+    """Insights for the Brief anchored on run_id, from the items published at the current level (D37)."""
+    from ci.api import service as svc
+    from ci.dedupe import default_embedding_fn
+
+    s = svc.Snapshot.read(store, cfg)
+    run = store.run(run_id)
+    anchor = svc.parse_ts(run["started_at"])  # this run is still "running": it can't be looked up as an anchor yet
+    brief = svc.israel_date(anchor)
+    earlier = [svc.parse_ts(r["started_at"]) for d, r in s.anchors() if d < brief]
+    prev_anchor = max(earlier) if earlier else anchor - timedelta(hours=24)
+    rows = [insights.item_from_output(s.outputs[i]) for i in s.classified_ids() if s.status(i) in svc.PUBLISHED]
+    res = insights.generate(rows, llm, embed_fn or default_embedding_fn(), anchor=anchor, prev_anchor=prev_anchor,
+                            level=s.level, trigger=trigger, sheet=sheet)
+    store.save_insights(brief, res.to_json())
+    return {"status": res.status, "brief_date": brief, "insights": len(res.insights), "rejected": len(res.rejected),
+            "fingerprint": res.fingerprint, "error": res.error}
 
 
 def main(argv: list[str] | None = None) -> int:

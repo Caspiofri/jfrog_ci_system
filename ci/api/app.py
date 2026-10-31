@@ -21,6 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ci import config as ci_config
 from ci import coverage, eval_golden, insights, route, sources
+from ci import lens as lens_mod
 from ci.api import competitors as competitors_api
 from ci.api import health as health_api
 from ci.api import service as svc
@@ -85,6 +86,7 @@ class ItemOut(BaseModel):
     run_id: str | None
     fingerprint: str | None
     event_id: str | None
+    lens: dict | None  # D42: {axis, capability_quote, relation, why}; None when no lens passed its quote check
 
 
 class Note(BaseModel):
@@ -125,7 +127,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                insights_llm: Callable[[], object] | None = None, embed_fn=None,
                evals_dir: Path = eval_golden.EVALS_OUT_DIR, coverage_dir: Path = coverage.COVERAGE_DIR,
                events_path: Path = coverage.EVENTS_PATH, changes_out_dir: Path = OUTPUT_DIR / "changes",
-               labels_path: Path = eval_golden.LABELS_PATH) -> FastAPI:
+               labels_path: Path = eval_golden.LABELS_PATH, sheet_path: Path = lens_mod.SHEET_PATH) -> FastAPI:
     cfg = cfg or ci_config.load()
     app = FastAPI(title="JFrog CI API", version=API_VERSION)
 
@@ -282,7 +284,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             if insights_llm is None:
                 raise ApiError(503, "llm_unavailable", "no insights model configured")
             res = insights.generate(rows, insights_llm(), embed_fn, anchor=w["anchor"], prev_anchor=w["prev_anchor"],
-                                    level=s.level, trigger="refresh", now=now)
+                                    level=s.level, trigger="refresh", now=now, sheet=lens_mod.load_sheet(sheet_path))
             store.save_insights(date, res.to_json())
         return ok({"date": date, "status": res.status, "insights": len(res.insights), "rejected": len(res.rejected),
                    "generated_at": res.generated_at})

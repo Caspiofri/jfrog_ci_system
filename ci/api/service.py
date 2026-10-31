@@ -62,6 +62,7 @@ class Snapshot:
     level: str
     cfg: ci_config.CIConfig
     vetted_lists: dict = field(default_factory=dict)
+    lens: dict = field(default_factory=dict)  # item_id -> latest lens row (D42)
 
     @classmethod
     def read(cls, store: Store, cfg: ci_config.CIConfig) -> "Snapshot":
@@ -69,7 +70,7 @@ class Snapshot:
                    items={i["item_id"]: i for i in store.all_items()},
                    rejections=store.rejection_reasons(), states=store.item_states(), trusted=store.trusted_hosts(),
                    skips=store.skips(), runs=store.runs(), sightings=store.sightings(), level=store.autonomy_level(),
-                   cfg=cfg, vetted_lists=sources.load())
+                   cfg=cfg, vetted_lists=sources.load(), lens=store.lens())
 
     # ---- vetting and routing ----
 
@@ -136,7 +137,16 @@ class Snapshot:
             "edited": edited or None, "flagged": bool(state.get("flagged")), "version": state.get("version", 0),
             "run_id": out["run_id"] if out else None, "fingerprint": out["fingerprint"] if out else None,
             "event_id": None,  # events are not built (D33)
+            "lens": self.lens_out(item_id),
         }
+
+    def lens_out(self, item_id: str) -> dict | None:
+        """The JFrog lens (D42) when its quote check passed; None when there is none or it was dropped."""
+        row = self.lens.get(item_id)
+        if not row or row["status"] != "ok":
+            return None
+        return {"axis": row["axis"], "capability_quote": row["capability_quote"] or "", "relation": row["relation"],
+                "why": row["why"] or ""}
 
     def classified_ids(self) -> list[str]:
         return [i for i, o in self.outputs.items()]

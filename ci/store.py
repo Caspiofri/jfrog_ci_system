@@ -129,6 +129,19 @@ CREATE TABLE IF NOT EXISTS trusted_sources (  -- D34 "Trust this source": added 
     note TEXT,
     from_item_id TEXT
 );
+CREATE TABLE IF NOT EXISTS lens (     -- JFrog lens (D42): how an item relates to JFrog; ok, rejected or failed
+    item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    status TEXT NOT NULL,            -- ok | rejected (quote check or rule failed) | failed (the batch failed)
+    axis TEXT,
+    capability_quote TEXT,
+    relation TEXT,                   -- closes_gap | opens_gap | improves_shared | not_related
+    why TEXT,
+    reason TEXT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (item_id, run_id)
+);
 CREATE TABLE IF NOT EXISTS skips (
     item_id TEXT NOT NULL,
     run_id TEXT NOT NULL,
@@ -252,6 +265,23 @@ class Store:
         out: dict[str, list[str]] = {}
         for item_id, stage, reason in self._db.execute("SELECT item_id, stage, reason FROM rejections ORDER BY rowid"):
             out.setdefault(item_id, []).append(f"{stage}: {reason}")
+        return out
+
+    # ---- JFrog lens (D42) -------------------------------------------------------------------------------------------
+
+    def save_lens(self, run_id: str, fingerprint: str, rows: list[dict]) -> None:
+        now = _now()
+        with self._db:
+            self._db.executemany(
+                "INSERT OR REPLACE INTO lens VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(r["item_id"], run_id, fingerprint, r["status"], r["axis"], r["capability_quote"], r["relation"],
+                  r["why"], r["reason"], now) for r in rows])
+
+    def lens(self) -> dict[str, dict]:
+        """item_id -> its latest lens row (any status)."""
+        out: dict[str, dict] = {}
+        for r in self._db.execute("SELECT * FROM lens ORDER BY created_at"):
+            out[r["item_id"]] = dict(r)
         return out
 
     # ---- insights ------------------------------------------------------------------------------------------------
