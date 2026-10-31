@@ -1,7 +1,8 @@
 """The CI store (PRD D6): data/ci/ci.sqlite, one file for runs, items and the model output per item.
 
 This is the first slice of the store in the events/freshness plan (1.10): runs, items, sightings, classifications,
-rankings, rejections, insights, settings and skips. Events, routing and analyst actions come later.
+rankings, rejections, insights, settings, skips, and the
+analyst side: item_state, analyst_actions, trusted_sources. Events, routing and analyst actions come later.
 
 - An item's discovered_at is the started_at of the earliest run that saw it. A later sighting never moves it, and an
   older run imported later moves it back, so a re-collected item never looks new again.
@@ -101,6 +102,32 @@ CREATE TABLE IF NOT EXISTS insights (  -- Brief insights (ci.insights); every ge
     model TEXT NOT NULL,
     data TEXT NOT NULL,
     PRIMARY KEY (brief_date, generated_at)
+);
+CREATE TABLE IF NOT EXISTS item_state (  -- analyst decisions (D16); routing is derived, this only overrides it
+    item_id TEXT PRIMARY KEY,
+    decision TEXT,                   -- approved | dismissed | NULL
+    flagged INTEGER NOT NULL DEFAULT 0,
+    edit_competitor TEXT,
+    edit_category TEXT,
+    edit_score INTEGER,
+    version INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS analyst_actions (
+    action_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_kind TEXT NOT NULL,       -- item | source
+    target_id TEXT NOT NULL,
+    action TEXT NOT NULL,            -- approve | dismiss | edit | flag | unflag | trust | untrust
+    reason TEXT,
+    note TEXT,
+    payload TEXT NOT NULL,           -- before/after values, what the action measures
+    at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS trusted_sources (  -- D34 "Trust this source": added on top of config/vetted_sources.yaml
+    host TEXT PRIMARY KEY,
+    added_at TEXT NOT NULL,
+    note TEXT,
+    from_item_id TEXT
 );
 CREATE TABLE IF NOT EXISTS skips (
     item_id TEXT NOT NULL,
@@ -245,6 +272,87 @@ class Store:
         rows = self._db.execute("SELECT generated_at, trigger, level, status FROM insights WHERE brief_date = ?"
                                 " ORDER BY generated_at", (brief_date,))
         return [dict(r) for r in rows]
+
+    # ---- analyst state ---------------------------------------------------------------------------------------------
+
+    def item_states(self) -> dict[str, dict]:
+        return {r["item_id"]: dict(r) for r in self._db.execute("SELECT * FROM item_state")}
+
+    def apply_item_action(self, item_id: str, action: str, update: dict, *, reason: str | None = None,
+                          note: str | None = None, payload: dict | None = None,
+                          expect_version: int | None = None) -> dict:
+        """Change item_state and log the action in one transaction. expect_version (If-Match) must match the current
+        version (0 when the item has no state yet); otherwise ValueError("version")."""
+        now = _now()
+        with self._db:
+            row = self._db.execute("SELECT * FROM item_state WHERE item_id = ?", (item_id,)).fetchone()
+            current = dict(row) if row else {"item_id": item_id, "decision": None, "flagged": 0,
+                                             "edit_competitor": None, "edit_category": None, "edit_score": None,
+                                             "version": 0}
+            if expect_version is not None and expect_version != current["version"]:
+                raise ValueError("version")
+            new = {**current, **update, "version": current["version"] + 1, "updated_at": now}
+            self._db.execute(
+                "INSERT INTO item_state VALUES (:item_id, :decision, :flagged, :edit_competitor, :edit_category,"
+                " :edit_score, :version, :updated_at) ON CONFLICT(item_id) DO UPDATE SET decision = excluded.decision,"
+                " flagged = excluded.flagged, edit_competitor = excluded.edit_competitor,"
+                " edit_category = excluded.edit_category, edit_score = excluded.edit_score,"
+                " version = excluded.version, updated_at = excluded.updated_at", new)
+            cur = self._db.execute(
+                "INSERT INTO analyst_actions (target_kind, target_id, action, reason, note, payload, at)"
+                " VALUES ('item', ?, ?, ?, ?, ?, ?)",
+                (item_id, action, reason, note, json.dumps(payload or {}, ensure_ascii=False), now))
+        return {**new, "action_id": cur.lastrowid, "at": now}
+
+    def actions(self, target_id: str | None = None) -> list[dict]:
+        sql, args = "SELECT * FROM analyst_actions", ()
+        if target_id is not None:
+            sql, args = sql + " WHERE target_id = ?", (target_id,)
+        return [{**dict(r), "payload": json.loads(r["payload"])} for r in self._db.execute(sql + " ORDER BY action_id",
+                                                                                            args)]
+
+    def trusted_hosts(self) -> dict[str, dict]:
+        return {r["host"]: dict(r) for r in self._db.execute("SELECT * FROM trusted_sources")}
+
+    def trust(self, host: str, note: str | None, from_item_id: str | None) -> dict:
+        now = _now()
+        with self._db:
+            self._db.execute("INSERT INTO trusted_sources VALUES (?, ?, ?, ?)", (host, now, note, from_item_id))
+            cur = self._db.execute(
+                "INSERT INTO analyst_actions (target_kind, target_id, action, reason, note, payload, at)"
+                " VALUES ('source', ?, 'trust', NULL, ?, ?, ?)",
+                (host, note, json.dumps({"from_item_id": from_item_id}), now))
+        return {"host": host, "added_at": now, "action_id": cur.lastrowid}
+
+    def untrust(self, host: str) -> None:
+        now = _now()
+        with self._db:
+            self._db.execute("DELETE FROM trusted_sources WHERE host = ?", (host,))
+            self._db.execute("INSERT INTO analyst_actions (target_kind, target_id, action, reason, note, payload, at)"
+                             " VALUES ('source', ?, 'untrust', NULL, NULL, '{}', ?)", (host, now))
+
+    # ---- runs and items for the API -------------------------------------------------------------------------------
+
+    def runs(self) -> list[dict]:
+        return [dict(r) for r in self._db.execute("SELECT * FROM runs ORDER BY started_at")]
+
+    def all_items(self) -> list[dict]:
+        return [{**dict(r), "raw": json.loads(r["raw"])} for r in self._db.execute("SELECT * FROM items")]
+
+    def sightings(self) -> list[dict]:
+        return [dict(r) for r in self._db.execute("SELECT * FROM sightings")]
+
+    def skips(self) -> dict[str, str]:
+        return {r["item_id"]: r["reason"] for r in self._db.execute("SELECT item_id, reason FROM skips")}
+
+    def setting(self, key: str, default: str | None = None) -> str | None:
+        row = self._db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        with self._db:
+            self._db.execute("INSERT INTO settings VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET"
+                             " value = excluded.value, updated_at = excluded.updated_at", (key, value, _now()))
 
     # ---- settings ------------------------------------------------------------------------------------------------
 
