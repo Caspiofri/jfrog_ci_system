@@ -87,3 +87,34 @@ def test_the_shadow_prefilters_flags_are_listed_for_a_noise_answer_and_scored(st
     path.write_text(yaml.safe_dump(data, sort_keys=False))
     p = reliability.score(path)["prefilter"]
     assert (p["flagged"], p["noise_yes"], p["n"], p["precision"], p["relevant_flagged"]) == (1, 1, 1, 1.0, [])
+
+
+def test_the_briefs_insights_are_listed_one_row_per_claim_for_a_supported_answer(store, tmp_path):
+    with Store(store) as s:  # an insight stored for the Brief of 2026-10-31 (the daily run's Israel date)
+        s.save_insights("2026-10-31", {"generated_at": "2026-10-31T04:10:00+00:00", "trigger": "daily",
+                                       "level": "strict", "status": "partial", "fingerprint": "ifp", "model": "m",
+                                       "insights": [{"insight_id": "ins_2026-10-31_1", "pattern": "shared_threat",
+                                                     "title": "Attacks on AI tooling", "claims": [
+                                                         {"text": "Story 1 and 2 report attacks", "item_ids":
+                                                          ["auto01", "auto02"], "quote": "q", "quote_item_id":
+                                                          "auto01", "jfrog_quote": ""},
+                                                         {"text": "JFrog Curation blocks this", "item_ids": ["auto03"],
+                                                          "quote": "q2", "quote_item_id": "auto03",
+                                                          "jfrog_quote": "blocks malicious"}]}]})
+    path = reliability.make(store_path=store, out_dir=tmp_path / "reviews", now=MORNING)
+    data = yaml.safe_load(path.read_text())
+    assert data["insights_meta"]["status"] == "partial" and data["insights_meta"]["fingerprint"] == "ifp"
+    rows = data["insights"]
+    assert [(r["insight_id"], r["claim_no"]) for r in rows] == [("ins_2026-10-31_1", 1), ("ins_2026-10-31_1", 2)]
+    assert [c["title"] for c in rows[0]["cited"]] == ["Story 1", "Story 2"] and rows[0]["supported"] is None
+    assert rows[1]["jfrog_quote"] == "blocks malicious"
+    rows[0]["supported"], rows[1]["supported"] = "yes", "no"
+    path.write_text(yaml.safe_dump(data, sort_keys=False))
+    res = reliability.score(path)["insights"]
+    assert (res["supported"], res["unsupported"], res["n"], res["insights"]) == (1, 1, 2, 1)
+    assert res["unsupported_claims"][0]["claim_no"] == 2
+
+
+def test_no_insights_stored_gives_an_empty_section(store, tmp_path):
+    data = yaml.safe_load(reliability.make(store_path=store, out_dir=tmp_path / "r", now=MORNING).read_text())
+    assert data["insights"] == [] and data["insights_meta"]["status"] == "none stored"

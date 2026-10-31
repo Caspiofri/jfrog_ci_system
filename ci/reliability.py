@@ -8,6 +8,9 @@ never in the golden set.
 The file also lists every item of the run that the noise pre-filter (shadow mode, D25) would have dropped, with
 its reason and what the classifier decided, for a `noise: yes | no` answer: the pre-filter's precision on unseen data.
 
+It also lists the Brief's generated insights for that day, one row per claim with its cited sources, for a
+`supported: yes | no` answer (is the claim supported by its cited sources?).
+
 make never overwrites a review file that already exists (answers may be in it). score counts right / wrong per field
 and group with n and writes <file>.results.json next to it.
 """
@@ -37,6 +40,8 @@ HEADER = """# Reliability check of daily run {run_id} (D41). For every item, set
 #   set. Count them with: python -m ci.reliability score {path}
 # prefilter: every item of this run the noise pre-filter (shadow mode, D25: it changes nothing) would have dropped
 #   without an LLM call ({flags} items). Set noise: yes (it is noise) or no (it is relevant).
+# insights: the Brief's generated insights ({insights_status}), one row per claim ({claims} claims). Open the cited
+#   sources and set supported: yes (the cited sources support the claim) or no.
 """
 
 
@@ -64,6 +69,20 @@ def entry(s: svc.Snapshot, item_id: str, group: str) -> dict:
     return row
 
 
+def insight_claims(s: svc.Snapshot, stored: dict) -> list[dict]:
+    """One row per claim of the stored insights, with every cited source's title and URL."""
+    rows = []
+    for ins in stored.get("insights", []):
+        for n, c in enumerate(ins["claims"], 1):
+            rows.append({"insight_id": ins["insight_id"], "claim_no": n, "pattern": ins["pattern"],
+                         "insight_title": ins["title"], "claim": c["text"],
+                         "cited": [{"id": i, "title": s.items[i]["title"] if i in s.items else "?",
+                                    "url": s.items[i]["url"] if i in s.items else None} for i in c["item_ids"]],
+                         "quote": c["quote"], "quote_item_id": c["quote_item_id"],
+                         "jfrog_quote": c.get("jfrog_quote") or None, "supported": None})
+    return rows
+
+
 def make(run_id: str | None = None, sample: int = SAMPLE, seed: int = SEED, store_path: Path = STORE_PATH,
          out_dir: Path = REVIEW_DIR, now: datetime | None = None) -> Path:
     today = svc.israel_date(now or datetime.now(UTC))
@@ -79,14 +98,23 @@ def make(run_id: str | None = None, sample: int = SAMPLE, seed: int = SEED, stor
                     "would_drop_because": s.outputs[i]["classification"]["shadow_prefilter"],
                     "classifier_noise": bool(s.outputs[i]["classification"]["noise"]), "status": s.status(i),
                     "noise": None} for i in mine if s.outputs[i]["classification"].get("shadow_prefilter")]
+        brief_date = svc.israel_date(svc.parse_ts(run["started_at"]))
+        stored = store.latest_insights(brief_date)
+        claims = insight_claims(s, stored) if stored else []
     path = out_dir / f"reliability_{run['run_id']}.yaml"
     if path.exists():
         raise SystemExit(f"{path} exists; not overwritten (it may hold answers)")
     out_dir.mkdir(parents=True, exist_ok=True)
     body = {"run_id": run["run_id"], "level": s.level, "seed": seed, "auto_published_total": len(auto),
-            "items": items, "prefilter": flagged}
+            "items": items, "prefilter": flagged,
+            "insights_meta": {"brief_date": brief_date, "status": stored["status"] if stored else "none stored",
+                              "generated_at": stored.get("generated_at") if stored else None,
+                              "trigger": stored.get("trigger") if stored else None,
+                              "fingerprint": stored.get("fingerprint") if stored else None},
+            "insights": claims}
     path.write_text(HEADER.format(run_id=run["run_id"], level=s.level, held=len(held), sample=len(drawn),
-                                  auto=len(auto), seed=seed, path=path, flags=len(flagged)) +
+                                  auto=len(auto), seed=seed, path=path, flags=len(flagged),
+                                  insights_status=body["insights_meta"]["status"], claims=len(claims)) +
                     yaml.safe_dump(body, sort_keys=False, allow_unicode=True, width=120), encoding="utf-8")
     return path
 
@@ -121,6 +149,17 @@ def score(path: Path) -> dict:
                         "precision": round(answers["yes"] / judged, 3) if judged else None,
                         "relevant_flagged": [{"id": x["id"], "title": x["title"]} for x in flags
                                              if x.get("noise") == "no"]}
+    rows = data.get("insights") or []
+    sup = Counter(x.get("supported") for x in rows)
+    bad = sorted(set(sup) - {"yes", "no", None})
+    if bad:
+        raise SystemExit(f"{path}: insights supported answers must be yes, no or null, found {bad}")
+    out["insights"] = {"claims": len(rows), "supported": sup["yes"], "unsupported": sup["no"],
+                       "n": sup["yes"] + sup["no"], "unanswered": sup[None],
+                       "insights": len({x["insight_id"] for x in rows}),
+                       "unsupported_claims": [{"insight_id": x["insight_id"], "claim_no": x["claim_no"],
+                                               "claim": x["claim"], "note": x.get("note")}
+                                              for x in rows if x.get("supported") == "no"]}
     path.with_suffix(".results.json").write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     return out
 
@@ -139,7 +178,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "make":
         path = make(args.run, args.sample, args.seed)
         flags = len(yaml.safe_load(path.read_text(encoding="utf-8")).get("prefilter") or [])
-        print(f"wrote {path} (pre-filter shadow flags in this run: {flags})")
+        claims = len(yaml.safe_load(path.read_text(encoding="utf-8")).get("insights") or [])
+        print(f"wrote {path} (pre-filter shadow flags in this run: {flags}; insight claims: {claims})")
     else:
         res = score(args.path)
         for group, g in res["groups"].items():
@@ -149,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
         p = res["prefilter"]
         print(f"prefilter (shadow): flagged {p['flagged']}; noise {p['noise_yes']} of {p['n']} judged"
               + (f", relevant flagged: {[x['id'] for x in p['relevant_flagged']]}" if p["relevant_flagged"] else ""))
+        i = res["insights"]
+        print(f"insights: {i['supported']} of {i['n']} claims supported ({i['insights']} insights, "
+              f"{i['claims']} claims, {i['unanswered']} unanswered)")
         print(f"wrote {args.path.with_suffix('.results.json')}")
     return 0
 
