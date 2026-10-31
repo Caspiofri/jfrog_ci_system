@@ -1,0 +1,117 @@
+"use client";
+// The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { ExternalLink } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Async, CategoryTag, ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { useApi } from "@/lib/api";
+import { HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { competitorName, useMeta } from "@/lib/meta";
+import type { ItemDetail } from "@/lib/types";
+
+const Ctx = createContext<{ open: (id: string) => void }>({ open: () => {} });
+export const useItemDrawer = () => useContext(Ctx);
+
+export function ItemDrawerProvider({ children }: { children: ReactNode }) {
+  const [id, setId] = useState<string | null>(null);
+  const open = useCallback((x: string) => setId(x), []);
+  const value = useMemo(() => ({ open }), [open]);
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      <Sheet open={id !== null} onOpenChange={(o) => !o && setId(null)}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          {id ? <DrawerBody id={id} /> : null}
+        </SheetContent>
+      </Sheet>
+    </Ctx.Provider>
+  );
+}
+
+function Field({ k, children }: { k: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-2 border-t border-line py-2 first:border-t-0">
+      <span className="text-mute">{k}</span>
+      <span className="min-w-0 break-words">{children}</span>
+    </div>
+  );
+}
+
+function DrawerBody({ id }: { id: string }) {
+  const { data: meta } = useMeta();
+  const q = useApi<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`);
+  return (
+    <>
+      <SheetHeader className="px-5 pt-5 pb-0">
+        <SheetTitle className="pr-6 text-base leading-snug">{q.data?.item.title ?? "Item"}</SheetTitle>
+        <SheetDescription className="text-xs">Item {id}</SheetDescription>
+      </SheetHeader>
+      <div className="px-5 pb-6">
+        <Async {...q} retry={() => q.mutate()} rows={6}>
+          {(d) => {
+            const it = d.item;
+            return (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <ScoreBadge score={it.score} noise={it.noise} />
+                  <StatusDot status={it.status} />
+                  <CategoryTag category={it.category} />
+                  {it.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">Mentions JFrog</Tag> : null}
+                  {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
+                </div>
+                {it.why_it_matters ? (
+                  <div className="rounded border-l-4 border-jgreen bg-[#f8fbf8] px-3 py-2">
+                    <div className="text-xs font-semibold text-mute">Why it matters</div>
+                    <div>{it.why_it_matters}</div>
+                  </div>
+                ) : null}
+                {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : null}
+                <ExtLink href={it.url} className="inline-flex items-center gap-1 text-jgreen-d">
+                  Open the source <ExternalLink className="size-3" />
+                </ExtLink>
+                <div>
+                  <Field k="Competitor">{competitorName(meta, it.competitor)}{!it.classified ? " (prefilled, not classified)" : ""}</Field>
+                  <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>
+                  <Field k="Published">{fmtPublished(it.published_at, it.date_precision)}</Field>
+                  <Field k="Discovered">{fmtDateTime(it.discovered_at)}{it.discovery_lag_hours != null ? ` (${Math.round(it.discovery_lag_hours)} h after publication)` : ""}</Field>
+                  <Field k="Score reason">{it.reason || "—"}</Field>
+                  {d.ranking?.raw_score != null && d.ranking.raw_score !== it.score ? <Field k="Model score">{d.ranking.raw_score} (adjusted to {it.score ?? "—"})</Field> : null}
+                  <Field k="Classified by">{d.classification?.method ?? "—"}{d.classification?.reason ? ` · ${d.classification.reason}` : ""}</Field>
+                  <Field k="Confidence">{it.confidence != null ? it.confidence.toFixed(2) : "—"}</Field>
+                  {d.skip ? <Field k="Held out">{d.skip}</Field> : null}
+                  {d.rejections.length ? <Field k="Rejected output">{d.rejections.join("; ")}</Field> : null}
+                </div>
+                {it.hold_reasons.length ? (
+                  <div>
+                    <h3 className="mb-1 text-sm font-semibold">Hold reasons</h3>
+                    <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                      {it.hold_reasons.map((r) => (
+                        <li key={r.code}>
+                          <b className="font-semibold">{label(HOLD_LABEL, r.code)}</b>
+                          <span className="text-mute"> · held at {r.held_at.map((l) => LEVEL_LABEL[l] ?? l).join(", ")}</span>
+                          <div className="text-xs text-mute">{r.detail}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <div>
+                  <h3 className="mb-1 text-sm font-semibold">History</h3>
+                  {d.sightings.map((s) => (
+                    <div key={s.run_id} className="text-xs text-mute">Seen in run {s.run_id}{s.seen_at ? ` · ${fmtDateTime(s.seen_at)}` : ""}</div>
+                  ))}
+                  {d.actions.map((a, i) => (
+                    <div key={i} className="text-xs">
+                      {fmtDateTime(a.at)} · <b>{a.action}</b>{a.reason ? ` (${a.reason})` : ""}{a.note ? `: ${a.note}` : ""}
+                    </div>
+                  ))}
+                  {!d.actions.length ? <div className="text-xs text-mute">No analyst actions yet.</div> : null}
+                </div>
+              </div>
+            );
+          }}
+        </Async>
+      </div>
+    </>
+  );
+}

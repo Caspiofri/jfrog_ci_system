@@ -1,0 +1,140 @@
+// Display helpers. Labels and colors only: no data lives here.
+
+export const TZ = "Asia/Jerusalem";
+
+/** One importance color scale (build notes: urgency dropped, the score is the only scale). */
+export const SCORE_COLOR: Record<number, [string, string]> = {
+  5: ["#9b1c1c", "#fff"],
+  4: ["#e5483b", "#fff"],
+  3: ["#f59e0b", "#fff"],
+  2: ["#fcd34d", "#5b4400"],
+  1: ["#cbd3df", "#44516a"],
+  0: ["#eaeef4", "#6b7788"],
+};
+
+export const CATEGORY_COLOR: Record<string, string> = {
+  "Product & Features": "#3f5b8f",
+  "Pricing & Packaging": "#f59e0b",
+  "AI & Agents": "#8b5cf6",
+  Security: "#e5483b",
+  "Funding/M&A/Partnerships": "#14b8a6",
+  "Customers & Market": "#41be57",
+  "Leadership & Org": "#9aa5b5",
+};
+
+export const STATUS_LABEL: Record<string, string> = {
+  auto_published: "Auto-published",
+  awaiting_review: "Awaiting review",
+  approved: "Approved",
+  flagged: "Flagged",
+  dismissed: "Dismissed",
+  dropped: "Dropped",
+  held_out: "Held out (test split)",
+  unclassified: "Not classified yet",
+};
+
+export const STATUS_COLOR: Record<string, string> = {
+  auto_published: "#41be57",
+  approved: "#14a085",
+  awaiting_review: "#f59e0b",
+  flagged: "#e5483b",
+  dismissed: "#b45b5b",
+  dropped: "#9aa5b5",
+  held_out: "#8b5cf6",
+  unclassified: "#cbd3df",
+};
+
+export const HOLD_LABEL: Record<string, string> = {
+  unvetted_source: "Unvetted source",
+  low_confidence: "Low confidence",
+  teaser_high_score: "High score on a teaser",
+  junk_extraction: "Junk extraction",
+  pricing: "Pricing",
+  m_and_a: "M&A / funding",
+  mentions_jfrog: "Mentions JFrog",
+  model_failure: "Model failure",
+  invalid_output: "Invalid model output",
+  changed_cell: "Changed head-to-head cell",
+};
+
+export const DISMISS_LABEL: Record<string, string> = {
+  not_relevant: "Not relevant",
+  wrong_competitor: "Wrong competitor",
+  wrong_category: "Wrong category",
+  duplicate: "Duplicate",
+};
+
+export const LEVEL_LABEL: Record<string, string> = { strict: "Strict", balanced: "Balanced", relaxed: "Relaxed" };
+
+export const STAGE_LABEL: Record<string, string> = {
+  url_dedupe: "URL dedupe",
+  embedding_dedupe: "Embedding dedupe",
+  test_skip: "Test split",
+  classify: "Classify",
+  rank: "Rank",
+  validate: "Validate",
+  route: "Route",
+  analyst: "Analyst",
+  pending: "Pending",
+};
+
+export const SOURCE_LABEL: Record<string, string> = {
+  google_news: "News search",
+  vendor_feed: "Vendor feed",
+  github_releases: "GitHub releases",
+  hackernews: "Hacker News",
+};
+
+export const PATTERN_LABEL: Record<string, string> = {
+  competitor_momentum: "Competitor momentum",
+  axis_convergence: "Convergence",
+  shared_threat: "Shared threat",
+};
+
+export const label = (map: Record<string, string>, key: string | null | undefined) =>
+  key ? (map[key] ?? key.replace(/_/g, " ")) : "—";
+
+/** "Oct 31" or "Oct 31, 2025" when not this year. Israel date. */
+export function fmtDate(iso: string | null | undefined, withYear = false): string {
+  if (!iso) return "—";
+  const d = new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(withYear ? { year: "numeric" } : {}), timeZone: TZ });
+}
+
+export function fmtDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ });
+}
+
+/** A YYYY-MM-DD Brief date as "Saturday, Oct 31, 2026". */
+export function fmtLongDate(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/** Publication date with precision: day-precision dates say "date only". */
+export function fmtPublished(iso: string | null, precision: string): string {
+  if (!iso) return "publication date unknown";
+  return precision === "day" ? `${fmtDate(iso, true)} (date only)` : fmtDate(iso, true);
+}
+
+/** Only http(s) links are clickable; anything else from a collected page is shown as text (D32). */
+export function safeHref(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function delta(value: number, prev: number | null): { text: string; cls: string } {
+  if (prev === null || prev === undefined) return { text: "no previous Brief", cls: "text-mute" };
+  const d = value - prev;
+  if (d === 0) return { text: `same as previous Brief (${prev})`, cls: "text-mute" };
+  return { text: `${d > 0 ? "+" : ""}${d} vs previous Brief (${prev})`, cls: "text-mute" };
+}
