@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Async, Empty, ErrorNote, KpiTile, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
@@ -10,9 +10,9 @@ import { ItemRow } from "@/components/ItemRow";
 import { IntensityChart } from "@/components/brief/IntensityChart";
 import { ApiError, path, send, useApi } from "@/lib/api";
 import { PATTERN_LABEL, SCORE_COLOR, delta, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
-import { useMeta } from "@/lib/meta";
+import { competitorName, useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
-import type { Brief, BriefInsights, BriefRow, Insight, Page } from "@/lib/types";
+import type { Brief, BriefInsights, BriefRow, Insight, ItemDetail, Page } from "@/lib/types";
 
 const TOP = 5;
 const PAGE = 50;
@@ -214,6 +214,9 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         </Button>
       }
     >
+      <div className="mb-3 flex items-center gap-1.5 rounded border border-[#f59e0b]/60 bg-[#fff7e6] px-2.5 py-1.5 text-xs font-semibold text-[#8a5a00]">
+        <Sparkles className="size-3.5 shrink-0" aria-hidden /> AI-generated — check the cited sources
+      </div>
       {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
       {!enabled && !insights.items.length ? (
         <Empty>Insights are turned off until the expected-insights file is saved (D37), so none are shown for this Brief.</Empty>
@@ -234,7 +237,6 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
 }
 
 function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: boolean; onSelect: () => void }) {
-  const drawer = useItemDrawer();
   const top = SCORE_COLOR[ins.max_score ?? 0]?.[0] ?? "#e3e8ef";
   return (
     <div
@@ -254,23 +256,48 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
       <h3 className="m-0 text-sm font-semibold">{ins.title}</h3>
       <p className="m-0 text-[#44516a]">{ins.summary}</p>
       {ins.why_it_matters ? <p className="m-0 text-xs text-mute"><b className="font-semibold text-ink">Why it matters: </b>{ins.why_it_matters}</p> : null}
-      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
         {ins.claims.map((c, k) => (
-          <li key={k} className="text-xs">
+          <li key={k} className="flex flex-col gap-1 text-xs">
             <div>{c.text}</div>
-            {c.quote ? <blockquote className="my-1 border-l-2 border-line pl-2 italic text-mute">&ldquo;{c.quote}&rdquo;</blockquote> : null}
-            <div className="flex flex-wrap gap-1">
-              {c.item_ids.map((id) => (
-                <button key={id} type="button" onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
-                  className="rounded-[3px] border border-line px-1.5 text-[11px] text-mute hover:border-jgreen hover:text-jgreen-d" title="Open the cited item">
-                  {id.slice(0, 6)}
-                </button>
-              ))}
-            </div>
+            {c.quote ? (
+              <blockquote className="m-0 border-l-2 border-line pl-2 text-mute">
+                <span className="italic">&ldquo;{c.quote}&rdquo;</span>
+                {c.quote_item_id ? <span className="not-italic"> — <CitedItem id={c.quote_item_id} /></span> : null}
+              </blockquote>
+            ) : null}
+            {c.jfrog_quote ? (
+              <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-mute">
+                <span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span>
+                <span className="not-italic"> — JFrog capability sheet</span>
+              </blockquote>
+            ) : null}
+            {c.item_ids.length ? (
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-[11px] text-mute">Cites</span>
+                {c.item_ids.map((id) => <CitedItem key={id} id={id} />)}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
       {ins.baseline_note ? <div className="text-[11px] text-mute">{ins.baseline_note}</div> : null}
     </div>
+  );
+}
+
+// A cited item as a chip that opens its drawer. Same SWR key as the drawer, so opening it reuses this fetch.
+function CitedItem({ id }: { id: string }) {
+  const drawer = useItemDrawer();
+  const meta = useMeta();
+  const q = useApi<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`);
+  const it = q.data?.item;
+  const text = it ? `${competitorName(meta.data, it.competitor)}: ${it.title}` : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`;
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
+      title={it ? `${it.title} · open the cited item` : "Open the cited item"}
+      className="inline-block max-w-[16rem] truncate rounded-[3px] border border-line bg-white px-1.5 align-bottom text-[11px] text-ink hover:border-jgreen hover:text-jgreen-d">
+      {text}
+    </button>
   );
 }

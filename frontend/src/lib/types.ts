@@ -63,6 +63,7 @@ export interface Item {
   run_id: string | null;
   fingerprint: string | null;
   event_id: string | null;
+  lens?: { axis: string; capability_quote: string; relation: string; why: string } | null; // D42
 }
 
 export interface Competitor {
@@ -103,6 +104,7 @@ export interface Claim {
   item_ids: string[];
   quote: string;
   quote_item_id: string;
+  jfrog_quote?: string; // D42: verbatim from the JFrog capability sheet, when the claim is about JFrog
 }
 
 export interface Insight {
@@ -119,6 +121,7 @@ export interface Insight {
   axis: string | null;
   jfrog_cell: Record<string, unknown> | null;
   baseline_note: string;
+  jfrog_quotes?: string[];
 }
 
 export interface BriefInsights {
