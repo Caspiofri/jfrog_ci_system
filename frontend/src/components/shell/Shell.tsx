@@ -42,7 +42,13 @@ function RunPill() {
 function ReviewCount() {
   const { data } = useApi<Review>("/api/v1/review?limit=1");
   if (!data || !data.total) return null;
-  return <span className="ml-auto rounded-full bg-[#f59e0b] px-1.5 text-[11px] font-semibold text-navy tabular-nums">{data.total}</span>;
+  // The whole backlog (every undecided held item), not one Brief's window: say so, so it isn't read as today's count.
+  return (
+    <span className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[11px] font-normal text-[#c9d3e4]"
+      title={`${data.total} held items in the whole backlog, across every Brief`}>
+      <span className="rounded-full bg-[#f59e0b] px-1.5 font-semibold text-navy tabular-nums">{data.total}</span> total backlog
+    </span>
+  );
 }
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -78,8 +84,10 @@ export function Shell({ children }: { children: ReactNode }) {
                     )}
                   >
                     <Icon className="size-[18px] shrink-0" strokeWidth={1.7} />
-                    {it.label}
-                    {it.badge === "review" ? <ReviewCount /> : null}
+                    <span className="flex min-w-0 flex-col">
+                      {it.label}
+                      {it.badge === "review" ? <ReviewCount /> : null}
+                    </span>
                   </Link>
                 );
               })}

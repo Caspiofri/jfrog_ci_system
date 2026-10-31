@@ -11,7 +11,7 @@ import { FilterSelect } from "@/components/FilterSelect";
 import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, path, send, useApi } from "@/lib/api";
-import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, label } from "@/lib/format";
+import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { HoldReason, Level, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
@@ -39,7 +39,8 @@ function ReviewScreen() {
   const reason = get("reason");
   const competitor = get("competitor");
   const offset = Number(get("offset") || 0);
-  const q = useApi<Review>(path("/review", { level: preview || undefined, reason, competitor, limit: PAGE, offset }));
+  const brief = get("brief");
+  const q = useApi<Review>(path("/review", { level: preview || undefined, reason, competitor, brief, limit: PAGE, offset }));
   const current = meta?.level;
   const shown = q.data?.level;
   const previewing = Boolean(preview && current && preview !== current);
@@ -48,6 +49,7 @@ function ReviewScreen() {
   return (
     <>
       <PageHead title="Review queue" sub="Items held by the routing rules, each with the reason it was held" />
+      {brief ? <BriefScope brief={brief} applied={q.data ? q.data.scope?.brief === brief : null} onClear={() => set({ brief: null, offset: null })} /> : null}
       {trustMsg ? <TrustToast res={trustMsg} onDone={() => setTrustMsg(null)} /> : null}
 
       <Async {...q} retry={() => q.mutate()} rows={6}>
@@ -425,6 +427,19 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
         </DropdownMenu>
         <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs" disabled={off} onClick={() => setEditing(true)}><Pencil className="size-3.5" /> Edit</Button>
       </div>
+    </div>
+  );
+}
+
+/** The queue scoped to one Brief window (from the Brief's "Review these"). Says so when the API ignores the filter. */
+function BriefScope({ brief, applied, onClear }: { brief: string; applied: boolean | null; onClear: () => void }) {
+  return (
+    <div className="-mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <Tag className="bg-[#e8eefb] font-semibold text-[#3f5b8f]">Held from the Brief of {fmtLongDate(brief)}</Tag>
+      {applied === false ? (
+        <span className="text-[#8a5a00]">The API doesn&apos;t filter by Brief yet, so this is the whole backlog.</span>
+      ) : null}
+      <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onClear}>Show the whole backlog</Button>
     </div>
   );
 }
