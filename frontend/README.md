@@ -22,6 +22,9 @@ The CI tool's web UI: Next.js + Tailwind + shadcn/ui + Recharts (PRD D3). Every 
 
 For `npm run build && npm start`, set `CI_API_URL` at **build** time: Next.js writes the rewrite into the build.
 
+To check a production build while `npm run dev` is running, use `npm run build:check`: it builds into
+`.next-build/`. A plain `npm run build` writes `.next/` and breaks a running dev server.
+
 ## Rules
 
 - API strings are untrusted (D32): rendered as React text only. ESLint fails on `dangerouslySetInnerHTML` and

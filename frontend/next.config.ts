@@ -5,6 +5,8 @@ import type { NextConfig } from "next";
 const API = process.env.CI_API_URL ?? "http://127.0.0.1:8011";
 
 const nextConfig: NextConfig = {
+  // A check build goes to its own folder (npm run build:check), so it never overwrites the dev server's .next.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${API}/api/v1/:path*` }];
   },
