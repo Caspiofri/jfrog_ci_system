@@ -41,12 +41,13 @@ function RunPill() {
 
 function ReviewCount() {
   const { data } = useApi<Review>("/api/v1/review?limit=1");
-  if (!data || !data.total) return null;
+  const n = data?.backlog_total ?? data?.total; // §10.3: the unfiltered backlog
+  if (!n) return null;
   // The whole backlog (every undecided held item), not one Brief's window: say so, so it isn't read as today's count.
   return (
     <span className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[11px] font-normal text-[#c9d3e4]"
-      title={`${data.total} held items in the whole backlog, across every Brief`}>
-      <span className="rounded-full bg-[#f59e0b] px-1.5 font-semibold text-navy tabular-nums">{data.total}</span> total backlog
+      title={`${n} held items in the whole backlog, across every Brief`}>
+      <span className="rounded-full bg-[#f59e0b] px-1.5 font-semibold text-navy tabular-nums">{n}</span> total backlog
     </span>
   );
 }

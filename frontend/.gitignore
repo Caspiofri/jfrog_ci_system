@@ -41,6 +41,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# dev mock fixtures exported from the local store copy
-/public/mock/
 /.next-mock/

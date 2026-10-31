@@ -19,7 +19,16 @@ The frontend never edits backend code; each request waits here for Ofri.
   one); the same holds in the 2026-10-31 Brief, e.g. `402191752c14807f`. The contract says it is the first 280 characters of the stored text, or the teaser
   when the page is junk. The UI shows "Text couldn't be extracted" in its place.
 
-## 3. Daily Brief per D44 (the contract has no D44 section yet)
+## 3. Daily Brief per D44 — mostly done (884eebe, d5d87c5; contract §10)
+
+**Status (Oct 31, 20:45):** 3a, 3b, 3c, 3e and 3h are built under these names, and the UI uses them with mock
+off. Still open:
+- **3d `lens.source_url`:** not built. The sheet needs a source per axis row, so the quote shows unlinked as
+  "JFrog capability sheet".
+- **3f `rubric` in `/meta`:** not built. The UI keeps the three rubric v2 lines.
+- **3g Health counts:** not built. Health reads the deprecated `kpis`; `prev_anchor_kind` is still wanted.
+
+The original request follows.
 
 Written against D44 in the PRD on Oct 31, because `docs/plans/2026-10-31-api-contract.md` had no D44 shape yet.
 Field names are proposals: if the backend picks others, tell me and I'll rename on my side. Until a field lands, the

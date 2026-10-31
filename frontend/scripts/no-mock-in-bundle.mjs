@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const dist = process.argv[2] || ".next";
-const MARKERS = ["text-basis.local", "Dev mock mode", "mock_insights", "SAMPLE_LENS", "14-day hold)"];
+const MARKERS = ["Dev mock mode", "mock_insights", "all_held"];
 const hits = [];
 function walk(dir) {
   for (const name of readdirSync(dir)) {

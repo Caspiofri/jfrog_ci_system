@@ -16,6 +16,7 @@ const EMPHASIS: Record<number, string> = {
   3: "border-l-4 border-l-[#f59e0b]",
 };
 
+/** Dev mock scenarios only (src/lib/mock.ts). */
 export function MockTag({ what }: { what?: string }) {
   return (
     <span className="ml-1 rounded-[3px] border border-dashed border-[#8b5cf6] px-1 text-[10px] font-semibold uppercase tracking-wide text-[#6d28d9]"
@@ -56,14 +57,14 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 function LensView({ item }: { item: Item }) {
   const l = item.lens;
-  const mock = item.mock?.includes("lens") ? <MockTag what="the lens" /> : null;
   if (!l || l.relation === "not_related" || !l.capability_quote) {
-    return <span className="text-mute">No JFrog capability linked.{mock}</span>;
+    return <span className="text-mute">No JFrog capability linked.</span>;
   }
+  const why = l.why_it_matters || l.why;
   return (
     <div className="flex flex-col gap-1">
-      <span className="font-medium">{RELATION_LABEL[l.relation] ?? l.relation.replace(/_/g, " ")}{mock}</span>
-      {l.why ? <span className="text-[#44516a]">{l.why}</span> : null}
+      <span className="font-medium">{RELATION_LABEL[l.relation] ?? l.relation.replace(/_/g, " ")}</span>
+      {why ? <span className="text-[#44516a]">{why}</span> : null}
       <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-xs text-mute">
         <span className="italic">&ldquo;{l.capability_quote}&rdquo;</span>{" "}
         <span className="not-italic">
@@ -111,7 +112,6 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
           <span className="text-xs text-mute">
             {item.publisher} · Published {fmtPublished(item.published_at, item.date_precision)} ·{" "}
             {basis ?? "Text basis not reported"}
-            {item.mock?.includes("text_basis") ? <MockTag what="the text basis" /> : null}
           </span>
         </Row>
       </dl>

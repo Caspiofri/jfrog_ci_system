@@ -32,19 +32,26 @@ export interface HoldReason {
   held_at: Level[];
 }
 
+// Contract §10.5. axis and capability_quote are null for not_related.
 export interface Lens {
-  axis: string;
-  capability_quote: string;
+  axis: string | null;
+  capability_quote: string | null;
   relation: "closes_gap" | "opens_gap" | "improves_shared" | "not_related" | string;
-  why: string;
-  source_url?: string | null; // request 3d
+  why_it_matters: string;
+  /** @deprecated same text as why_it_matters */
+  why?: string;
+  source_url?: string | null; // request 3d, not built
   source_label?: string | null;
 }
 
+// Contract §10.5 (D39).
 export interface TextBasis {
   status: "full" | "partial" | "snippet" | "junk" | string;
-  source?: "page" | "feed" | "teaser" | string | null;
-  reason?: string | null;
+  source: "page" | "feed" | "teaser" | string;
+  label: string;
+  reason: string | null;
+  reason_detail: string | null;
+  chars_used_for_scoring: number;
 }
 
 export interface RubricLine {
@@ -86,8 +93,7 @@ export interface Item {
   fingerprint: string | null;
   event_id: string | null;
   lens?: Lens | null; // D42: only when its quote check passed
-  text_basis?: TextBasis | null; // D44 request 3c
-  mock?: string[]; // dev mock mode only: the fields filled with stand-in values
+  text_basis?: TextBasis | null; // contract §10.5
 }
 
 export interface Competitor {
@@ -119,6 +125,11 @@ export interface BriefRow {
   anchor_run_id: string;
   anchor_kind?: string; // requested in BACKEND_REQUESTS.md #1
   backfill?: boolean; // requested in BACKEND_REQUESTS.md #1 (either name)
+  published?: number; // §10.2
+  published_high?: number;
+  held?: number;
+  held_high?: number;
+  /** @deprecated §10.2 */
   items: number;
   found_late: number;
   awaiting_review: number;
@@ -150,16 +161,18 @@ export interface Insight {
 }
 
 export interface BriefInsights {
-  status: string; // ok | partial | none | failed | not_generated | missing
+  /** Contract §10.4: the state the UI shows. */
+  status: "disabled" | "refreshing" | "failed" | "none_passed" | "ok" | "not_run" | "missing" | string;
+  generator_status?: string; // ok | partial | none | failed
   enabled?: boolean;
   generated_at?: string;
   trigger?: string;
   level?: string;
   model?: string;
   window?: { from?: string; to?: string; days?: number; items?: number; stories?: number };
-  rejected?: number | unknown[];
+  rejected?: number; // a count (§10.4)
   items: Insight[];
-  mock?: boolean; // dev mock mode only
+  mock?: boolean; // dev mock scenarios only
 }
 
 export interface Kpi {
@@ -168,13 +181,17 @@ export interface Kpi {
   prev: number | null;
 }
 
+// Contract §10.2: the Brief window's counts, from the same query as the item list.
 export interface BriefSummary {
+  brief_min_score: number;
   published: number;
-  published_high: number | null;
+  published_high: number;
+  published_below: number;
   held: number;
-  held_high: number | null;
-  level?: string;
-  mock?: string[]; // dev mock mode only
+  held_high: number;
+  held_by_preliminary_score: Record<string, number>;
+  level: string;
+  mock?: boolean; // dev mock scenarios only
 }
 
 export interface Brief {
@@ -198,7 +215,8 @@ export interface Brief {
     mentions_jfrog: number;
   } | null;
   kpis: Kpi[];
-  summary?: BriefSummary | null; // D44, request 3a
+  summary?: BriefSummary; // contract §10.2; absent only for a missing Brief
+  brief_min_score?: number;
   insights: BriefInsights;
   intensity: { days: number; by: string; series: { date: string; score: number; items: number }[] } | null;
   level?: Level;
@@ -274,7 +292,8 @@ export interface Review extends Page<ReviewItemRow | ReviewChangeRow> {
   level: Level;
   levels: LevelCount[];
   counts_by_reason: Record<string, number>;
-  scope?: { date_from?: string | null; date_to?: string | null; competitor?: unknown; brief?: string | null };
+  scope?: { date_from?: string | null; date_to?: string | null; competitor?: unknown; brief?: string | null; window?: { prev_anchor: string; anchor: string } };
+  backlog_total?: number; // §10.3: every undecided held item at this level, unfiltered
   meta: ApiMeta;
 }
 

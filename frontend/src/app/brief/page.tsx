@@ -10,7 +10,7 @@ import { BriefCard, MockTag } from "@/components/brief/BriefCard";
 import { ApiError, path, send, useApi } from "@/lib/api";
 import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
-import { MOCK, mockBrief, useMock, useMockTextBasis } from "@/lib/mock";
+import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefInsights, BriefRow, BriefSummary, Insight, ItemDetail, Page } from "@/lib/types";
 
@@ -49,10 +49,9 @@ function BriefScreen() {
   const mock = useMock();
   const scenario = MOCK && mock ? get("mock") : "";
   const insightsScenario = MOCK && mock ? get("mock_insights") : "";
-  const basis = useMockTextBasis(mock);
   const data = useMemo(
-    () => (raw.data ? mockBrief(mock, raw.data, scenario, insightsScenario, basis.data) : undefined),
-    [mock, raw.data, scenario, insightsScenario, basis.data],
+    () => (raw.data ? mockBrief(mock, raw.data, scenario, insightsScenario) : undefined),
+    [mock, raw.data, scenario, insightsScenario],
   );
   const brief = { ...raw, data };
   const row = briefs.data?.items.find((r) => r.date === date);
@@ -95,8 +94,8 @@ function BriefScreen() {
 
       {MOCK && mock ? (
         <div className="rounded border border-dashed border-[#8b5cf6] bg-[#f5f3ff] px-3 py-2 text-xs text-[#5b21b6]">
-          Dev mock mode: values the API doesn&apos;t serve yet are stand-ins, each marked <MockTag />.
-          {scenario ? <> Scenario: <b>{scenario}</b>.</> : null}
+          Dev mock mode: values marked <MockTag /> are invented for a state check, not data.
+          {scenario || insightsScenario ? <> Scenario: <b>{[scenario, insightsScenario].filter(Boolean).join(", ")}</b>.</> : <> No scenario set, so everything below is the real API.</>}
         </div>
       ) : null}
       {briefs.error ? <ErrorNote error={briefs.error} onRetry={() => briefs.mutate()} /> : null}
@@ -107,7 +106,7 @@ function BriefScreen() {
       {briefs.data?.items.length ? (
         <Async {...brief} retry={() => brief.mutate()} rows={8}>
           {(b) =>
-            b.status === "missing" || !b.window || !b.counts ? (
+            b.status === "missing" || !b.window || !b.summary ? (
               <Panel><Empty>No Brief for {fmtLongDate(b.date)}: there was no successful daily run that day.</Empty></Panel>
             ) : (
               <>
@@ -117,13 +116,13 @@ function BriefScreen() {
                     : `Everything discovered from ${fmtDateTime(b.window.prev_anchor)} to ${fmtDateTime(b.window.anchor)} Israel time (${b.window.hours} h).`}
                 </div>
 
-                <SummaryBlock date={b.date} s={b.summary ?? fallbackSummary(b)} />
+                <SummaryBlock date={b.date} s={b.summary} />
 
                 <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
 
                 <Panel
                   title="What was published in this Brief?"
-                  cap={`Sorted by importance · ${b.items.total} items${competitor || category ? " match the filters" : ""}`}
+                  cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
                 >
                   {b.items.items.length ? (
                     b.items.items.map((it) => <BriefCard key={it.item_id} item={it} showLate={!backfill} highlight={highlighted.has(it.item_id)} />)
@@ -131,7 +130,7 @@ function BriefScreen() {
                     <Empty>
                       {competitor || category
                         ? "Nothing matches these filters."
-                        : (b.summary ?? fallbackSummary(b)).held
+                        : b.summary.held
                           ? "Nothing was published in this window. The held items above aren't verified yet, so they aren't part of the Brief."
                           : "Nothing was published in this window."}
                     </Empty>
@@ -147,36 +146,26 @@ function BriefScreen() {
   );
 }
 
-/** The counts the API already serves, until `summary` lands (BACKEND_REQUESTS.md 3a). No score counting here. */
-function fallbackSummary(b: Brief): BriefSummary {
-  return {
-    published: b.items.total,
-    published_high: b.kpis.find((k) => k.key === "important")?.value ?? null,
-    held: b.counts?.awaiting_review ?? 0,
-    held_high: null,
-  };
-}
-
 function SummaryBlock({ date, s }: { date: string; s: BriefSummary }) {
-  const m = (f: string) => (s.mock?.includes(f) || s.mock?.includes("all") ? <MockTag what="this count" /> : null);
+  const mock = s.mock ? <MockTag what="this count" /> : null;
   return (
     <section className="rounded-md border border-line bg-card px-[18px] py-4" aria-label="Brief summary">
       <div className="flex flex-wrap items-baseline gap-x-2 text-[15px]">
-        <span><b className="text-xl font-semibold tabular-nums">{s.published}</b> published{m("published")}</span>
+        <span><b className="text-xl font-semibold tabular-nums">{s.published}</b> published</span>
         <span className="text-mute">·</span>
-        <span>
-          {s.published_high === null ? <span className="text-mute">count rated 4–5 not reported</span> : <><b className="font-semibold tabular-nums">{s.published_high}</b> rated 4–5</>}
-          {m("published_high")}
-        </span>
+        <span><b className="font-semibold tabular-nums">{s.published_high}</b> rated 4–5</span>
+        {mock}
+        {s.published_below ? (
+          <span className="text-xs text-mute" title="Rubric v2: score 2 goes to the competitor profile, score 1 to the timeline">
+            ({s.published_below} more published below {s.brief_min_score} are on the competitor profiles)
+          </span>
+        ) : null}
       </div>
       <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[15px]">
-        <span><b className="text-xl font-semibold tabular-nums text-[#8a5a00]">{s.held}</b> held for review{m("held")}</span>
-        {s.held_high !== null && s.held_high !== undefined ? (
-          <>
-            <span className="text-mute">·</span>
-            <span><b className="font-semibold tabular-nums">{s.held_high}</b> preliminarily rated 4–5{m("held_high")}</span>
-          </>
-        ) : null}
+        <span><b className="text-xl font-semibold tabular-nums text-[#8a5a00]">{s.held}</b> held for review</span>
+        <span className="text-mute">·</span>
+        <span><b className="font-semibold tabular-nums">{s.held_high}</b> preliminarily rated 4–5</span>
+        {mock}
         {s.held ? (
           <Link href={`/review?brief=${encodeURIComponent(date)}`} className="inline-flex items-center gap-1 font-semibold text-jgreen-d hover:underline">
             <ArrowRight className="size-3.5" aria-hidden /> Review these
@@ -211,22 +200,25 @@ function FeedFooter({ total, all, offset, set }: { total: number; all: boolean; 
   );
 }
 
+/** Contract §10.4: `status` is the state to show. null = show the insights. */
 function insightState(ins: BriefInsights): string | null {
-  const rejected = Array.isArray(ins.rejected) ? ins.rejected.length : (ins.rejected ?? 0);
-  if (ins.enabled === false && !ins.items.length) return "Pattern analysis is not enabled for this Brief.";
-  if (ins.items.length) return null;
   switch (ins.status) {
+    case "ok":
+      return ins.items.length ? null : "No cross-competitor pattern met the evidence bar today.";
+    case "disabled":
+      return "Pattern analysis is not enabled for this Brief.";
+    case "refreshing":
+      return "refreshing";
     case "failed":
       return "failed";
     case "none_passed":
-    case "none":
-      return `No cross-competitor pattern met the evidence bar today${rejected || ins.status === "none_passed" ? ` (${rejected} candidates rejected)` : ""}.`;
+      return `No cross-competitor pattern met the evidence bar today (${ins.rejected ?? 0} candidates rejected).`;
+    case "not_run":
+      return "Pattern analysis didn't run for this Brief.";
     case "missing":
       return "There is no Brief for this date.";
-    case "not_generated":
-      return "Pattern analysis hasn't run for this Brief yet.";
     default:
-      return `No patterns for this Brief (${ins.status.replace(/_/g, " ")}).`;
+      return ins.items.length ? null : `No patterns for this Brief (${ins.status.replace(/_/g, " ")}).`;
   }
 }
 
@@ -235,7 +227,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<ApiError | null>(null);
-  const enabled = insights.enabled !== false;
+  const enabled = insights.status !== "disabled" && insights.enabled !== false;
   const refresh = async () => {
     setBusy(true);
     setErr(null);
@@ -248,7 +240,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
       setBusy(false);
     }
   };
-  const rejected = Array.isArray(insights.rejected) ? insights.rejected.length : insights.rejected;
+  const rejected = insights.rejected;
   const cap = insights.generated_at && insights.items.length
     ? `Generated ${fmtDateTime(insights.generated_at)}${insights.trigger === "refresh" ? " (refreshed)" : ""}${insights.window?.from ? ` · window ${fmtDate(insights.window.from)}–${fmtDate(insights.window.to)}` : ""}${rejected ? ` · ${rejected} rejected by the checks` : ""}`
     : undefined;
@@ -258,7 +250,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
       title="What patterns matter today?"
       cap={cap}
       right={
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={refresh} disabled={busy || !enabled}
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={refresh} disabled={busy || !enabled || insights.status === "refreshing"}
           title={enabled ? "Run pattern analysis again after analyst approvals; the 06:00 version is kept" : "Pattern analysis is not enabled for this Brief"}>
           <RefreshCw className={busy ? "size-3 animate-spin" : "size-3"} /> Refresh insights
         </Button>
@@ -269,7 +261,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         {insights.mock ? <MockTag what="this insights state" /> : null}
       </div>
       {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
-      {busy ? (
+      {busy || state === "refreshing" ? (
         <div className="flex items-center gap-2 py-3 text-mute" role="status"><Loader2 className="size-4 animate-spin" aria-hidden /> Refreshing pattern analysis…</div>
       ) : state === "failed" ? (
         <Empty>Pattern analysis failed on this run. See <Link href="/health" className="text-jgreen-d hover:underline">Health</Link>.</Empty>

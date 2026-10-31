@@ -170,18 +170,30 @@ export const RELATION_LABEL: Record<string, string> = {
   improves_shared: "Improves a capability both already have",
 };
 
+/** Why the article text wasn't used (contract §10.5 `reason`), in words. http_<code> is handled below. */
 const BASIS_REASON: Record<string, string> = {
   cloudflare_challenge: "the site blocks text extraction",
-  http_403: "the site blocks text extraction",
   timeout: "the page timed out",
   empty: "the page had no readable text",
+  not_html: "the link isn't an article page",
+  connection_error: "the site couldn't be reached",
+  skipped_unresolved: "the news link couldn't be resolved to the article",
+  shorter_than_teaser: "the page text was shorter than the teaser",
+  failed: "the fetch failed",
+  not_recorded: "why wasn't recorded for this older item",
 };
 
-/** The text an item was scored from, in words (D39). null when the API doesn't report it. */
-export function textBasisWords(b: { status: string; source?: string | null; reason?: string | null } | null | undefined): string | null {
+function reasonWords(reason: string | null): string | null {
+  if (!reason || reason === "not_article") return null; // the junk label already says so
+  const http = reason.match(/^http_(\d{3})$/);
+  if (http) return http[1] === "403" || http[1] === "401" ? "the site blocks text extraction" : `the site answered HTTP ${http[1]}`;
+  return BASIS_REASON[reason] ?? reason.replace(/_/g, " ");
+}
+
+/** The text an item was scored from, in words (D39): the API's label, plus why when the article wasn't used. */
+export function textBasisWords(b: { status: string; label: string; reason: string | null } | null | undefined): string | null {
   if (!b) return null;
-  if (b.status === "full") return b.source === "feed" ? "Full text from the feed" : "Full text";
-  if (b.status === "partial") return "Partial text";
-  const why = (b.reason && BASIS_REASON[b.reason]) || (b.status === "junk" ? "the page text was unusable" : "the full text wasn't available");
-  return `Scored from headline and teaser; ${why}`;
+  if (b.status === "full" || b.status === "partial") return b.label;
+  const why = reasonWords(b.reason);
+  return `Scored from ${b.label.charAt(0).toLowerCase()}${b.label.slice(1)}${why ? `; ${why}` : ""}`;
 }
