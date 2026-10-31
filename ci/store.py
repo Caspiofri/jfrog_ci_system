@@ -279,6 +279,25 @@ class Store:
         done = {r[0] for r in self._db.execute("SELECT DISTINCT item_id FROM classifications")}
         return [i for i in ids if i not in done]
 
+    def recoverable(self) -> list[dict]:
+        """Stored items a failed daily run never classified (D49), oldest first, as their stored rows.
+
+        Unclassified here means all of:
+        - stored: dedupe-dropped items never reach the items table;
+        - no classification from any run: noise items have one (noise=true), so they are never re-sent;
+        - not skipped by any run: the golden-set test split stays away from the model;
+        - never seen by an import run: the 14-day import was processed once, and its unclassified items are its
+          test-split skips.
+        """
+        rows = self._db.execute(
+            "SELECT raw FROM items i"
+            " WHERE NOT EXISTS (SELECT 1 FROM classifications c WHERE c.item_id = i.item_id)"
+            " AND NOT EXISTS (SELECT 1 FROM skips k WHERE k.item_id = i.item_id)"
+            " AND NOT EXISTS (SELECT 1 FROM sightings s JOIN runs r ON r.run_id = s.run_id"
+            "                 WHERE s.item_id = i.item_id AND r.kind = 'import')"
+            " ORDER BY i.discovered_at, i.item_id")
+        return [json.loads(r["raw"]) for r in rows]
+
     # ---- model output --------------------------------------------------------------------------------------------
 
     def save_outputs(self, run_id: str, fingerprint: str, classifications: list[Classification],

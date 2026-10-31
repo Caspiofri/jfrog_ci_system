@@ -239,3 +239,77 @@ def test_the_fetch_status_reaches_the_store_and_the_item_payload(paths):
         raw = json.loads(s.item(blocked["id"])["raw"])
     assert (raw["fetch_status"], raw["fetch_http_status"]) == ("cloudflare_challenge", 403)
     assert svc.text_basis(raw)["reason"] == "cloudflare_challenge"
+
+
+def collect_at(rows, run_id, started_at):
+    """A collection run at a given time (fake_collect's start is fixed)."""
+    def collect(cfg, *, days=None, runs_dir=None, data_dir=None):
+        report = {"run_id": run_id, "started_at": started_at, "status": "ok", "status_reason": "",
+                  "pipeline_errors": [], "sources": {"google_news": {"collected": len(rows), "dup_url": 0,
+                                                                     "dup_embedding": 0, "errors": []}}}
+        return RunResult(run_id, [Packet.model_validate({**r, "run_id": run_id}) for r in rows], [], report)
+    return collect
+
+
+CRASH_RUN, NEXT_RUN = "20261101T0400Z-cccccc", "20261102T0400Z-dddddd"
+
+
+def test_items_of_a_run_that_crashed_in_classify_reach_the_next_brief(paths, monkeypatch):
+    """D49: a crash after the items are stored used to lose them for good. Collection had already written their URLs
+    to the seen history, so the next run dropped them as duplicates and only classified its own rows."""
+    from ci.api import service as svc
+
+    assert run(paths, from_run=OLD_RUN).status == "ok"  # the import: classified A and B, skipped T (test split)
+    c = row("https://c.example/9", "Gamma ships a firewall", run_id=CRASH_RUN)
+
+    def boom(self, items):
+        raise RuntimeError("classifier crashed")
+
+    with monkeypatch.context() as m:
+        m.setattr(daily.Classifier, "classify", boom)
+        crashed = run(paths, collect=collect_at([c], CRASH_RUN, "2026-11-01T04:00:00+00:00"))
+    assert crashed.status == "failed"
+    with Store(paths["store_path"]) as s:
+        assert s.item(c["id"]) and s.unclassified([c["id"]]) == [c["id"]]  # stored, never classified
+
+    res = run(paths, collect=collect_at([], NEXT_RUN, "2026-11-02T04:00:00+00:00"))  # c comes back as a dup_url
+    assert res.status == "ok" and res.report["recovered"] == {"items": 1, "item_ids": [c["id"]]}
+    with Store(paths["store_path"]) as s:
+        assert s.unclassified([c["id"]]) == [] and s.recoverable() == []
+        assert s.run_metrics(NEXT_RUN)[0]["items"]["recovered"] == 1
+        snap = svc.Snapshot.read(s, CFG)
+    w = snap.window("2026-11-02")  # the failed run anchors no Brief, so its discovery time falls in the next one
+    assert c["id"] in snap.window_ids(w)
+    ids, summary = snap.brief_summary(w, min_score=1)
+    assert summary["published"] + summary["held"] == 1 and snap.status(c["id"]) in (*svc.PUBLISHED, "awaiting_review")
+
+
+def test_a_normal_run_recovers_nothing_and_never_resends_the_import(paths):
+    """The normal path is unchanged: the import's test-split skip and its classified items are never re-sent."""
+    run(paths, from_run=OLD_RUN)
+    llm = FakeLLM(answer)
+    d = row("https://d.example/1", "Delta story", run_id=NEXT_RUN)
+    res = run(paths, llm=llm, collect=collect_at([d], NEXT_RUN, "2026-11-02T04:00:00+00:00"))
+    assert res.report["recovered"] == {"items": 0, "item_ids": []}
+    sent = {i for p, _ in llm.calls for i in (A["id"], B["id"], T["id"], d["id"]) if i in p}
+    assert sent == {d["id"]}
+
+
+def test_recoverable_excludes_noise_skips_and_the_import(tmp_path):
+    from ci.classify import Classification
+    from ci.rank import Ranked
+
+    def r(i):
+        return {**row(f"https://x.example/{i}", i), "id": i}
+
+    with Store(tmp_path / "ci.sqlite") as s:
+        s.start_run("imp", "import", "2026-10-30T00:00:00+00:00", "fp", "m")
+        s.add_items([r("imported")], "imp", "2026-10-30T00:00:00+00:00")
+        s.start_run("day", "daily", "2026-11-01T00:00:00+00:00", "fp", "m")
+        s.add_items([r("noise"), r("skipped"), r("lost"), r("imported")], "day", "2026-11-01T00:00:00+00:00")
+        noise = Classification(id="noise", competitor="none", category="Security", noise=True, mentions_jfrog=False,
+                               confidence=0.9, method="rules")
+        s.save_outputs("day", "fp", [noise],
+                       [Ranked(id="noise", raw_score=None, score=None, noise=True, reason="", confidence=0.9)])
+        s.save_skips("day", {"skipped": "test split"})
+        assert [x["id"] for x in s.recoverable()] == ["lost"]

@@ -214,8 +214,14 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
                 if from_run:
                     errors += remember_history(rows, data_dir, embed_fn)
                 pending = set(store.unclassified(r["id"] for r in rows))
-                skips = {r["id"]: TEST_SKIP for r in rows if r["id"] in pending and r["id"] in test_ids}
+                # D49: items an earlier run stored but never classified (it crashed before saving outputs). Their URLs
+                # are already in the seen history, so no later collection brings them back; this is their only path.
+                in_run = {r["id"] for r in rows}
+                recovered = [r for r in store.recoverable() if r["id"] not in in_run]
+                skips = {r["id"]: TEST_SKIP for r in rows + recovered
+                         if (r["id"] in pending or r["id"] not in in_run) and r["id"] in test_ids}
                 to_model = [r for r in rows if r["id"] in pending and r["id"] not in skips]
+                to_model += [r for r in recovered if r["id"] not in skips]
                 store.save_skips(run_id, skips)
             checked = ValidatingLLM(counting)  # D32: every answer row checked against the config lists
             classifications, ranked = [], []
@@ -259,15 +265,22 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
             errors.append(f"{len(rejections)} model outputs rejected for {len({r.item_id for r in rejections})}"
                           " items (routed to review; see the rejections table)")
         status = "degraded" if errors else "ok"
+        if recovered:
+            log.warning("classified %d items an earlier run stored but never classified: %s", len(recovered),
+                        ", ".join(r["id"] for r in recovered))
         out = {"run_id": run_id, "kind": kind, "status": status, "started_at": started_at,
                "finished_at": datetime.now(UTC).isoformat(), "fingerprint": fp, "model": counting.model,
                "llm_calls": counting.calls, "errors": errors, **extra,
                "rejections": [vars(r) for r in rejections],
-               "funnel": funnel(rows, report, new, skips, to_model, classifications, ranked, rejections)}
+               "recovered": {"items": len(recovered), "item_ids": [r["id"] for r in recovered]},
+               # the funnel follows this run's own rows; recovered items are counted above, not per source
+               "funnel": funnel(rows, report, new, skips, [r for r in to_model if r["id"] in in_run],
+                                classifications, ranked, rejections)}
         save_metrics(store, lambda: run_metrics.build(
             run_id=run_id, kind=kind, status=status, started_at=started_at, fingerprints=fps, model=counting.model,
             llm_calls=counting.calls, steps=steps,
-            items=run_metrics.items_block(out["funnel"]["totals"], routed_statuses(store, cfg, run_id)),
+            items=run_metrics.items_block(out["funnel"]["totals"], routed_statuses(store, cfg, run_id))
+            | {"recovered": len(recovered)},
             extraction=run_metrics.extraction_block(rows),
             lens=run_metrics.lens_block(store.lens_rows(run_id), extra["lens"]["status"]),
             insights=run_metrics.insights_block(extra["insights"]),

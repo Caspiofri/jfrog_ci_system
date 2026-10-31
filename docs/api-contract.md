@@ -556,7 +556,7 @@ Every daily or import run writes one row to the store's `run_metrics` table when
 |---|---|
 | `run_id`, `kind`, `status`, `started_at`, `finished_at`, `model`, `llm_calls`, `error` | as in `runs`; `error` is set on a failed run |
 | `fingerprints` | `{classify_rank, lens, insights}`: the eval fingerprint and the lens and insights prompt fingerprints |
-| `items` | `collected`, `kept`, `new`, `test_skip`, `to_model`, `noise`, `non_noise`; `published`, `held` (awaiting review) and `by_status` at the level when the run ended, out of `routed_n` = items classified in this run |
+| `items` | `collected`, `kept`, `new`, `test_skip`, `to_model`, `noise`, `non_noise` (this run's own rows); `recovered`: items an earlier failed run stored but never classified, classified by this run (D49); `published`, `held` (awaiting review) and `by_status` at the level when the run ended, out of `routed_n` = items classified in this run |
 | `extraction` | `extracted` of `n` kept items, and `by_source`: `{source: {extracted, n, fetch: {fetch_status: count}}}` |
 | `lens` | `status`, `n`, `ok`, `rejected`, `failed`; `quote_check: {passed, failed, n}` (n = items whose relation needs a quote); `relations` over the ok lenses, with `relations_n`; `rejected_reasons` |
 | `insights` | `status`, `produced`, `rejected`, `rejected_reasons: [{title, reason}]`, `brief_date`, `error` |
