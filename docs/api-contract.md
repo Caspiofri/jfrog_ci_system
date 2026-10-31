@@ -275,7 +275,9 @@ The response to `POST`:
 | `run` | – | ✅ | `runs` (status, fingerprint, model, llm_calls, errors) |
 | `funnel` | `funnel` | ✅ / 🔧 | per source, from the daily funnel (collected, dup_url, dup_embedding, kept, new, test_skip, rules, llm, fallback, noise, scored, rejected). The prototype's `published` and `held_for_review` come from 🔧 routing |
 | `silent` | `silent` | 🔧 | `source`, `last_item`, `hours_silent`, `status` (Healthy\|Silent). The plan 2.8 rule needs ≥ 7 daily runs of history; until then it reports `"insufficient_history": true` with the number of runs |
-| `eval` | `eval` | ✅ | the newest `output/evals/*.json`; see below |
+| `run_metrics` | – | ✅ | the selected run's metrics row, or null for a run before Oct 31 night; see §11 |
+| `eval` | `eval` | ✅ | the newest eval report in `output/evals/` (`<timestamp>.json`; the `insights_*.json` beside them are not eval reports); see below |
+| `test_eval` | – | ✅ | the D23 test-split eval; `"status": "none"` until it has run; see §11.3 |
 | `coverage` | – | ✅ | `output/coverage/<run>.json` |
 | `change_detection` | – | ✅ | `output/changes/<run>.report.json` |
 
@@ -543,3 +545,42 @@ Every `Item` gains `text_basis`, and `lens` gains `why_it_matters`:
 | top-level `insights_status` | `insights.status` (raw status → `insights.generator_status`) |
 | `insights.rejected_count` | `insights.rejected` (a count) |
 | `text_basis.failure_reason` / `failure_detail` | `text_basis.reason` / `reason_detail` |
+
+## 11. Per-run metrics and the test-split eval (31 Oct night; as built)
+
+### 11.1 The metrics row
+
+Every daily or import run writes one row to the store's `run_metrics` table when it ends: ok, degraded or failed. Every count comes with its n.
+
+| Field | Content |
+|---|---|
+| `run_id`, `kind`, `status`, `started_at`, `finished_at`, `model`, `llm_calls`, `error` | as in `runs`; `error` is set on a failed run |
+| `fingerprints` | `{classify_rank, lens, insights}`: the eval fingerprint and the lens and insights prompt fingerprints |
+| `items` | `collected`, `kept`, `new`, `test_skip`, `to_model`, `noise`, `non_noise`; `published`, `held` (awaiting review) and `by_status` at the level when the run ended, out of `routed_n` = items classified in this run |
+| `extraction` | `extracted` of `n` kept items, and `by_source`: `{source: {extracted, n, fetch: {fetch_status: count}}}` |
+| `lens` | `status`, `n`, `ok`, `rejected`, `failed`; `quote_check: {passed, failed, n}` (n = items whose relation needs a quote); `relations` over the ok lenses, with `relations_n`; `rejected_reasons` |
+| `insights` | `status`, `produced`, `rejected`, `rejected_reasons: [{title, reason}]`, `brief_date`, `error` |
+| `validation` | D32: `outputs` and `items` rejected, `by_stage`, `reasons: [{item_id, stage, reason}]` |
+| `steps` | in order: `[{step, status, seconds, llm_calls, errors?, item_ids?, reason?}]`. Steps are `collect` or `load_run`, then `store`, `classify`, `rank`, `validate`, `lens`, `insights`. `status` is one of `ok`, `degraded` (some items fell back; `item_ids` lists them), `failed` (where the run stopped) or `skipped` (`reason`) |
+
+On a failed run, the blocks the run never reached are null, and the last step present is the one that failed.
+
+Not recorded: a run that stopped before the store opened (another run held the lock, the split file was missing). Those runs exist only in `output/logs/ci_daily.log`.
+
+### 11.2 Endpoints
+
+- `GET /api/v1/run-metrics?limit=&offset=`: the rows, newest run first, paged like `/runs`.
+- `GET /api/v1/run-metrics/{run_id}`: one row; 404 `not_found` when the run has none.
+- `GET /api/v1/health` adds `run_metrics` for the selected run (`?run_id=`), or null.
+
+### 11.3 The test-split eval (D23)
+
+`GET /api/v1/evals/test`, also served as `health.test_eval`, returns the newest eval report that is live, on the test split and not aborted:
+
+`{status: "ok", report, created_at, split: "test", fingerprint, model, n, split_counts, fallbacks, test_runs, metrics, cards}`
+
+- `test_runs` is the number of such reports. It should be 1.
+- `cards` has the same shape as the `eval` block's cards.
+- Until the test eval runs, the response is `{status: "none", note}`.
+- `health.eval` keeps showing the newest report of any split. A later train run therefore replaces the test numbers in `eval`, but not in `test_eval`.
+

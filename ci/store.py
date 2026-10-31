@@ -148,6 +148,17 @@ CREATE TABLE IF NOT EXISTS skips (
     reason TEXT NOT NULL,
     PRIMARY KEY (item_id, run_id)
 );
+CREATE TABLE IF NOT EXISTS run_metrics (  -- one row per run, written when it ends (ci.run_metrics); for Health
+    run_id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,            -- ok | degraded | failed, as in runs
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    fingerprint TEXT,                -- classifier + ranker (the eval fingerprint)
+    lens_fingerprint TEXT,
+    insights_fingerprint TEXT,
+    metrics TEXT NOT NULL            -- JSON: items, extraction, lens, insights, validation, steps
+);
 """
 
 
@@ -313,6 +324,26 @@ class Store:
         for r in self._db.execute("SELECT * FROM lens ORDER BY created_at"):
             out[r["item_id"]] = dict(r)
         return out
+
+    def lens_rows(self, run_id: str) -> list[dict]:
+        return [dict(r) for r in self._db.execute("SELECT * FROM lens WHERE run_id = ?", (run_id,))]
+
+    # ---- per-run metrics -----------------------------------------------------------------------------------------
+
+    def save_run_metrics(self, m: dict) -> None:
+        fp = m.get("fingerprints") or {}
+        with self._db:
+            self._db.execute(
+                "INSERT OR REPLACE INTO run_metrics VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (m["run_id"], m["kind"], m["status"], m["started_at"], m["finished_at"], fp.get("classify_rank"),
+                 fp.get("lens"), fp.get("insights"), json.dumps(m, ensure_ascii=False)))
+
+    def run_metrics(self, run_id: str | None = None) -> list[dict]:
+        """The metrics rows, newest run first; one run's row when run_id is given (an empty list if none)."""
+        sql, args = "SELECT metrics FROM run_metrics", ()
+        if run_id is not None:
+            sql, args = sql + " WHERE run_id = ?", (run_id,)
+        return [json.loads(r["metrics"]) for r in self._db.execute(sql + " ORDER BY started_at DESC", args)]
 
     # ---- insights ------------------------------------------------------------------------------------------------
 

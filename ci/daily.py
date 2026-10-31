@@ -37,7 +37,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ci import config as ci_config
-from ci import eval_golden, insights, lens, validate
+from ci import eval_golden, insights, lens, run_metrics, validate
 from ci.classify import Classifier
 from ci.dedupe import EmbeddingDeduper, SeenUrls
 from ci.llm import GeminiLLM, JsonLLM
@@ -180,53 +180,79 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
     cfg = cfg or ci_config.load()
     test_ids = held_out_ids(split_path)  # before any collection or LLM call
     errors: list[str] = []
+    counting = CountingLLM(llm or GeminiLLM())
+    steps = run_metrics.Steps(counting)
+    fps = {"classify_rank": None, "lens": lens.fingerprint(), "insights": insights.fingerprint()}
     if from_run:
-        rows, report = load_run(from_run, runs_dir)
+        with steps.step("load_run"):
+            rows, report = load_run(from_run, runs_dir)
         run_id, kind = from_run, "import"
     else:
-        result = collect(cfg, days=days, runs_dir=runs_dir, data_dir=data_dir)
+        with steps.step("collect"):
+            result = collect(cfg, days=days, runs_dir=runs_dir, data_dir=data_dir)
         report, run_id, kind = result.report, result.run_id, "daily"
         if result.failed:  # recorded in the store too, so a missed day is visible there and not only in the log
             reason = report.get("status_reason") or "collection failed"
+            steps.fail("collect", reason)
             out = {"run_id": run_id, "kind": kind, "status": "failed", "error": reason, "collection": report}
             with Store(store_path) as store:
                 store.start_run(run_id, kind, report["started_at"], "", "")
+                save_metrics(store, lambda: run_metrics.build(
+                    run_id=run_id, kind=kind, status="failed", started_at=report["started_at"], fingerprints=fps,
+                    model=None, llm_calls=0, steps=steps, error=reason), out)
                 store.finish_run(run_id, "failed", out, reason)
             return DailyResult(run_id, "failed", out, [reason])
         rows = [p.model_dump(mode="json") for p in result.kept]
         errors += report.get("pipeline_errors", [])
     started_at = report["started_at"]
-    counting = CountingLLM(llm or GeminiLLM())
-    fp = fingerprint or eval_golden.fingerprint(cfg)
+    fp = fps["classify_rank"] = fingerprint or eval_golden.fingerprint(cfg)
     with Store(store_path) as store:
         store.start_run(run_id, kind, started_at, fp, counting.model)
         try:
-            new = set(store.add_items(rows, run_id, started_at))
-            if from_run:
-                errors += remember_history(rows, data_dir, embed_fn)
-            pending = set(store.unclassified(r["id"] for r in rows))
-            skips = {r["id"]: TEST_SKIP for r in rows if r["id"] in pending and r["id"] in test_ids}
-            to_model = [r for r in rows if r["id"] in pending and r["id"] not in skips]
-            store.save_skips(run_id, skips)
+            with steps.step("store"):
+                new = set(store.add_items(rows, run_id, started_at))
+                if from_run:
+                    errors += remember_history(rows, data_dir, embed_fn)
+                pending = set(store.unclassified(r["id"] for r in rows))
+                skips = {r["id"]: TEST_SKIP for r in rows if r["id"] in pending and r["id"] in test_ids}
+                to_model = [r for r in rows if r["id"] in pending and r["id"] not in skips]
+                store.save_skips(run_id, skips)
             checked = ValidatingLLM(counting)  # D32: every answer row checked against the config lists
-            classifications = Classifier(checked, cfg, runs_dir=runs_dir).classify(to_model) if to_model else []
-            ranked = Ranker(checked).rank(to_model, classifications) if to_model else []
-            sent = {r["id"] for r in to_model}
-            rejections = checked.rejections + validate.check_outputs(sent, cfg, classifications, ranked)
-            # an output for an id we never sent is not stored; every rejected item goes to review with its reason
-            classifications = [c for c in classifications if c.id in sent]
-            ranked = [r for r in ranked if r.id in sent]
-            classifications, ranked = validate.route_to_review(rejections, classifications, ranked)
-            store.save_outputs(run_id, fp, classifications, ranked)
-            store.save_rejections(run_id, rejections)
+            classifications, ranked = [], []
+            if not to_model:
+                steps.skip("classify", "no new items")
+                steps.skip("rank", "no new items")
+            else:
+                with steps.step("classify"):
+                    classifications = Classifier(checked, cfg, runs_dir=runs_dir).classify(to_model)
+                with steps.step("rank"):
+                    ranked = Ranker(checked).rank(to_model, classifications)
+            with steps.step("validate"):
+                sent = {r["id"] for r in to_model}
+                rejections = checked.rejections + validate.check_outputs(sent, cfg, classifications, ranked)
+                # an output for an id we never sent is not stored; every rejected item goes to review with its reason
+                classifications = [c for c in classifications if c.id in sent]
+                ranked = [r for r in ranked if r.id in sent]
+                classifications, ranked = validate.route_to_review(rejections, classifications, ranked)
+                store.save_outputs(run_id, fp, classifications, ranked)
+                store.save_rejections(run_id, rejections)
             extra = explain_and_summarize(store, run_id, started_at, to_model, classifications, ranked, counting,
-                                          cfg, sheet_path, embed_fn, errors)
+                                          cfg, sheet_path, embed_fn, errors, steps)
         except Exception as e:
             out = {"run_id": run_id, "kind": kind, "status": "failed", "error": f"{type(e).__name__}: {e}",
                    "traceback": traceback.format_exc()}
+            save_metrics(store, lambda: run_metrics.build(
+                run_id=run_id, kind=kind, status="failed", started_at=started_at, fingerprints=fps,
+                model=counting.model, llm_calls=counting.calls, steps=steps, error=out["error"]), out)
             store.finish_run(run_id, "failed", out, out["error"])
             return DailyResult(run_id, "failed", out, [out["error"]])
-        fallbacks = sum(c.method == "fallback" for c in classifications) + sum(r.degraded for r in ranked)
+        fell_back = [c.id for c in classifications if c.method == "fallback"]
+        degraded = [r.id for r in ranked if r.degraded]
+        if fell_back:
+            steps.fail("classify", f"{len(fell_back)} of {len(to_model)} items fell back", fell_back, "degraded")
+        if degraded:
+            steps.fail("rank", f"{len(degraded)} of {len(to_model)} items degraded", degraded, "degraded")
+        fallbacks = len(fell_back) + len(degraded)
         if fallbacks:
             errors.append(f"{fallbacks} classifier/ranker outputs fell back or are degraded (see the funnel)")
         if rejections:
@@ -238,40 +264,74 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
                "llm_calls": counting.calls, "errors": errors, **extra,
                "rejections": [vars(r) for r in rejections],
                "funnel": funnel(rows, report, new, skips, to_model, classifications, ranked, rejections)}
+        save_metrics(store, lambda: run_metrics.build(
+            run_id=run_id, kind=kind, status=status, started_at=started_at, fingerprints=fps, model=counting.model,
+            llm_calls=counting.calls, steps=steps,
+            items=run_metrics.items_block(out["funnel"]["totals"], routed_statuses(store, cfg, run_id)),
+            extraction=run_metrics.extraction_block(rows),
+            lens=run_metrics.lens_block(store.lens_rows(run_id), extra["lens"]["status"]),
+            insights=run_metrics.insights_block(extra["insights"]),
+            validation=run_metrics.validation_block(rejections)), out)
         store.finish_run(run_id, status, out, "; ".join(errors))
     (runs_dir / f"{run_id}.daily.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     return DailyResult(run_id, status, out, errors)
 
 
+def save_metrics(store: Store, build: Callable[[], dict], out: dict) -> None:
+    """Write the run's metrics row (ci.run_metrics). Never raises: a metrics failure is noted in the report."""
+    try:
+        store.save_run_metrics(build())
+    except Exception as e:
+        log.exception("run metrics not written")
+        out["metrics_error"] = f"{type(e).__name__}: {e}"
+
+
+def routed_statuses(store: Store, cfg: ci_config.CIConfig, run_id: str) -> list[str]:
+    """The routing status, at the current level, of each item this run classified."""
+    from ci.api import service as svc
+
+    s = svc.Snapshot.read(store, cfg)
+    return [s.status(i) for i, o in s.outputs.items() if o["run_id"] == run_id]
+
+
 def explain_and_summarize(store: Store, run_id: str, started_at: str, to_model: list[dict], classifications: list,
                           ranked: list, llm: JsonLLM, cfg: ci_config.CIConfig, sheet_path: Path, embed_fn,
-                          errors: list[str]) -> dict:
+                          errors: list[str], steps: run_metrics.Steps | None = None) -> dict:
     """The JFrog lens on this run's non-noise items, then the Brief's insights when enabled. Never raises: a failure
     is an error in the report (the run is then degraded), not a lost run."""
+    steps = steps or run_metrics.Steps()
     out: dict = {"lens": {"status": "skipped"}, "insights": {"status": "disabled"}}
     sheet = lens.load_sheet(sheet_path)
     noise = {c.id for c in classifications if c.noise}
     items = [r for r in to_model if r["id"] not in noise]
     if sheet is None:
         out["lens"] = {"status": "skipped", "reason": f"no capability sheet at {sheet_path}"}
-    elif items:
+        steps.skip("lens", out["lens"]["reason"])
+    elif not items:
+        steps.skip("lens", "no new non-noise items")
+    else:
         try:
-            got = lens.explain(items, llm, sheet)
-            store.save_lens(run_id, lens.fingerprint(), [lens.to_row(x) for x in got])
+            with steps.step("lens"):
+                got = lens.explain(items, llm, sheet)
+                store.save_lens(run_id, lens.fingerprint(), [lens.to_row(x) for x in got])
             counts = Counter(x.status for x in got)
             out["lens"] = {"status": "ok", "fingerprint": lens.fingerprint(), "items": len(got), **counts,
                            "rejected_reasons": [x.reason for x in got if x.status == "rejected"]}
             if counts["failed"]:
                 errors.append(f"lens: {counts['failed']} of {len(got)} items in failed batches")
+                steps.fail("lens", errors[-1], [x.item_id for x in got if x.status == "failed"], "degraded")
         except Exception as e:
             errors.append(f"lens failed: {type(e).__name__}: {e}")
             out["lens"] = {"status": "failed", "error": str(e)[:200]}
     if store.setting("insights_enabled", "false") != "true":
+        steps.skip("insights", "insights_enabled is off")
         return out
     try:
-        out["insights"] = generate_insights(store, run_id, llm, cfg, sheet, embed_fn, trigger="daily")
+        with steps.step("insights"):
+            out["insights"] = generate_insights(store, run_id, llm, cfg, sheet, embed_fn, trigger="daily")
         if out["insights"]["status"] == "failed":
             errors.append(f"insights failed: {out['insights'].get('error', '')}")
+            steps.fail("insights", errors[-1])
     except Exception as e:
         errors.append(f"insights failed: {type(e).__name__}: {e}")
         out["insights"] = {"status": "failed", "error": str(e)[:200]}
@@ -295,6 +355,7 @@ def generate_insights(store: Store, run_id: str, llm: JsonLLM, cfg: ci_config.CI
                             level=s.level, trigger=trigger, sheet=sheet)
     store.save_insights(brief, res.to_json())
     return {"status": res.status, "brief_date": brief, "insights": len(res.insights), "rejected": len(res.rejected),
+            "rejected_reasons": [{"title": r.get("title"), "reason": r.get("reason")} for r in res.rejected],
             "fingerprint": res.fingerprint, "error": res.error}
 
 

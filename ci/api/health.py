@@ -15,6 +15,7 @@
   events. Coverage is reported as counts with their n, never as a rate.
 """
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from ci.api import service as svc
 
 WEAK_N = 10
 MIN_RUNS_FOR_SILENT = 2
+EVAL_REPORT_NAME = re.compile(r"\d{8}T\d{6}Z\.json")  # ci.eval_golden reports; not insights_*.json beside them
 DEALS_CATEGORY = "Funding/M&A/Partnerships"
 IMPORTANT_NOTE = ("few important labels ({important} of {n} non-noise labels score 4-5); the coverage check is the "
                   "main evidence for not missing important events")
@@ -96,8 +98,16 @@ def extraction_block(raws: list[dict]) -> dict:
             "by_publisher": extraction_rows(raws, lambda r: r.get("publisher") or svc.sources.host(r.get("url") or ""))}
 
 
+def eval_reports(evals_dir) -> list[Path]:
+    return [p for p in Path(evals_dir).glob("*.json") if EVAL_REPORT_NAME.fullmatch(p.name)]
+
+
+def is_test_eval(report: dict) -> bool:
+    return report.get("split") == "test" and bool(report.get("live")) and not report.get("aborted")
+
+
 def newest(paths: list[Path]) -> Path | None:
-    return max(paths, key=lambda p: p.stat().st_mtime) if paths else None
+    return max(paths, key=lambda p: (p.stat().st_mtime, p.name)) if paths else None  # ties: the timestamped name
 
 
 def register(app, d) -> None:
@@ -165,7 +175,7 @@ def register(app, d) -> None:
                         "collected and an error in the latest run", "items": rows}
 
     def eval_block() -> dict:
-        path = newest([p for p in Path(d.evals_dir).glob("*.json")])
+        path = newest(eval_reports(d.evals_dir))
         labels = label_summary(Path(d.labels_path))
         if path is None:
             return {"status": "none", "labels": labels, "cards": eval_cards({}, labels)}
@@ -175,6 +185,25 @@ def register(app, d) -> None:
                 "model": report.get("model"), "n": report.get("n"), "labels": labels,
                 "test_eval_run": report.get("split") == "test" and bool(report.get("live")),
                 "cards": eval_cards(report, labels)}
+
+    def test_eval_block() -> dict:
+        """D23: the newest live test-split eval report; "none" until the one test eval has run."""
+        tests = []
+        for p in eval_reports(d.evals_dir):
+            try:
+                r = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if is_test_eval(r):
+                tests.append((r.get("created_at") or "", p, r))
+        if not tests:
+            return {"status": "none", "note": "the test-split eval has not run (D23: once, on a frozen fingerprint)"}
+        _, path, r = max(tests, key=lambda t: t[0])
+        return {"status": "ok", "report": path.name, "created_at": r.get("created_at"), "split": "test",
+                "fingerprint": r.get("fingerprint"), "model": r.get("model"), "n": r.get("n"),
+                "split_counts": r.get("split_counts"), "fallbacks": r.get("fallbacks"),
+                "test_runs": len(tests), "metrics": r.get("metrics"),
+                "cards": eval_cards(r, label_summary(Path(d.labels_path)))}
 
     def coverage_block() -> dict:
         """Recomputed from the current events list (no file written) on the run of the newest coverage report."""
@@ -225,8 +254,31 @@ def register(app, d) -> None:
                         "run": {"run_id": run["run_id"], **extraction_block(
                             [s.items[sg["item_id"]]["raw"] for sg in s.sightings if sg["run_id"] == run["run_id"]])},
                         "all": extraction_block([i["raw"] for i in s.items.values()])}}
-        body |= {"eval": eval_block(), "coverage": coverage_block(), "change_detection": change_block()}
+            metrics = store.run_metrics(run["run_id"])
+        body |= {"run_metrics": metrics[0] if metrics else None, "eval": eval_block(), "test_eval": test_eval_block(),
+                 "coverage": coverage_block(), "change_detection": change_block()}
         return d.ok(body)
+
+    @app.get("/api/v1/run-metrics")
+    def list_run_metrics(limit: int = 50, offset: int = 0):
+        """Per-run quality metrics (ci.run_metrics), newest run first."""
+        store, _ = d.snap()
+        with store:
+            rows = store.run_metrics()
+        return d.ok(d.page(rows, limit, offset))
+
+    @app.get("/api/v1/run-metrics/{run_id}")
+    def get_run_metrics(run_id: str):
+        store, _ = d.snap()
+        with store:
+            rows = store.run_metrics(run_id)
+        if not rows:
+            raise d.ApiError(404, "not_found", f"no metrics for run {run_id}")
+        return d.ok(rows[0])
+
+    @app.get("/api/v1/evals/test")
+    def get_test_eval():
+        return d.ok(test_eval_block())
 
     @app.get("/api/v1/runs")
     def list_runs(limit: int = 50, offset: int = 0):
