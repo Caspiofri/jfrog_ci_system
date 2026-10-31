@@ -8,7 +8,8 @@
 - Extraction: per source and per publisher, the items whose page text was extracted (text_status full or partial)
   over the items kept, with n: for the run and for every stored item. snippet = only a teaser or nothing (the fetch
   failed or gave less than the teaser); junk = the page text was not the article. Why a fetch failed (e.g. HTTP 403
-  from a Cloudflare challenge) is not stored yet.
+  from a Cloudflare challenge, a timeout, an empty page) is recorded per item from Oct 31 (fetch_status) and counted
+  per row; earlier items show "not_recorded".
 - Eval cards: every metric with its n. "untested" when n = 0; "weak" when n < WEAK_N, and always for the
   important-item metrics (few labels at score 4-5): the coverage check is the main evidence for not missing important
   events. Coverage is reported as counts with their n, never as a rate.
@@ -72,21 +73,25 @@ TEXT_STATUSES = ("full", "partial", "snippet", "junk")
 
 
 def extraction_rows(raws: list[dict], key) -> list[dict]:
+    """fetch: why the page text is or isn't there (ci.packet fetch_status); "not_recorded" before Oct 31."""
     groups: dict[str, Counter] = {}
+    fetches: dict[str, Counter] = {}
     for r in raws:
         groups.setdefault(key(r), Counter())[r.get("text_status") or "snippet"] += 1
+        fetches.setdefault(key(r), Counter())[r.get("fetch_status") or "not_recorded"] += 1
     rows = []
     for k, c in groups.items():
         n = sum(c.values())
         extracted = sum(c[x] for x in EXTRACTED)
         rows.append({"key": k, "extracted": extracted, "n": n, "rate": round(extracted / n, 3) if n else None,
-                     "by_status": {x: c[x] for x in TEXT_STATUSES}})
+                     "by_status": {x: c[x] for x in TEXT_STATUSES}, "fetch": dict(fetches[k].most_common())})
     return sorted(rows, key=lambda r: (-r["n"], r["key"]))
 
 
 def extraction_block(raws: list[dict]) -> dict:
     extracted = sum((r.get("text_status") in EXTRACTED) for r in raws)
     return {"extracted": extracted, "n": len(raws), "rate": round(extracted / len(raws), 3) if raws else None,
+            "fetch": dict(Counter(r.get("fetch_status") or "not_recorded" for r in raws).most_common()),
             "by_source": extraction_rows(raws, lambda r: r.get("source") or "?"),
             "by_publisher": extraction_rows(raws, lambda r: r.get("publisher") or svc.sources.host(r.get("url") or ""))}
 

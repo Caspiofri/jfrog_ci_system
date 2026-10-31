@@ -137,3 +137,5 @@ def test_extraction_success_per_source_and_publisher_with_n(env):
     pubs = {r["key"]: (r["extracted"], r["n"]) for r in run["by_publisher"]}
     assert pubs["DevOps.com"] == (0, 1) and pubs["theregister.com"] == (1, 1)
     assert (ex["all"]["extracted"], ex["all"]["n"]) == (8, 9)  # 7 fixture items + the test-split item + blocked
+    assert pubs and next(r for r in run["by_publisher"] if r["key"] == "DevOps.com")["fetch"] == {"not_recorded": 1}
+    assert ex["all"]["fetch"] == {"not_recorded": 9}  # items stored before fetch_status existed

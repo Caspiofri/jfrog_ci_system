@@ -2,6 +2,7 @@
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from urllib.parse import urlparse
 
 import requests
@@ -155,16 +156,57 @@ def extract_main_text(html: str) -> str | None:
     return kept or plain
 
 
-def fetch_text(url: str, timeout: int = 10) -> str | None:
-    """Main article text of a page, or None when it can't be fetched or has no extractable text."""
+# a bot check in front of the page (Cloudflare "Just a moment...", managed challenge). It is only recognised and
+# recorded, never answered or worked around: such a site needs another source (its RSS feed)
+_CHALLENGE_MARKERS = ("just a moment...", "challenge-platform", "cf-chl-", "attention required! | cloudflare",
+                      "enable javascript and cookies to continue")
+
+
+@dataclass(frozen=True)
+class FetchResult:
+    """text: the page's main text, or None. status: ok | http_<code> | cloudflare_challenge | not_html | empty |
+    timeout | connection_error | error:<type>. final_url: after redirects (empty when no response)."""
+    text: str | None
+    status: str
+    http_status: int | None = None
+    final_url: str = ""
+
+
+def is_challenge(resp) -> bool:
+    if resp.headers.get("cf-mitigated", "").lower() == "challenge":
+        return True
+    head = (resp.text or "")[:4000].lower()
+    return resp.status_code in (403, 429, 503) and any(m in head for m in _CHALLENGE_MARKERS)
+
+
+def fetch_page(url: str, timeout: int = 10) -> FetchResult:
+    """The page's main text and why there is none when it fails."""
     try:
         resp = requests.get(url, headers=_HEADERS, timeout=timeout, allow_redirects=True)
-        if resp.status_code != 200 or "html" not in resp.headers.get("content-type", "html"):
-            return None
+    except requests.Timeout:
+        return FetchResult(None, "timeout")
+    except requests.ConnectionError:
+        return FetchResult(None, "connection_error")
+    except Exception as e:
+        return FetchResult(None, f"error:{type(e).__name__}")
+    final = getattr(resp, "url", "") or url
+    if is_challenge(resp):
+        return FetchResult(None, "cloudflare_challenge", resp.status_code, final)
+    if resp.status_code != 200:
+        return FetchResult(None, f"http_{resp.status_code}", resp.status_code, final)
+    if "html" not in resp.headers.get("content-type", "html"):
+        return FetchResult(None, "not_html", resp.status_code, final)
+    try:
         text = extract_main_text(resp.text)
-        return clean_page_text(resp.url, text) if text else None
-    except Exception:  # network errors and parser errors both mean "keep the teaser"
-        return None
+    except Exception as e:  # a parser error means "keep the teaser"
+        return FetchResult(None, f"error:{type(e).__name__}", resp.status_code, final)
+    text = clean_page_text(final, text) if text else None
+    return FetchResult(text, "ok" if text else "empty", resp.status_code, final)
+
+
+def fetch_text(url: str, timeout: int = 10) -> str | None:
+    """Main article text of a page, or None when it can't be fetched or has no extractable text."""
+    return fetch_page(url, timeout).text
 
 
 def read_article(article: Article, max_chars: int, fetch=fetch_text) -> Article:

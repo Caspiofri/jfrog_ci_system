@@ -17,7 +17,7 @@ from ci.config import CIConfig
 from ci.dedupe import Drop, EmbeddingDeduper, EmbedFn, SeenUrls, resolve_duplicates, url_dedupe
 from ci.packet import CollectorResult, Packet, packet_id, utc_now, window_start
 from config.settings import DATA_DIR, OUTPUT_DIR
-from modules.reader import FULL_TEXT_MIN_CHARS, fetch_text
+from modules.reader import FULL_TEXT_MIN_CHARS, FetchResult, fetch_page
 
 # source name -> collector module; imported lazily so one broken collector can't stop the others
 COLLECTORS = {
@@ -105,18 +105,33 @@ def _skip_fetch(p: Packet) -> bool:
 Counter = Callable[[str], tuple[dict[str, int], bool]]  # page text -> (mentions, mentions_jfrog); title excluded
 
 
-def read_full_text(p: Packet, fetch: Callable[[str], str | None], count: Counter | None = None) -> Packet:
+def _fetched(result) -> tuple[str | None, str, int | None]:
+    """(text, status, http status) from a fetch: a FetchResult, or a plain str / None (injected fetchers in tests)."""
+    if isinstance(result, FetchResult):
+        return result.text, result.status, result.http_status
+    return result, "ok" if result else "failed", None
+
+
+def read_full_text(p: Packet, fetch: Callable[[str], "str | FetchResult | None"],
+                   count: Counter | None = None) -> Packet:
     """Replace the teaser with the page text when the page gives more; a failed fetch keeps the teaser.
     Mentions are counted over the whole page (or the teaser) before the text is capped at TEXT_MAX_CHARS.
     Page text that is not the article (ci.extraction_quality) is kept for inspection but marked "junk", with its
     reasons; mentions then come from the teaser, since nav menus name competitors."""
-    text = None if _skip_fetch(p) else fetch(p.url)
+    if _skip_fetch(p):
+        text, status, http = None, "skipped_full_feed" if p.text_status == "full" else "skipped_unresolved", None
+    else:
+        text, status, http = _fetched(fetch(p.url))
+    if text and len(text) <= len(p.text):
+        status = "shorter_than_teaser"
+    fetch_info = {"fetch_status": status, "fetch_http_status": http}
     if not text or len(text) <= len(p.text):
-        update = {"text": p.text[:TEXT_MAX_CHARS]}
+        update = {"text": p.text[:TEXT_MAX_CHARS], **fetch_info}
         page = p.text
     else:
-        status = "full" if len(text) >= FULL_TEXT_MIN_CHARS else "partial"
-        update = {"text": text[:TEXT_MAX_CHARS], "text_status": status, "text_source": "page", "teaser": p.text}
+        text_status = "full" if len(text) >= FULL_TEXT_MIN_CHARS else "partial"
+        update = {"text": text[:TEXT_MAX_CHARS], "text_status": text_status, "text_source": "page", "teaser": p.text,
+                  **fetch_info}
         page = text
         quality = extraction_quality.assess(p.title, text)
         if not quality.ok:
@@ -199,7 +214,7 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
 
 def run(cfg: CIConfig, *, sources: list[str] | None = None, fresh: bool = False, days: int | None = None,
         registry: dict[str, str] = COLLECTORS, runs_dir: Path = RUNS_DIR, data_dir: Path = CI_DATA_DIR,
-        embed_fn: EmbedFn | None = None, fetch: Callable[[str], str | None] = fetch_text,
+        embed_fn: EmbedFn | None = None, fetch: Callable[[str], "str | FetchResult | None"] = fetch_page,
         collector_timeout: float = COLLECTOR_TIMEOUT_S) -> RunResult:
     started, t0 = utc_now(), time.monotonic()
     run_id = new_run_id(started)

@@ -50,6 +50,11 @@ class Packet(BaseModel):
     mentions: dict[str, int] = {}  # competitor key -> name matches, title included; every tracked key, zeros too
     mentions_jfrog: bool = False
     mentions_config: str = ""  # MentionCounter.config_hash: which competitor list and name rules made the counts
+    # why the page text is or isn't there: ok | shorter_than_teaser | skipped_full_feed | skipped_unresolved |
+    # http_<code> | cloudflare_challenge | not_html | empty | timeout | connection_error | error:<type> | failed
+    # ("" in items stored before Oct 31: not recorded)
+    fetch_status: str = ""
+    fetch_http_status: int | None = None
 
 
 @dataclass
