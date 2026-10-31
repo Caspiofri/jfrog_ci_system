@@ -158,3 +158,29 @@ def test_test_eval_endpoint_shows_only_a_live_test_split_report(api):
     h = c.get("/api/v1/health").json()
     assert h["test_eval"]["report"] == "20261101T100000Z.json"
     assert h["eval"]["report"] == "20261101T100000Z.json"  # the insights eval file beside it is not a classifier eval
+
+
+@pytest.mark.parametrize("kind", ["ok", "crash", "failed_collection"])
+def test_a_failing_metrics_write_never_fails_the_run(paths, monkeypatch, caplog, kind):  # noqa: F811
+    """The metrics row is a side output: a broken write is logged and noted in the report, the run's own status
+    stands, on every path that writes one."""
+    def broken(self, m):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Store, "save_run_metrics", broken)
+    if kind == "crash":
+        class Boom:
+            def __init__(self, llm):
+                pass
+
+            def rank(self, items, classifications):
+                raise ValueError("ranker exploded")
+
+        monkeypatch.setattr(daily, "Ranker", Boom)
+    res = (run(paths, collect=fake_collect([], failed=True)) if kind == "failed_collection"
+           else run(paths, from_run=OLD_RUN))
+    assert res.status == {"ok": "ok", "crash": "failed", "failed_collection": "failed"}[kind]
+    assert res.report["metrics_error"] == "OSError: disk full"
+    assert "run metrics not written" in caplog.text
+    with Store(paths["store_path"]) as s:
+        assert s.run(res.run_id)["status"] == res.status  # the run row is still finished
