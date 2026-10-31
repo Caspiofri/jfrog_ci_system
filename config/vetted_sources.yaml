@@ -1,0 +1,37 @@
+# D9 vetted sources (Q3, D34): approved by Ofri on 31 Oct 2026 as seeded (10 first-party, 20 trade press).
+# A host matches when the item URL's host is the listed host or a subdomain of it (updates.snyk.io matches snyk.io).
+first_party:   # competitor-owned hosts (feeds, repos, blogs, docs, status pages)
+  - github.blog
+  - github.com
+  - githubstatus.com
+  - about.gitlab.com
+  - docs.gitlab.com
+  - gitlab.com
+  - snyk.io            # includes updates.snyk.io
+  - sonatype.com
+  - cloudsmith.com
+  - aws.amazon.com
+trade_press:   # 20 developer, DevOps and security trade outlets
+  - thehackernews.com
+  - securityweek.com
+  - theregister.com
+  - infoworld.com
+  - visualstudiomagazine.com
+  - securityboulevard.com
+  - sdtimes.com
+  - thenewstack.io
+  - devops.com
+  - techcrunch.com
+  - techtarget.com
+  - darkreading.com
+  - csoonline.com
+  - siliconangle.com
+  - helpnetsecurity.com
+  - bleepingcomputer.com
+  - zdnet.com
+  - infoq.com
+  - arstechnica.com
+  - venturebeat.com
+# Left off (unvetted unless trusted later): press wires (businesswire.com, prnewswire.com: official releases, but
+# anyone can post), security aggregators (gbhackers.com, cybersecuritynews.com, cyberpress.org), vendor blogs that are
+# not competitors (endorlabs.com, ox.security, socradar.io, blog.gitguardian.com, kaspersky.com), finance sites.
