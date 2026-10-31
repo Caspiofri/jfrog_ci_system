@@ -199,3 +199,28 @@ class _no_lock:
     def __exit__(self, *exc):
         return False
 
+
+
+def test_invalid_model_output_is_rejected_logged_and_sent_to_review(paths, caplog):
+    def bad(prompt, schema):
+        got = answer(prompt, schema)
+        if "score" in schema["properties"]["items"]["items"]["properties"]:
+            got["items"][0]["score"] = 9  # outside 1-5
+        else:
+            got["items"][0]["competitor"] = "jetbrains"  # not in the config list
+            got["items"].append({**got["items"][1], "id": "invented0000000"})  # not an item we sent
+        return got
+
+    res = run(paths, from_run=OLD_RUN, llm=FakeLLM(bad))
+    assert res.status == "degraded" and res.exit_code == daily.EXIT_DEGRADED
+    rej = rows_of(paths["store_path"], "SELECT item_id, stage, reason FROM rejections ORDER BY stage, item_id")
+    by_item = {(i, st) for i, st, _ in rej}
+    assert (A["id"], "classifier") in by_item and ("invented0000000", "classifier") in by_item
+    assert any(st == "ranker" and "outside 1-5" in why for _, st, why in rej)
+    assert "rejected classifier output for item invented0000000" in caplog.text
+    with Store(paths["store_path"]) as s:
+        out = {o["item_id"]: o for o in s.outputs()}
+    assert "invented0000000" not in out  # an id we never sent is not stored
+    assert out[A["id"]]["ranking"]["needs_review"]
+    assert any(r.startswith("invalid output (classifier)") for r in out[A["id"]]["ranking"]["review_reasons"])
+    assert res.report["funnel"]["totals"]["rejected"] >= 1

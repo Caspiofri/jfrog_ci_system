@@ -12,8 +12,13 @@ Items in the golden-set test split (evals/split_assignments.json, written by ci.
 the ranker until after the test eval (PRD D23, D31): they are stored, with a skip row, and no prediction is made for
 them. Without the split file the run stops before any LLM call.
 
+Every model answer and every final output is validated (ci.validate, D32): score 1-5 or noise, competitor and
+category from the config lists, existing item ids. A rejection is logged with the item id and the reason, stored in
+the rejections table, and its item is routed to review.
+
 Exit codes: 0 ok; 1 failed (collection failed, the split file is missing, or a stage raised); 2 another collection
-run holds the lock; 3 finished, but some classifier or ranker batches fell back, or a history write failed.
+run holds the lock; 3 finished, but some classifier or ranker batches fell back, outputs were rejected, or a history
+write failed.
 """
 import argparse
 import json
@@ -27,7 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ci import config as ci_config
-from ci import eval_golden
+from ci import eval_golden, validate
 from ci.classify import Classifier
 from ci.dedupe import EmbeddingDeduper, SeenUrls
 from ci.llm import GeminiLLM, JsonLLM
@@ -37,6 +42,7 @@ from ci.pipeline import run as collect_run
 from ci.rank import Ranker
 from ci.runlock import RunLocked, run_lock
 from ci.store import STORE_PATH, Store
+from ci.validate import ValidatingLLM
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +51,7 @@ SPLIT_PATH = eval_golden.SPLIT_ASSIGNMENTS_PATH
 TEST_SKIP = "golden-set test split: no prediction until after the test eval"
 EXIT_OK, EXIT_FAILED, EXIT_LOCKED, EXIT_DEGRADED = 0, 1, 2, 3
 FUNNEL_COLUMNS = ["collected", "dup_url", "dup_embedding", "kept", "known", "new", "test_skip", "to_model",
-                  "rules", "llm", "fallback", "noise", "scored", "rank_degraded"]
+                  "rules", "llm", "fallback", "noise", "scored", "rank_degraded", "rejected"]
 
 
 class SplitMissing(RuntimeError):
@@ -102,10 +108,11 @@ def remember_history(rows: list[dict], data_dir: Path, embed_fn=None) -> list[st
 
 
 def funnel(rows: list[dict], report: dict, new: set[str], skips: dict[str, str], to_model: list[dict],
-           classifications: list, ranked: list) -> dict:
+           classifications: list, ranked: list, rejections: list | None = None) -> dict:
     """Items per source per stage, from collection to the ranker; every count is an item count."""
     cls_by = {c.id: c for c in classifications}
     rank_by = {r.id: r for r in ranked}
+    rejected = {r.item_id for r in rejections or []}
     by_source: dict[str, dict] = {}
     names = list(report.get("sources", {})) + sorted({r["source"] for r in rows} - set(report.get("sources", {})))
     for name in names:
@@ -122,7 +129,7 @@ def funnel(rows: list[dict], report: dict, new: set[str], skips: dict[str, str],
             "test_skip": sum(r["id"] in skips for r in mine), "to_model": len(sent),
             "rules": methods["rules"], "llm": methods["llm"], "fallback": methods["fallback"],
             "noise": sum(c.noise for c in cls), "scored": sum(r.score is not None for r in rk),
-            "rank_degraded": sum(r.degraded for r in rk),
+            "rank_degraded": sum(r.degraded for r in rk), "rejected": sum(r["id"] in rejected for r in sent),
             "errors": list(src.get("errors", [])),
         }
     totals = {c: sum(s[c] for s in by_source.values()) for c in FUNNEL_COLUMNS}
@@ -195,9 +202,17 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
             skips = {r["id"]: TEST_SKIP for r in rows if r["id"] in pending and r["id"] in test_ids}
             to_model = [r for r in rows if r["id"] in pending and r["id"] not in skips]
             store.save_skips(run_id, skips)
-            classifications = Classifier(counting, cfg, runs_dir=runs_dir).classify(to_model) if to_model else []
-            ranked = Ranker(counting).rank(to_model, classifications) if to_model else []
+            checked = ValidatingLLM(counting)  # D32: every answer row checked against the config lists
+            classifications = Classifier(checked, cfg, runs_dir=runs_dir).classify(to_model) if to_model else []
+            ranked = Ranker(checked).rank(to_model, classifications) if to_model else []
+            sent = {r["id"] for r in to_model}
+            rejections = checked.rejections + validate.check_outputs(sent, cfg, classifications, ranked)
+            # an output for an id we never sent is not stored; every rejected item goes to review with its reason
+            classifications = [c for c in classifications if c.id in sent]
+            ranked = [r for r in ranked if r.id in sent]
+            classifications, ranked = validate.route_to_review(rejections, classifications, ranked)
             store.save_outputs(run_id, fp, classifications, ranked)
+            store.save_rejections(run_id, rejections)
         except Exception as e:
             out = {"run_id": run_id, "kind": kind, "status": "failed", "error": f"{type(e).__name__}: {e}",
                    "traceback": traceback.format_exc()}
@@ -206,11 +221,15 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
         fallbacks = sum(c.method == "fallback" for c in classifications) + sum(r.degraded for r in ranked)
         if fallbacks:
             errors.append(f"{fallbacks} classifier/ranker outputs fell back or are degraded (see the funnel)")
+        if rejections:
+            errors.append(f"{len(rejections)} model outputs rejected for {len({r.item_id for r in rejections})}"
+                          " items (routed to review; see the rejections table)")
         status = "degraded" if errors else "ok"
         out = {"run_id": run_id, "kind": kind, "status": status, "started_at": started_at,
                "finished_at": datetime.now(UTC).isoformat(), "fingerprint": fp, "model": counting.model,
                "llm_calls": counting.calls, "errors": errors,
-               "funnel": funnel(rows, report, new, skips, to_model, classifications, ranked)}
+               "rejections": [vars(r) for r in rejections],
+               "funnel": funnel(rows, report, new, skips, to_model, classifications, ranked, rejections)}
         store.finish_run(run_id, status, out, "; ".join(errors))
     (runs_dir / f"{run_id}.daily.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     return DailyResult(run_id, status, out, errors)

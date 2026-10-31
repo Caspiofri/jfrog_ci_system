@@ -1,11 +1,12 @@
 """The CI store (PRD D6): data/ci/ci.sqlite, one file for runs, items and the model output per item.
 
 This is the first slice of the store in the events/freshness plan (1.10): runs, items, sightings, classifications,
-rankings and skips. Events, routing and analyst actions come later.
+rankings, rejections and skips. Events, routing and analyst actions come later.
 
 - An item's discovered_at is the started_at of the earliest run that saw it. A later sighting never moves it, and an
   older run imported later moves it back, so a re-collected item never looks new again.
 - Classifier and ranker output is stored per (item, run) with the fingerprint of the prompts and config that made it.
+- A rejection is a model output that failed validation (ci.validate, D32); its item was routed to review.
 - A skip records why an item was not sent to the model in a run (today: it is in the golden-set test split).
 """
 import json
@@ -77,6 +78,13 @@ CREATE TABLE IF NOT EXISTS rankings (
     data TEXT NOT NULL,
     created_at TEXT NOT NULL,
     PRIMARY KEY (item_id, run_id)
+);
+CREATE TABLE IF NOT EXISTS rejections (   -- D32: a model output that failed validation; its item went to review
+    item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    stage TEXT NOT NULL,             -- classifier | ranker | output
+    reason TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS skips (
     item_id TEXT NOT NULL,
@@ -189,6 +197,12 @@ class Store:
                 "INSERT OR REPLACE INTO rankings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [(r.id, run_id, fingerprint, r.score, r.raw_score, int(r.noise), int(r.degraded),
                   int(r.needs_review), r.model_dump_json(), now) for r in ranked])
+
+    def save_rejections(self, run_id: str, rejections) -> None:
+        now = _now()
+        with self._db:
+            self._db.executemany("INSERT INTO rejections VALUES (?, ?, ?, ?, ?)",
+                                 [(r.item_id, run_id, r.stage, r.reason, now) for r in rejections])
 
     def save_skips(self, run_id: str, skips: dict[str, str]) -> None:
         with self._db:
