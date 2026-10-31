@@ -120,3 +120,20 @@ def test_runs_list(env):
     c, _ = env
     rows = c.get("/api/v1/runs").json()["items"]
     assert [r["run_id"] for r in rows] == [RUN2, RUN1] and rows[0]["llm_calls"] == 6
+
+
+def test_extraction_success_per_source_and_publisher_with_n(env):
+    c, tmp = env
+    with Store(tmp / "ci.sqlite") as s:  # one Google News item of the daily run whose page fetch failed
+        from tests.ci.test_api import raw as mkraw
+        row = {**mkraw("blocked", "https://devops.com/x", "Blocked by Cloudflare", "2026-10-31T01:00:00Z", RUN2),
+               "text": "", "text_status": "snippet", "publisher": "DevOps.com"}
+        s.add_items([row], RUN2, "2026-10-31T04:00:00+00:00")
+    ex = c.get("/api/v1/health").json()["extraction"]
+    run = ex["run"]
+    assert run["run_id"] == RUN2 and (run["extracted"], run["n"], run["rate"]) == (1, 2, 0.5)
+    gn = next(r for r in run["by_source"] if r["key"] == "google_news")
+    assert (gn["extracted"], gn["n"]) == (1, 2) and gn["by_status"]["snippet"] == 1
+    pubs = {r["key"]: (r["extracted"], r["n"]) for r in run["by_publisher"]}
+    assert pubs["DevOps.com"] == (0, 1) and pubs["theregister.com"] == (1, 1)
+    assert (ex["all"]["extracted"], ex["all"]["n"]) == (8, 9)  # 7 fixture items + the test-split item + blocked

@@ -5,6 +5,10 @@
 - Silent sources: per source, the last item and the hours since, and "n runs so far". A source is "critical" when the
   latest run collected nothing from it and reported an error, "silent" when the latest MIN_RUNS_FOR_SILENT runs
   collected nothing from it; with fewer runs than that it is "healthy" or "critical" only, and says so.
+- Extraction: per source and per publisher, the items whose page text was extracted (text_status full or partial)
+  over the items kept, with n: for the run and for every stored item. snippet = only a teaser or nothing (the fetch
+  failed or gave less than the teaser); junk = the page text was not the article. Why a fetch failed (e.g. HTTP 403
+  from a Cloudflare challenge) is not stored yet.
 - Eval cards: every metric with its n. "untested" when n = 0; "weak" when n < WEAK_N, and always for the
   important-item metrics (few labels at score 4-5): the coverage check is the main evidence for not missing important
   events. Coverage is reported as counts with their n, never as a rate.
@@ -61,6 +65,30 @@ def eval_cards(report: dict, labels: dict) -> list[dict]:
     out.append(card("funding_m_and_a", None, labels["funding_m_and_a"],
                     "untested: no Funding/M&A/Partnerships labels" if not labels["funding_m_and_a"] else ""))
     return out
+
+
+EXTRACTED = ("full", "partial")
+TEXT_STATUSES = ("full", "partial", "snippet", "junk")
+
+
+def extraction_rows(raws: list[dict], key) -> list[dict]:
+    groups: dict[str, Counter] = {}
+    for r in raws:
+        groups.setdefault(key(r), Counter())[r.get("text_status") or "snippet"] += 1
+    rows = []
+    for k, c in groups.items():
+        n = sum(c.values())
+        extracted = sum(c[x] for x in EXTRACTED)
+        rows.append({"key": k, "extracted": extracted, "n": n, "rate": round(extracted / n, 3) if n else None,
+                     "by_status": {x: c[x] for x in TEXT_STATUSES}})
+    return sorted(rows, key=lambda r: (-r["n"], r["key"]))
+
+
+def extraction_block(raws: list[dict]) -> dict:
+    extracted = sum((r.get("text_status") in EXTRACTED) for r in raws)
+    return {"extracted": extracted, "n": len(raws), "rate": round(extracted / len(raws), 3) if raws else None,
+            "by_source": extraction_rows(raws, lambda r: r.get("source") or "?"),
+            "by_publisher": extraction_rows(raws, lambda r: r.get("publisher") or svc.sources.host(r.get("url") or ""))}
 
 
 def newest(paths: list[Path]) -> Path | None:
@@ -186,7 +214,12 @@ def register(app, d) -> None:
             body = {"run": {k: run[k] for k in ("run_id", "kind", "started_at", "finished_at", "status", "fingerprint",
                                                 "model", "error")} | {"llm_calls": report.get("llm_calls"),
                                                                      "errors": report.get("errors", [])},
-                    "funnel": funnel(s, run), "silent_sources": silent(s)}
+                    "funnel": funnel(s, run), "silent_sources": silent(s),
+                    "extraction": {
+                        "definition": "extracted = page text full or partial; n = items kept",
+                        "run": {"run_id": run["run_id"], **extraction_block(
+                            [s.items[sg["item_id"]]["raw"] for sg in s.sightings if sg["run_id"] == run["run_id"]])},
+                        "all": extraction_block([i["raw"] for i in s.items.values()])}}
         body |= {"eval": eval_block(), "coverage": coverage_block(), "change_detection": change_block()}
         return d.ok(body)
 
