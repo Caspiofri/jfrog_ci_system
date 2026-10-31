@@ -84,23 +84,27 @@ def test_analyst_decision_overrides_routing():
 
 
 def test_measured_counts_on_the_14_day_import():
-    """D36 rules on the stored outputs of run 389e71 (n=228 non-noise of 256 classified): 87 / 31 / 12. Before Q-B
-    added the teaser and junk holds, the same data gave 84 / 28 / 12 (D34)."""
+    """D36 rules on the stored outputs of run 389e71 (n=228 non-noise of 256 classified): 88 / 31 / 12. Before Q-B
+    added the teaser and junk holds, the same data gave 84 / 28 / 12 (D34); 87 / 31 / 12 before D49 vetted github.com
+    per org, which holds the one third-party repo (github.com/cognitionai, score 3, Hacker News) at strict."""
     data = json.loads(FIXTURE.read_text())
     inputs = [route.RouteInput(**{**d, "rejections": tuple(d["rejections"])}) for d in data["items"]]
     assert len(inputs) == 256
     counts = route.level_counts(inputs)
     assert {lv: (c["held"], c["n"]) for lv, c in counts.items()} == {
-        "strict": (87, 228), "balanced": (31, 228), "relaxed": (12, 228)}
+        "strict": (88, 228), "balanced": (31, 228), "relaxed": (12, 228)}
     by = route.reason_counts(inputs)
-    assert (by["unvetted_source"], by["pricing"], by["m_and_a"], by["mentions_jfrog"]) == (79, 3, 4, 5)
+    assert (by["unvetted_source"], by["pricing"], by["m_and_a"], by["mentions_jfrog"]) == (80, 3, 4, 5)
     assert by.get("low_confidence", 0) == 0 and by.get("model_failure", 0) == 0
 
 
 def test_fixture_holds_no_article_text():
     data = json.loads(FIXTURE.read_text())
     assert all(set(d) <= set(route.RouteInput.__dataclass_fields__) for d in data["items"])
-    assert all(d["url"].count("/") == 3 for d in data["items"])  # host only, no path
+    def host_or_org(url: str) -> bool:  # host only, no path; github.com keeps its org segment (D49)
+        return url.count("/") == 3 or (url.startswith("https://github.com/") and url.count("/") == 4)
+
+    assert all(host_or_org(d["url"]) for d in data["items"])
 
 
 def test_autonomy_level_setting_defaults_to_strict(tmp_path):

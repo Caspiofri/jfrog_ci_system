@@ -509,6 +509,8 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
         h = clean_host(body.host)
         store, s = snap()
         with store:
+            if h == sources.ORG_SCOPED_HOST:  # trusting the host would undo the per-org rule (D49)
+                raise ApiError(409, "conflict", f"{h} is vetted per org (github_orgs in config/vetted_sources.yaml)")
             if sources.is_vetted(f"https://{h}/"):
                 raise ApiError(409, "conflict", f"{h} is already on the vetted list (config/vetted_sources.yaml)")
             if h in s.trusted:

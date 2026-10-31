@@ -19,3 +19,20 @@ def test_custom_list(tmp_path):
     p = tmp_path / "v.yaml"
     p.write_text("first_party: [Example.com]\ntrade_press: []\n")
     assert sources.is_vetted("https://blog.example.com/a", p) and not sources.is_vetted("https://x.org", p)
+
+
+def test_github_com_is_vetted_only_for_the_tracked_competitors_orgs():
+    """D34/D49: github.com is a place, not one company. The HN item github.com/cognitionai/devin-vuln-fixes was
+    auto-published at strict while github.com was vetted as a whole host."""
+    assert sources.vetted_group("https://github.com/github/codeql-action/releases/tag/v4") == "first_party"
+    assert sources.is_vetted("https://github.com/Cloudsmith-io/cloudsmith-cli/releases")
+    assert not sources.is_vetted("https://github.com/cognitionai/devin-vuln-fixes")
+    assert not sources.is_vetted("https://github.com/")  # the host alone is no org
+    assert sources.is_vetted("https://github.blog/changelog/x")  # other GitHub hosts are unchanged
+
+
+def test_every_tracked_repo_owner_is_a_vetted_org():
+    from ci.config import load
+
+    owners = {r.split("/")[0].lower() for c in load().competitors for r in c.github_repos}
+    assert owners and owners <= sources.github_orgs()

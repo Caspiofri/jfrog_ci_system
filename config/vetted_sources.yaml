@@ -2,7 +2,7 @@
 # A host matches when the item URL's host is the listed host or a subdomain of it (updates.snyk.io matches snyk.io).
 first_party:   # competitor-owned hosts (feeds, repos, blogs, docs, status pages)
   - github.blog
-  - github.com
+  - github.com          # only the orgs in github_orgs below (D34, D49)
   - githubstatus.com
   - about.gitlab.com
   - docs.gitlab.com
@@ -35,3 +35,9 @@ trade_press:   # 20 developer, DevOps and security trade outlets
 # Left off (unvetted unless trusted later): press wires (businesswire.com, prnewswire.com: official releases, but
 # anyone can post), security aggregators (gbhackers.com, cybersecuritynews.com, cyberpress.org), vendor blogs that are
 # not competitors (endorlabs.com, ox.security, socradar.io, blog.gitguardian.com, kaspersky.com), finance sites.
+# github.com is vetted per org (D49): a github.com URL counts as first party only under one of these orgs, the owners
+# of the repositories config/competitors.yaml tracks. Any other repository on github.com is unvetted (held at strict).
+github_orgs:
+  - github
+  - cloudsmith-io
+  - sonatype
