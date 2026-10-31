@@ -33,6 +33,13 @@ To check a production build while `npm run dev` is running, use `npm run build:c
 insight states. The text basis comes from `public/mock/text-basis.local.json` (gitignored), exported from the local
 store copy. Delete each block in `src/lib/mock.ts` once its field lands.
 
+Mock mode is local `next dev` only, and separate from demo mode (`CI_MODE=demo`, a frozen real snapshot):
+- `next.config.ts` refuses `next build`, `next start` and demo mode when `NEXT_PUBLIC_CI_MOCK` is set.
+- The mock code is stripped from production bundles. `npm run build` and `build:check` fail if any of it remains.
+- At runtime, mock stays off until `/meta` reports `mode: "live"`.
+- `.dockerignore` keeps env files and `public/mock/` out of images.
+- `npm test` checks all of this.
+
 ## Rules
 
 - API strings are untrusted (D32): rendered as React text only. ESLint fails on `dangerouslySetInnerHTML` and

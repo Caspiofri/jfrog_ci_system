@@ -10,7 +10,7 @@ import { BriefCard, MockTag } from "@/components/brief/BriefCard";
 import { ApiError, path, send, useApi } from "@/lib/api";
 import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
-import { MOCK, mockBrief, useMockTextBasis } from "@/lib/mock";
+import { MOCK, mockBrief, useMock, useMockTextBasis } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefInsights, BriefRow, BriefSummary, Insight, ItemDetail, Page } from "@/lib/types";
 
@@ -46,12 +46,13 @@ function BriefScreen() {
   const raw = useApi<Brief>(
     briefs.data ? path("/brief", { date: date || undefined, competitor, category, limit: all ? PAGE : TOP, offset: all ? offset : 0 }) : null,
   );
-  const scenario = MOCK ? get("mock") : "";
-  const insightsScenario = MOCK ? get("mock_insights") : "";
-  const basis = useMockTextBasis();
+  const mock = useMock();
+  const scenario = MOCK && mock ? get("mock") : "";
+  const insightsScenario = MOCK && mock ? get("mock_insights") : "";
+  const basis = useMockTextBasis(mock);
   const data = useMemo(
-    () => (raw.data ? mockBrief(raw.data, scenario, insightsScenario, basis.data) : undefined),
-    [raw.data, scenario, insightsScenario, basis.data],
+    () => (raw.data ? mockBrief(mock, raw.data, scenario, insightsScenario, basis.data) : undefined),
+    [mock, raw.data, scenario, insightsScenario, basis.data],
   );
   const brief = { ...raw, data };
   const row = briefs.data?.items.find((r) => r.date === date);
@@ -92,7 +93,7 @@ function BriefScreen() {
         }
       />
 
-      {MOCK ? (
+      {MOCK && mock ? (
         <div className="rounded border border-dashed border-[#8b5cf6] bg-[#f5f3ff] px-3 py-2 text-xs text-[#5b21b6]">
           Dev mock mode: values the API doesn&apos;t serve yet are stand-ins, each marked <MockTag />.
           {scenario ? <> Scenario: <b>{scenario}</b>.</> : null}

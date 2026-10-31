@@ -1,14 +1,24 @@
 // Dev-only stand-ins for D44 fields the API doesn't serve yet (BACKEND_REQUESTS.md #3).
-// Off unless NEXT_PUBLIC_CI_MOCK=1. Every filled value is listed in `mock` and shown on screen as "mock".
+// Off unless NEXT_PUBLIC_CI_MOCK=1 under `next dev`. Every filled value is listed in `mock` and shown as "mock".
+// Never in a production build, `next start` or demo mode: next.config.ts refuses those, NODE_ENV below strips the
+// code from production bundles, and useMock() stays off until the API says it is live (never in demo, a frozen
+// real snapshot). Tested by `npm test`.
 // Remove a block here when its field lands in the API.
 import { useApi } from "@/lib/api";
+import { useMeta } from "@/lib/meta";
 import type { Brief, Item, Lens, TextBasis } from "@/lib/types";
 
-export const MOCK = process.env.NEXT_PUBLIC_CI_MOCK === "1";
+export const MOCK = process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_CI_MOCK === "1";
+
+/** Mock is active only with the flag and once /meta confirms a live API: off while loading and in demo mode. */
+export function useMock(): boolean {
+  const { data } = useMeta();
+  return MOCK && data?.meta?.mode === "live";
+}
 
 /** Real text_status/text_source per item, exported from the dev store copy (public/mock/, gitignored). */
-export function useMockTextBasis() {
-  return useApi<Record<string, TextBasis>>(MOCK ? "/mock/text-basis.local.json" : null, { shouldRetryOnError: false });
+export function useMockTextBasis(on: boolean) {
+  return useApi<Record<string, TextBasis>>(MOCK && on ? "/mock/text-basis.local.json" : null, { shouldRetryOnError: false });
 }
 
 /** One sample lens so the card can be checked before the first run that stores lenses (Nov 1, 06:00).
@@ -38,8 +48,8 @@ function fillItem(it: Item, basis: Record<string, TextBasis> | undefined, lensId
 }
 
 /** Scenarios for checking states without a matching real window: ?mock=empty | all_held; ?mock_insights=… */
-export function mockBrief(b: Brief, scenario: string, insights: string, basis: Record<string, TextBasis> | undefined): Brief {
-  if (!MOCK) return b;
+export function mockBrief(on: boolean, b: Brief, scenario: string, insights: string, basis: Record<string, TextBasis> | undefined): Brief {
+  if (!on || !MOCK) return b;
   let out: Brief = b;
   if (scenario === "empty" || scenario === "all_held") {
     const held = scenario === "all_held" ? 11 : 0;

@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/no-mock-in-bundle.mjs .next",
     "start": "next start",
     "lint": "eslint",
-    "build:check": "NEXT_DIST_DIR=.next-build next build"
+    "build:check": "NEXT_DIST_DIR=.next-build next build && node scripts/no-mock-in-bundle.mjs .next-build",
+    "test": "node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
