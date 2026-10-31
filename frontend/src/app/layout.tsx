@@ -7,8 +7,8 @@ import "./globals.css";
 const openSans = Open_Sans({ variable: "--font-open-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Jessie · JFrog competitive intelligence",
-  description: "Daily competitive intelligence for the JFrog CI team",
+  title: "Jessi · JFrog competitive intelligence",
+  description: "Jessi, JFrog's Engine for Strategic Signals & Intelligence: daily competitive intelligence for the JFrog CI team",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

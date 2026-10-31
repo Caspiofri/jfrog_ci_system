@@ -54,7 +54,7 @@
 }
 
 :root {
-  /* JFrog look, from docs/design/jessie_prototype.html */
+  /* JFrog look, from the design prototype in docs/design/ */
   --page: #f4f6f9;
   --ink: #1c2536;
   --mute: #6b7788;

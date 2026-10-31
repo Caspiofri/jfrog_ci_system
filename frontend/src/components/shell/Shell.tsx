@@ -57,8 +57,8 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-screen grid-cols-1 grid-rows-[56px_auto_1fr] md:grid-cols-[196px_minmax(0,1fr)] md:grid-rows-[56px_1fr]">
       <header className="col-span-full flex items-center gap-3.5 bg-navy px-5 text-[#e8edf5]">
-        <Link href="/brief" className="flex items-center" aria-label="Jessie home">
-          <Image src="/logo.png" alt="Jessie" width={145} height={34} priority className="h-[34px] w-auto" />
+        <Link href="/brief" className="flex items-center" aria-label="Jessi home">
+          <Image src="/logo.png" alt="Jessi" width={145} height={34} priority className="h-[34px] w-auto" />
         </Link>
         <span className="h-6 w-px bg-[#2c3d63]" />
         <span className="hidden text-sm text-[#c9d3e4] sm:inline">Competitive intelligence</span>
