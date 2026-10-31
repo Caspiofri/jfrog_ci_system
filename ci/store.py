@@ -161,6 +161,21 @@ def _iso(value) -> str | None:
     return value or None
 
 
+def _ts(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
+def _not_after(row: dict, seen_at: str) -> dict:
+    """The row with published_at no later than seen_at; a later source date is kept as published_at_source."""
+    published = _iso(row.get("published_at"))
+    if published and _ts(published) > _ts(seen_at):
+        return {**row, "published_at": seen_at, "published_at_source": row.get("published_at_source") or published}
+    return row
+
+
 class Store:
     def __init__(self, path: Path = STORE_PATH):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -168,6 +183,21 @@ class Store:
         self._db = sqlite3.connect(path)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(SCHEMA)
+        self._repair_future_published()
+
+    def _repair_future_published(self) -> None:
+        """No stored published_at is later than its discovered_at: rows stored before that rule are fixed here."""
+        rows = self._db.execute("SELECT item_id, published_at, discovered_at, raw FROM items"
+                                " WHERE published_at IS NOT NULL AND substr(published_at, 1, 10) >= "
+                                "substr(discovered_at, 1, 10)").fetchall()
+        fixed = []
+        for r in rows:
+            if _ts(r["published_at"]) > _ts(r["discovered_at"]):
+                raw = _not_after({**json.loads(r["raw"]), "published_at": r["published_at"]}, r["discovered_at"])
+                fixed.append((r["discovered_at"], json.dumps(raw, ensure_ascii=False, default=str), r["item_id"]))
+        if fixed:
+            with self._db:
+                self._db.executemany("UPDATE items SET published_at = ?, raw = ? WHERE item_id = ?", fixed)
 
     def close(self) -> None:
         self._db.close()
@@ -205,7 +235,7 @@ class Store:
         """Store each item and its sighting in run_id; returns the ids that were not in the store before.
 
         discovered_at only ever moves earlier: the earliest run that saw an item is its discovery."""
-        rows = list(rows)
+        rows = [_not_after(r, seen_at) for r in rows]  # never a future published_at
         known = self.known_ids(r["id"] for r in rows)
         with self._db:
             for r in rows:

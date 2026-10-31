@@ -248,7 +248,9 @@ def test_day_stamp_is_never_after_the_run_start():
     assert stamped.published_at == run_start == stamped.collected_at and stamped.in_24h
 
 
-def test_exact_times_are_not_capped():
+def test_exact_future_times_are_capped_and_kept_as_the_source_date():
+    """Never a future published_at (C2, 31 Oct; was "kept as given"): the source's date stays in published_at_source."""
     run_start = datetime(2026, 10, 28, 8, tzinfo=UTC)
-    future = datetime(2026, 10, 28, 9, tzinfo=UTC)  # a source clock ahead of ours is kept as given
-    assert stamp(_packet(future, "time"), "run", run_start).published_at == future
+    future = datetime(2026, 10, 28, 9, tzinfo=UTC)  # a source clock ahead of ours
+    stamped = stamp(_packet(future, "time"), "run", run_start)
+    assert stamped.published_at == run_start and stamped.published_at_source == future

@@ -34,6 +34,9 @@ class Packet(BaseModel):
     published_at: datetime | None = None  # timezone-aware UTC
     # "day": the source gave a date only (a listing page); published_at is that day at 12:00 UTC
     date_precision: Literal["time", "day"] = "time"
+    # the source's own date when it was later than our collection (a scheduled changelog entry already in the feed);
+    # published_at is then the collection time: a stored published_at is never in the future
+    published_at_source: datetime | None = None
     text: str = ""  # plain text: the source's teaser, replaced by the full page text when fetched
     text_status: TextStatus = "snippet"
     text_source: TextSource = "teaser"  # where text came from: the feed's full entry body, the fetched page, a teaser

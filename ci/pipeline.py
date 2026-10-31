@@ -85,16 +85,20 @@ def run_collectors(names: list[str], cfg: CIConfig, since: datetime, registry: d
 
 
 def stamp(p: Packet, run_id: str, now: datetime) -> Packet:
-    published = p.published_at
+    published, source_date = p.published_at, None
     if published and published.tzinfo is None:
         published = published.replace(tzinfo=UTC)
-    if published and p.date_precision == "day" and published > now:  # a made-up time never after the run start
+    if published and published > now:
+        # never a future published_at: a day-only stamp's made-up noon, or a source date in the future (Snyk's
+        # changelog RSS lists scheduled entries ahead of their date). The item existed when we saw it.
+        if p.date_precision == "time":
+            source_date = published
         published = now
     # the same rule as the collectors' window; a day-only date (date_precision "day") is its noon-UTC stamp, so its
     # in_24h can be off by up to 12h either way
     in_24h = bool(published and published >= now - timedelta(hours=24))
     return p.model_copy(update={"id": packet_id(p.url), "run_id": run_id, "collected_at": now, "in_24h": in_24h,
-                                "published_at": published})
+                                "published_at": published, "published_at_source": source_date})
 
 
 def _skip_fetch(p: Packet) -> bool:
