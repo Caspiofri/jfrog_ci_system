@@ -1,0 +1,208 @@
+"""The CI store (PRD D6): data/ci/ci.sqlite, one file for runs, items and the model output per item.
+
+This is the first slice of the store in the events/freshness plan (1.10): runs, items, sightings, classifications,
+rankings and skips. Events, routing and analyst actions come later.
+
+- An item's discovered_at is the started_at of the earliest run that saw it. A later sighting never moves it, and an
+  older run imported later moves it back, so a re-collected item never looks new again.
+- Classifier and ranker output is stored per (item, run) with the fingerprint of the prompts and config that made it.
+- A skip records why an item was not sent to the model in a run (today: it is in the golden-set test split).
+"""
+import json
+import sqlite3
+from collections.abc import Iterable
+from datetime import UTC, datetime
+from pathlib import Path
+
+from ci.classify import Classification
+from ci.rank import Ranked
+from config.settings import DATA_DIR
+
+STORE_PATH = DATA_DIR / "ci" / "ci.sqlite"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS runs (
+    run_id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,              -- daily | import
+    started_at TEXT NOT NULL,        -- the collection run's start: the discovery time of its new items
+    processed_at TEXT NOT NULL,      -- when classify + rank started for this run
+    finished_at TEXT,
+    status TEXT NOT NULL,            -- running | ok | degraded | failed
+    fingerprint TEXT,
+    model TEXT,
+    error TEXT,
+    report TEXT
+);
+CREATE TABLE IF NOT EXISTS items (
+    item_id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    source TEXT NOT NULL,
+    competitor TEXT NOT NULL,        -- prefilled from the query; the classified one is in classifications
+    title TEXT NOT NULL,
+    published_at TEXT,
+    discovered_at TEXT NOT NULL,
+    first_run_id TEXT NOT NULL,
+    raw TEXT NOT NULL                -- the item as the collection run wrote it
+);
+CREATE TABLE IF NOT EXISTS sightings (
+    item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    seen_at TEXT NOT NULL,
+    PRIMARY KEY (item_id, run_id)
+);
+CREATE TABLE IF NOT EXISTS classifications (
+    item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    competitor TEXT NOT NULL,
+    category TEXT,
+    noise INTEGER NOT NULL,
+    mentions_jfrog INTEGER NOT NULL,
+    confidence REAL NOT NULL,
+    method TEXT NOT NULL,
+    degraded INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (item_id, run_id)
+);
+CREATE TABLE IF NOT EXISTS rankings (
+    item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    fingerprint TEXT NOT NULL,
+    score INTEGER,
+    raw_score INTEGER,
+    noise INTEGER NOT NULL,
+    degraded INTEGER NOT NULL,
+    needs_review INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (item_id, run_id)
+);
+CREATE TABLE IF NOT EXISTS skips (
+    item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    PRIMARY KEY (item_id, run_id)
+);
+"""
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _iso(value) -> str | None:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value or None
+
+
+class Store:
+    def __init__(self, path: Path = STORE_PATH):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.path = path
+        self._db = sqlite3.connect(path)
+        self._db.row_factory = sqlite3.Row
+        self._db.executescript(SCHEMA)
+
+    def close(self) -> None:
+        self._db.close()
+
+    def __enter__(self) -> "Store":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+    # ---- runs ----------------------------------------------------------------------------------------------------
+
+    def start_run(self, run_id: str, kind: str, started_at: str, fingerprint: str, model: str) -> None:
+        """Insert or restart the run row; a re-run of the same run id replaces its status, not its outputs."""
+        with self._db:
+            self._db.execute(
+                "INSERT INTO runs (run_id, kind, started_at, processed_at, status, fingerprint, model)"
+                " VALUES (?, ?, ?, ?, 'running', ?, ?) ON CONFLICT(run_id) DO UPDATE SET"
+                " processed_at = excluded.processed_at, status = 'running', fingerprint = excluded.fingerprint,"
+                " model = excluded.model, finished_at = NULL, error = NULL",
+                (run_id, kind, started_at, _now(), fingerprint, model))
+
+    def finish_run(self, run_id: str, status: str, report: dict, error: str = "") -> None:
+        with self._db:
+            self._db.execute("UPDATE runs SET status = ?, finished_at = ?, report = ?, error = ? WHERE run_id = ?",
+                             (status, _now(), json.dumps(report, ensure_ascii=False), error or None, run_id))
+
+    def run(self, run_id: str) -> dict | None:
+        row = self._db.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+        return dict(row) if row else None
+
+    # ---- items ---------------------------------------------------------------------------------------------------
+
+    def add_items(self, rows: Iterable[dict], run_id: str, seen_at: str) -> list[str]:
+        """Store each item and its sighting in run_id; returns the ids that were not in the store before.
+
+        discovered_at only ever moves earlier: the earliest run that saw an item is its discovery."""
+        rows = list(rows)
+        known = self.known_ids(r["id"] for r in rows)
+        with self._db:
+            for r in rows:
+                self._db.execute(
+                    "INSERT INTO items (item_id, url, source, competitor, title, published_at, discovered_at,"
+                    " first_run_id, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(item_id) DO UPDATE SET"
+                    " discovered_at = excluded.discovered_at, first_run_id = excluded.first_run_id"
+                    " WHERE excluded.discovered_at < items.discovered_at",
+                    (r["id"], r["url"], r["source"], r.get("competitor") or "", r.get("title") or "",
+                     _iso(r.get("published_at")), seen_at, run_id, json.dumps(r, ensure_ascii=False, default=str)))
+                self._db.execute("INSERT OR IGNORE INTO sightings VALUES (?, ?, ?)", (r["id"], run_id, seen_at))
+        return [r["id"] for r in rows if r["id"] not in known]
+
+    def known_ids(self, ids: Iterable[str]) -> set[str]:
+        ids = list(ids)
+        found: set[str] = set()
+        for start in range(0, len(ids), 500):  # SQLite caps the number of bound parameters
+            chunk = ids[start:start + 500]
+            marks = ",".join("?" * len(chunk))
+            found |= {r[0] for r in self._db.execute(f"SELECT item_id FROM items WHERE item_id IN ({marks})", chunk)}
+        return found
+
+    def item(self, item_id: str) -> dict | None:
+        row = self._db.execute("SELECT * FROM items WHERE item_id = ?", (item_id,)).fetchone()
+        return dict(row) if row else None
+
+    def unclassified(self, ids: Iterable[str]) -> list[str]:
+        """The given ids, in order, that have no classification from any run."""
+        ids = list(ids)
+        done = {r[0] for r in self._db.execute("SELECT DISTINCT item_id FROM classifications")}
+        return [i for i in ids if i not in done]
+
+    # ---- model output --------------------------------------------------------------------------------------------
+
+    def save_outputs(self, run_id: str, fingerprint: str, classifications: list[Classification],
+                     ranked: list[Ranked]) -> None:
+        """Both tables in one transaction, so an item never has a classification without its ranking."""
+        now = _now()
+        with self._db:
+            self._db.executemany(
+                "INSERT OR REPLACE INTO classifications VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(c.id, run_id, fingerprint, c.competitor, c.category, int(c.noise), int(c.mentions_jfrog),
+                  c.confidence, c.method, int(c.degraded), c.model_dump_json(), now) for c in classifications])
+            self._db.executemany(
+                "INSERT OR REPLACE INTO rankings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(r.id, run_id, fingerprint, r.score, r.raw_score, int(r.noise), int(r.degraded),
+                  int(r.needs_review), r.model_dump_json(), now) for r in ranked])
+
+    def save_skips(self, run_id: str, skips: dict[str, str]) -> None:
+        with self._db:
+            self._db.executemany("INSERT OR REPLACE INTO skips VALUES (?, ?, ?)",
+                                 [(i, run_id, why) for i, why in skips.items()])
+
+    def outputs(self) -> list[dict]:
+        """One row per classified item: the item fields plus its latest classification and ranking."""
+        rows = self._db.execute(
+            "SELECT i.item_id, i.url, i.source, i.competitor AS prefilled, i.title, i.published_at,"
+            " i.discovered_at, i.raw, c.run_id, c.fingerprint, c.data AS classification, r.data AS ranking"
+            " FROM items i JOIN classifications c ON c.item_id = i.item_id"
+            " JOIN rankings r ON r.item_id = c.item_id AND r.run_id = c.run_id"
+            " WHERE c.created_at = (SELECT MAX(created_at) FROM classifications WHERE item_id = i.item_id)"
+            " ORDER BY i.item_id")
+        return [{**dict(r), "raw": json.loads(r["raw"]), "classification": json.loads(r["classification"]),
+                 "ranking": json.loads(r["ranking"])} for r in rows]
