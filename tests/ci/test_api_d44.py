@@ -74,25 +74,25 @@ def test_brief_lists_published_3_plus_and_counts_the_rest(env):
     b = brief(c, "2026-11-01")
     assert b["brief_min_score"] == 3
     assert ids(b["items"]["items"]) == ["s5", "fut", "s3"]  # s2 and s1 are published but below the Brief
-    assert b["summary"] == {"brief_min_score": 3, "published_in_brief": 3, "published_in_brief_4plus": 1,
-                            "published_below_brief": 2, "held_total": 2,
+    assert b["summary"] == {"brief_min_score": 3, "published": 3, "published_high": 1,
+                            "published_below": 2, "held": 2, "held_high": 1,
                             "held_by_preliminary_score": {"5": 0, "4": 1, "3": 0, "<=2": 1, "noise": 0},
                             "level": "strict"}
-    assert b["summary"]["published_in_brief"] == b["items"]["total"]
+    assert b["summary"]["published"] == b["items"]["total"]
     assert b["counts"]["items"] == 5  # deprecated counts keep their old meaning: every published item
 
 
 def test_held_total_is_the_window_filtered_review_queue(env):
     c, _ = env
     for date in ("2026-10-30", "2026-11-01", "2026-11-02", "2026-11-03"):
-        r = review(c, brief_date=date)
-        assert r["total"] == brief(c, date)["summary"]["held_total"], date
-        assert r["scope"]["brief_date"] == date and r["scope"]["window"]["anchor"]
-    r = review(c, brief_date="2026-11-01")
+        r = review(c, brief=date)
+        assert r["total"] == brief(c, date)["summary"]["held"], date
+        assert r["scope"]["brief"] == date and r["scope"]["window"]["anchor"]
+    r = review(c, brief="2026-11-01")
     assert sorted(x["item"]["item_id"] for x in r["items"]) == ["h2", "h4"]
     assert r["backlog_total"] == 7 == review(c)["total"]  # uv, uv4, jf, h4, h2, a5, a3: the whole backlog
     assert review(c)["backlog_total"] == 7
-    assert c.get("/api/v1/review", params={"brief_date": "2026-12-25"}).json()["error"]["code"] == "not_found"
+    assert c.get("/api/v1/review", params={"brief": "2026-12-25"}).json()["error"]["code"] == "not_found"
 
 
 def test_the_14_day_import_day(env):
@@ -101,29 +101,29 @@ def test_the_14_day_import_day(env):
     assert b["window"]["anchor_kind"] == "import"
     assert ids(b["items"]["items"]) == ["pub1", "late"]
     s = b["summary"]
-    assert (s["published_in_brief"], s["published_in_brief_4plus"], s["published_below_brief"]) == (2, 1, 0)
-    assert s["held_total"] == 3 and s["held_by_preliminary_score"] == {"5": 0, "4": 1, "3": 2, "<=2": 0, "noise": 0}
+    assert (s["published"], s["published_high"], s["published_below"]) == (2, 1, 0)
+    assert s["held"] == 3 and s["held_by_preliminary_score"] == {"5": 0, "4": 1, "3": 2, "<=2": 0, "noise": 0}
 
 
 def test_empty_window(env):
     c, _ = env
     b = brief(c, "2026-11-02")
     assert b["status"] == "ok" and b["items"]["total"] == 0 and b["items"]["items"] == []
-    assert b["summary"] == {"brief_min_score": 3, "published_in_brief": 0, "published_in_brief_4plus": 0,
-                            "published_below_brief": 0, "held_total": 0,
+    assert b["summary"] == {"brief_min_score": 3, "published": 0, "published_high": 0,
+                            "published_below": 0, "held": 0, "held_high": 0,
                             "held_by_preliminary_score": {"5": 0, "4": 0, "3": 0, "<=2": 0, "noise": 0},
                             "level": "strict"}
-    assert review(c, brief_date="2026-11-02")["total"] == 0
+    assert review(c, brief="2026-11-02")["total"] == 0
 
 
 def test_all_items_held(env):
     c, _ = env
     b = brief(c, "2026-11-03")
     assert b["items"]["total"] == 0  # "nothing published" is not "nothing important": the summary says why
-    assert b["summary"]["held_total"] == 2
+    assert b["summary"]["held"] == 2 and b["summary"]["held_high"] == 1
     assert b["summary"]["held_by_preliminary_score"] == {"5": 1, "4": 0, "3": 1, "<=2": 0, "noise": 0}
     rows = c.get("/api/v1/briefs").json()["items"]
-    assert {r["date"]: (r["published_in_brief"], r["held_total"]) for r in rows}["2026-11-03"] == (0, 2)
+    assert {r["date"]: (r["published"], r["held"]) for r in rows}["2026-11-03"] == (0, 2)
 
 
 def test_a_future_dated_item_is_stored_at_its_discovery_time(env):
@@ -144,17 +144,17 @@ def test_the_threshold_is_a_config_value(env, tmp_path):
                               cfg=CFG, now=lambda: NOW, brief_config_path=cfg_path))
     b = brief(c, "2026-11-01")
     assert b["brief_min_score"] == 2 and ids(b["items"]["items"]) == ["s5", "fut", "s3", "s2"]
-    assert b["summary"]["published_below_brief"] == 1
+    assert b["summary"]["published_below"] == 1
 
 
 def test_text_basis_and_lens_fields(env):
     c, store_path = env
     s3 = c.get("/api/v1/items/s3").json()["item"]
     assert s3["text_basis"] == {"status": "snippet", "source": "teaser", "label": "Headline and teaser only",
-                                "failure_reason": "cloudflare_challenge", "failure_detail": None,
+                                "reason": "cloudflare_challenge", "reason_detail": None,
                                 "chars_used_for_scoring": len("A short teaser.")}
     s5 = c.get("/api/v1/items/s5").json()["item"]
-    assert s5["text_basis"]["failure_reason"] is None and s5["text_basis"]["label"] == "Full article"
+    assert s5["text_basis"]["reason"] is None and s5["text_basis"]["label"] == "Full article"
     assert s5["text_basis"]["chars_used_for_scoring"] == 1080 and s5["lens"] is None
     with Store(store_path) as s:
         s.save_lens(RUN3, "lensfp", [
@@ -180,10 +180,10 @@ def stored(status, kept=0, rejected=0):
 
 def test_insight_states(env):
     c, store_path = env
-    assert brief(c, "2026-11-01")["insights_status"] == "disabled"
+    assert brief(c, "2026-11-01")["insights"]["status"] == "disabled"
     with Store(store_path) as s:
         s.set_setting("insights_enabled", "true")
-    assert brief(c, "2026-11-01")["insights_status"] == "not_run"
+    assert brief(c, "2026-11-01")["insights"]["status"] == "not_run"
     for result, state, rejected in ((stored("none", rejected=3), "none_passed", 3),
                                     (stored("none"), "none_passed", 0),
                                     (stored("failed"), "failed", 0),
@@ -194,14 +194,14 @@ def test_insight_states(env):
                           (datetime.now(UTC).isoformat(),))
             s._db.commit()
         b = brief(c, "2026-11-01")
-        assert (b["insights_status"], b["insights"]["rejected_count"]) == (state, rejected), state
+        assert (b["insights"]["status"], b["insights"]["rejected"]) == (state, rejected), state
     with Store(store_path) as s:
         s.set_setting("insights_refreshing:2026-11-01", "2026-11-03T08:55:00Z")  # 5 minutes before NOW
-    assert brief(c, "2026-11-01")["insights_status"] == "refreshing"
+    assert brief(c, "2026-11-01")["insights"]["status"] == "refreshing"
     assert c.post("/api/v1/brief/2026-11-01/insights/refresh").json()["error"]["code"] == "refresh_running"
     with Store(store_path) as s:
         s.set_setting("insights_refreshing:2026-11-01", "2026-11-03T08:00:00Z")  # stale: a crashed refresh
-    assert brief(c, "2026-11-01")["insights_status"] == "ok"
+    assert brief(c, "2026-11-01")["insights"]["status"] == "ok"
     assert c.post("/api/v1/brief/2026-11-01/insights/refresh").status_code == 200
     with Store(store_path) as s:
         assert s.setting("insights_refreshing:2026-11-01") == ""  # cleared after the refresh

@@ -95,8 +95,8 @@ class TextBasisOut(BaseModel):
     status: str
     source: str
     label: str
-    failure_reason: str | None
-    failure_detail: list[str] | None
+    reason: str | None
+    reason_detail: list[str] | None
     chars_used_for_scoring: int
 
 
@@ -254,9 +254,8 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 c = brief_counts(s, w)
                 _, summary = s.brief_summary(w, min_score)
                 rows.append({"date": date, "anchor_run_id": run["run_id"], "anchor_kind": run["kind"],
-                             "published_in_brief": summary["published_in_brief"],
-                             "published_in_brief_4plus": summary["published_in_brief_4plus"],
-                             "held_total": summary["held_total"],
+                             "published": summary["published"], "published_high": summary["published_high"],
+                             "held": summary["held"], "held_high": summary["held_high"],
                              "items": c["items"],  # deprecated (D44): every published item, whatever the score
                              "found_late": c["found_late"], "awaiting_review": c["awaiting_review"]})
         return ok(page(rows, limit, offset))
@@ -273,8 +272,8 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             w = s.window(date)
             if w is None:
                 return ok({"date": date, "status": "missing", "window": None, "brief_min_score": min_score,
-                           "summary": None, "counts": None, "kpis": [], "insights_status": None,
-                           "insights": {"status": "missing", "items": [], "rejected_count": 0}, "intensity": None,
+                           "summary": None, "counts": None, "kpis": [],
+                           "insights": {"status": "missing", "items": [], "rejected": 0}, "intensity": None,
                            "items": page([], limit, offset)})
             listed, summary = s.brief_summary(w, min_score)
             rows = [item_out(s, i, badge=s.badge(i, w)) for i in listed]
@@ -287,14 +286,16 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                     for k in ("items", "important", "found_late", "mentions_jfrog")]
             stored = store.latest_insights(date)
             enabled = insights_enabled()
+            # D44: status is the state the UI shows; the generator's own status stays as generator_status, and the
+            # rejection reasons stay in the stored generation (Health), the Brief carries only their count
+            state = insights_state(enabled, stored, (stored or {}).get("insights") or [], refreshing(store, date))
             if stored:
                 generated = stored.pop("insights", [])
-                ins = {**stored, "items": generated, "enabled": enabled,
-                       "rejected_count": len(stored.get("rejected") or [])}
+                ins = {**stored, "generator_status": stored.get("status"), "status": state, "items": generated,
+                       "enabled": enabled, "rejected": len(stored.get("rejected") or [])}
             else:
-                ins = {"status": "not_generated", "items": [], "enabled": enabled, "rejected_count": 0}
+                ins = {"status": state, "generator_status": None, "items": [], "enabled": enabled, "rejected": 0}
             body = {"date": date, "status": "ok", "brief_min_score": min_score, "summary": summary,
-                    "insights_status": insights_state(enabled, stored, ins["items"], refreshing(store, date)),
                     "window": {"prev_anchor": svc.iso(w["prev_anchor"]), "anchor": svc.iso(w["anchor"]),
                                "anchor_run_id": w["anchor_run_id"], "anchor_kind": w["anchor_kind"],
                                "hours": round((w["anchor"] - w["prev_anchor"]).total_seconds() / 3600, 2),
@@ -361,13 +362,13 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     @app.get("/api/v1/review")
     def get_review(level: Level | None = None, reason: Multi = None,
                    competitor: Multi = None, date_from: str | None = None, date_to: str | None = None,
-                   brief_date: str | None = None, kind: Kinds = None, limit: int = 50, offset: int = 0):
+                   brief: str | None = None, kind: Kinds = None, limit: int = 50, offset: int = 0):
         store, s = snap()
         with store:
             lv = level or s.level
-            w = s.window(brief_date) if brief_date else None
-            if brief_date and w is None:
-                raise ApiError(404, "not_found", f"no Brief for {brief_date}")
+            w = s.window(brief) if brief else None
+            if brief and w is None:
+                raise ApiError(404, "not_found", f"no Brief for {brief}")
             base = s.window_ids(w) if w else s.classified_ids()  # D44: the Brief links to its own window's held items
             scope = [i for i in base if in_dates(s, i, date_from, date_to)
                      and (not competitor or s.item(i)["competitor"] in competitor)]
@@ -390,7 +391,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             if changes:
                 counts["changed_cell"] += len(changes)
             body = {"level": lv, "levels": level_block(s, scope),
-                    "scope": {"brief_date": brief_date,
+                    "scope": {"brief": brief,
                               "window": {"prev_anchor": svc.iso(w["prev_anchor"]), "anchor": svc.iso(w["anchor"])}
                               if w else None,
                               "date_from": date_from, "date_to": date_to, "competitor": competitor},

@@ -57,7 +57,7 @@ def text_basis(raw: dict) -> dict:
     else:
         reason, detail = (fetch if fetch and fetch != "ok" else "not_recorded"), None
     return {"status": status, "source": raw.get("text_source") or "teaser",
-            "label": TEXT_BASIS_LABELS.get(status, status), "failure_reason": reason, "failure_detail": detail,
+            "label": TEXT_BASIS_LABELS.get(status, status), "reason": reason, "reason_detail": detail,
             "chars_used_for_scoring": len(content_text(raw)[:RANKER_TEXT_CHARS])}
 
 
@@ -236,9 +236,9 @@ class Snapshot:
                     str(score) if (score or 0) >= 3 else "<=2")
                 held[key] += 1
         scores = [self.item(i)["score"] or 0 for i in listed]
-        return listed, {"brief_min_score": min_score, "published_in_brief": len(listed),
-                        "published_in_brief_4plus": sum(x >= 4 for x in scores), "published_below_brief": below,
-                        "held_total": sum(held.values()),
+        return listed, {"brief_min_score": min_score, "published": len(listed),
+                        "published_high": sum(x >= 4 for x in scores), "published_below": below,
+                        "held": sum(held.values()), "held_high": held["5"] + held["4"],
                         "held_by_preliminary_score": {k: held[k] for k in HELD_SCORE_KEYS},
                         "level": level or self.level}
 
