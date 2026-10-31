@@ -20,14 +20,15 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ci import config as ci_config
-from ci import eval_golden, insights, route, sources
+from ci import coverage, eval_golden, insights, route, sources
 from ci.api import competitors as competitors_api
+from ci.api import health as health_api
 from ci.api import service as svc
 from ci.api.service import Snapshot
 from ci.classify import CATEGORIES
 from ci.pipeline import RUNS_DIR
 from ci.store import STORE_PATH, Store
-from config.settings import DATA_DIR, EVALS_DIR
+from config.settings import DATA_DIR, EVALS_DIR, OUTPUT_DIR
 
 API_VERSION = "1"
 CHANGES_PATH = DATA_DIR / "ci" / "changes.sqlite"
@@ -121,7 +122,10 @@ def page(rows: list, limit: int, offset: int) -> dict:
 def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, changes_path: Path = CHANGES_PATH,
                labels_out: Path = ANALYST_LABELS_PATH, split_path: Path = eval_golden.SPLIT_ASSIGNMENTS_PATH,
                cfg: ci_config.CIConfig | None = None, now: Callable[[], datetime] = lambda: datetime.now(UTC),
-               insights_llm: Callable[[], object] | None = None, embed_fn=None) -> FastAPI:
+               insights_llm: Callable[[], object] | None = None, embed_fn=None,
+               evals_dir: Path = eval_golden.EVALS_OUT_DIR, coverage_dir: Path = coverage.COVERAGE_DIR,
+               events_path: Path = coverage.EVENTS_PATH, changes_out_dir: Path = OUTPUT_DIR / "changes",
+               labels_path: Path = eval_golden.LABELS_PATH) -> FastAPI:
     cfg = cfg or ci_config.load()
     app = FastAPI(title="JFrog CI API", version=API_VERSION)
 
@@ -554,6 +558,8 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     deps = SimpleNamespace(ok=ok, snap=snap, item_out=item_out, page=page, ApiError=ApiError, cfg=cfg, now=now,
                            changes_path=changes_path, store_path=store_path, runs_dir=runs_dir,
-                           store=lambda: Store(store_path))
+                           store=lambda: Store(store_path), evals_dir=evals_dir, coverage_dir=coverage_dir,
+                           events_path=events_path, changes_out_dir=changes_out_dir, labels_path=labels_path)
     competitors_api.register(app, deps)
+    health_api.register(app, deps)
     return app
