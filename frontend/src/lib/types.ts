@@ -81,6 +81,8 @@ export interface Item {
   why_it_matters: string;
   published_at: string | null;
   date_precision: "time" | "day" | string;
+  published_at_source?: string | null; // §10.6: the source's date when it was after our collection
+  scheduled_for?: string | null; // §10.6: published_at_source while still in the future
   discovered_at: string | null;
   discovery_lag_hours: number | null;
   badge: Badge | null;

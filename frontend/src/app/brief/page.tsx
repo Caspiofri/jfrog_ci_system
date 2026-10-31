@@ -151,15 +151,14 @@ function SummaryBlock({ date, s }: { date: string; s: BriefSummary }) {
   return (
     <section className="rounded-md border border-line bg-card px-[18px] py-4" aria-label="Brief summary">
       <div className="flex flex-wrap items-baseline gap-x-2 text-[15px]">
-        <span><b className="text-xl font-semibold tabular-nums">{s.published}</b> published</span>
+        <span><b className="text-xl font-semibold tabular-nums">{s.published}</b> in Brief</span>
+        <span className="text-mute">(<b className="font-semibold tabular-nums text-ink">{s.published_high}</b> rated 4–5)</span>
         <span className="text-mute">·</span>
-        <span><b className="font-semibold tabular-nums">{s.published_high}</b> rated 4–5</span>
+        <Link href="/competitors" className="hover:underline"
+          title={`Published but scored below ${s.brief_min_score}: score 2 is on the competitor profile, score 1 on its timeline`}>
+          <b className="font-semibold tabular-nums">{s.published_below}</b> lower-scored on competitor pages
+        </Link>
         {mock}
-        {s.published_below ? (
-          <span className="text-xs text-mute" title="Rubric v2: score 2 goes to the competitor profile, score 1 to the timeline">
-            ({s.published_below} more published below {s.brief_min_score} are on the competitor profiles)
-          </span>
-        ) : null}
       </div>
       <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[15px]">
         <span><b className="text-xl font-semibold tabular-nums text-[#8a5a00]">{s.held}</b> held for review</span>
@@ -256,10 +255,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         </Button>
       }
     >
-      <div className="mb-3 flex items-center gap-1.5 rounded border border-[#f59e0b]/60 bg-[#fff7e6] px-2.5 py-1.5 text-xs font-semibold text-[#8a5a00]">
-        <Sparkles className="size-3.5 shrink-0" aria-hidden /> AI-generated — check the cited sources
-        {insights.mock ? <MockTag what="this insights state" /> : null}
-      </div>
+      {insights.mock ? <div className="mb-2"><MockTag what="this insights state" /></div> : null}
       {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
       {busy || state === "refreshing" ? (
         <div className="flex items-center gap-2 py-3 text-mute" role="status"><Loader2 className="size-4 animate-spin" aria-hidden /> Refreshing pattern analysis…</div>
@@ -269,6 +265,9 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         <Empty>{state}</Empty>
       ) : (
         <>
+          <div className="mb-3 flex items-center gap-1.5 rounded border border-[#f59e0b]/60 bg-[#fff7e6] px-2.5 py-1.5 text-xs font-semibold text-[#8a5a00]">
+            <Sparkles className="size-3.5 shrink-0" aria-hidden /> AI-generated — check the cited sources
+          </div>
           {insights.status === "partial" ? <div className="mb-2 text-xs text-mute">Fewer than 3 insights passed the checks this time.</div> : null}
           <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
             {insights.items.map((x) => (

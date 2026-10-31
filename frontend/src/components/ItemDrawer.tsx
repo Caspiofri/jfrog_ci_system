@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Async, CategoryTag, ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { useApi } from "@/lib/api";
-import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { ItemDetail } from "@/lib/types";
 
@@ -72,7 +72,14 @@ function DrawerBody({ id }: { id: string }) {
                 <div>
                   <Field k="Competitor">{competitorName(meta, it.competitor)}{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>
-                  <Field k="Published">{fmtPublished(it.published_at, it.date_precision)}</Field>
+                  {it.scheduled_for ? (
+                    <Field k="Scheduled">{fmtDate(it.scheduled_for, true)} per source (not yet published)</Field>
+                  ) : (
+                    <Field k="Published">
+                      {fmtPublished(it.published_at, it.date_precision)}
+                      {it.published_at_source ? <span className="text-mute"> · the source dated it {fmtDate(it.published_at_source, true)}</span> : null}
+                    </Field>
+                  )}
                   <Field k="Discovered">{fmtDateTime(it.discovered_at)}{it.discovery_lag_hours != null ? ` (${Math.round(it.discovery_lag_hours)} h after publication)` : ""}</Field>
                   <Field k="Score reason">{it.reason || "—"}</Field>
                   {d.ranking?.raw_score != null && d.ranking.raw_score !== it.score ? <Field k="Model score">{d.ranking.raw_score} (adjusted to {it.score ?? "—"})</Field> : null}

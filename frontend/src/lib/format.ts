@@ -124,6 +124,13 @@ export function fmtPublished(iso: string | null, precision: string): string {
   return precision === "day" ? `${fmtDate(iso, true)} (date only)` : fmtDate(iso, true);
 }
 
+/** The date line for an item (contract §10.6): a future source date reads "scheduled for <date> per source",
+ * never as a publication date. Once it passes, the API clears scheduled_for and published_at shows as usual. */
+export function itemDateText(it: { published_at: string | null; date_precision: string; scheduled_for?: string | null }): string {
+  if (it.scheduled_for) return `scheduled for ${fmtDate(it.scheduled_for, true)} per source`;
+  return `Published ${fmtPublished(it.published_at, it.date_precision)}`;
+}
+
 /** Only http(s) links are clickable; anything else from a collected page is shown as text (D32). */
 export function safeHref(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
@@ -197,3 +204,14 @@ export function textBasisWords(b: { status: string; label: string; reason: strin
   const why = reasonWords(b.reason);
   return `Scored from ${b.label.charAt(0).toLowerCase()}${b.label.slice(1)}${why ? `; ${why}` : ""}`;
 }
+
+/** Head-to-head axis keys -> the capability sheet's row labels (the /capabilities page anchors on the key). */
+export const AXIS_LABEL: Record<string, string> = {
+  deployment: "Deployment",
+  package_coverage: "Package coverage",
+  security_scanning: "Security scanning",
+  curation_gating: "Curation / gating",
+  ai_mcp: "AI & MCP",
+  cicd_integration: "CI/CD integration",
+  pricing_model: "Pricing model",
+};

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ExternalLink } from "lucide-react";
 import { CategoryTag, ExtLink, ScoreBadge, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
-import { NO_TEXT, fmtPublished } from "@/lib/format";
+import { NO_TEXT, itemDateText } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { Item } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -49,7 +49,7 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
           <span className="font-medium text-ink">{competitorName(meta, item.competitor)}</span>
           <CategoryTag category={item.category} />
           <span>{item.publisher}</span>
-          <span>Published {fmtPublished(item.published_at, item.date_precision)}</span>
+          <span>{itemDateText(item)}</span>
           {showBadge && item.badge === "late" ? (
             <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after publication (D31)">Found late</Tag>
           ) : null}

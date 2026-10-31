@@ -2,10 +2,11 @@
 // A published item in the Brief (D44): score with its rubric label, then three labeled rows.
 // Every collected string renders as React text (D32); links go through safeHref via ExtLink.
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { CategoryTag, ExtLink, ScoreBadge, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
-import { RELATION_LABEL, RUBRIC, fmtPublished, textBasisWords } from "@/lib/format";
+import { AXIS_LABEL, RELATION_LABEL, RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { Item, Meta } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -34,13 +35,15 @@ function rubricFor(meta: Meta | undefined, score: number | null, competitor: str
   return { label: line.label, rule: competitor === "industry" ? line.industry : line.competitor };
 }
 
-/** Score badge plus its rubric v2 label; the tooltip is the rubric line (industry column for industry items). */
-export function ScoreLabel({ score, competitor }: { score: number | null; competitor: string }) {
+/** Score badge plus its rubric v2 label. Tooltip: the rubric line (industry column for industry items), then the
+ * ranker's reason for this item: interpretation lives here, not in the card's "What happened". */
+export function ScoreLabel({ score, competitor, reason }: { score: number | null; competitor: string; reason?: string }) {
   const { data: meta } = useMeta();
   const r = rubricFor(meta, score, competitor);
+  const tip = [r ? `${score} · ${r.label}: ${r.rule}` : null, reason ? `Why this score: ${reason}` : null].filter(Boolean).join("\n\n") || undefined;
   return (
-    <span className="inline-flex items-center gap-1.5" title={r ? `${score} · ${r.label}: ${r.rule}` : undefined}>
-      <ScoreBadge score={score} title={r ? `${score} · ${r.label}: ${r.rule}` : undefined} />
+    <span className="inline-flex items-center gap-1.5" title={tip}>
+      <ScoreBadge score={score} title={tip} />
       {r ? <span className="text-xs font-semibold text-ink">{r.label}</span> : null}
     </span>
   );
@@ -55,10 +58,12 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** "Why it matters to JFrog" is the lens only (D42). No lens row and "not related" are different answers. */
 function LensView({ item }: { item: Item }) {
   const l = item.lens;
-  if (!l || l.relation === "not_related" || !l.capability_quote) {
-    return <span className="text-mute">No JFrog capability linked.</span>;
+  if (!l) return <span className="text-mute">Not analyzed yet</span>;
+  if (l.relation === "not_related" || !l.capability_quote) {
+    return <span className="text-mute">No direct link to a JFrog capability</span>;
   }
   const why = l.why_it_matters || l.why;
   return (
@@ -68,7 +73,12 @@ function LensView({ item }: { item: Item }) {
       <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-xs text-mute">
         <span className="italic">&ldquo;{l.capability_quote}&rdquo;</span>{" "}
         <span className="not-italic">
-          — {l.source_url ? <ExtLink href={l.source_url} className="text-jgreen-d hover:underline">{l.source_label || "JFrog capability sheet"}</ExtLink> : "JFrog capability sheet"}
+          —{" "}
+          {l.axis ? (
+            <Link href={`/capabilities#${encodeURIComponent(l.axis)}`} className="text-jgreen-d hover:underline">
+              JFrog capability sheet · {AXIS_LABEL[l.axis] ?? l.axis}
+            </Link>
+          ) : "JFrog capability sheet"}
         </span>
       </blockquote>
     </div>
@@ -86,7 +96,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
       data-item={item.item_id}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <ScoreLabel score={item.score} competitor={item.competitor} />
+        <ScoreLabel score={item.score} competitor={item.competitor} reason={item.reason} />
         <span className="text-xs font-medium text-ink">· {competitorName(meta, item.competitor)}</span>
         <CategoryTag category={item.category} />
         {showLate && item.badge === "late" ? (
@@ -105,12 +115,12 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
       </div>
       <dl className="m-0 mt-2 grid grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)]">
         <Row label="What happened">
-          {item.why_it_matters ? <span className="text-[#44516a]">{item.why_it_matters}</span> : <span className="text-mute">No summary for this item.</span>}
+          {item.excerpt.trim() ? <span className="text-[#44516a]">{item.excerpt}</span> : <span className="text-mute">Only the headline is available.</span>}
         </Row>
         <Row label="Why it matters to JFrog"><LensView item={item} /></Row>
         <Row label="Evidence">
           <span className="text-xs text-mute">
-            {item.publisher} · Published {fmtPublished(item.published_at, item.date_precision)} ·{" "}
+            {item.publisher} · {itemDateText(item)} ·{" "}
             {basis ?? "Text basis not reported"}
           </span>
         </Row>
