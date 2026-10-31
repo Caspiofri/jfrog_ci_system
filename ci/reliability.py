@@ -5,6 +5,9 @@ never in the golden set.
     python -m ci.reliability make [--run RUN_ID] [--sample 20] [--seed 20261101]   (default: today's daily run)
     python -m ci.reliability score output/reviews/reliability_<run_id>.yaml
 
+The file also lists every item of the run that the noise pre-filter (shadow mode, D25) would have dropped, with
+its reason and what the classifier decided, for a `noise: yes | no` answer: the pre-filter's precision on unseen data.
+
 make never overwrites a review file that already exists (answers may be in it). score counts right / wrong per field
 and group with n and writes <file>.results.json next to it.
 """
@@ -32,6 +35,8 @@ HEADER = """# Reliability check of daily run {run_id} (D41). For every item, set
 # held: every item held for review at level {level} ({held} items). auto: {sample} of the {auto} auto-published items,
 #   drawn with seed {seed} (fixed, so the sample can be redrawn exactly). Answers stay in this file, not in the golden
 #   set. Count them with: python -m ci.reliability score {path}
+# prefilter: every item of this run the noise pre-filter (shadow mode, D25: it changes nothing) would have dropped
+#   without an LLM call ({flags} items). Set noise: yes (it is noise) or no (it is relevant).
 """
 
 
@@ -70,14 +75,18 @@ def make(run_id: str | None = None, sample: int = SAMPLE, seed: int = SEED, stor
         auto = [i for i in mine if s.status(i) == "auto_published"]
         drawn = sorted(random.Random(seed).sample(auto, min(sample, len(auto))))
         items = [entry(s, i, "held") for i in held] + [entry(s, i, "auto") for i in drawn]
+        flagged = [{"id": i, "title": s.items[i]["title"], "url": s.items[i]["url"],
+                    "would_drop_because": s.outputs[i]["classification"]["shadow_prefilter"],
+                    "classifier_noise": bool(s.outputs[i]["classification"]["noise"]), "status": s.status(i),
+                    "noise": None} for i in mine if s.outputs[i]["classification"].get("shadow_prefilter")]
     path = out_dir / f"reliability_{run['run_id']}.yaml"
     if path.exists():
         raise SystemExit(f"{path} exists; not overwritten (it may hold answers)")
     out_dir.mkdir(parents=True, exist_ok=True)
     body = {"run_id": run["run_id"], "level": s.level, "seed": seed, "auto_published_total": len(auto),
-            "items": items}
+            "items": items, "prefilter": flagged}
     path.write_text(HEADER.format(run_id=run["run_id"], level=s.level, held=len(held), sample=len(drawn),
-                                  auto=len(auto), seed=seed, path=path) +
+                                  auto=len(auto), seed=seed, path=path, flags=len(flagged)) +
                     yaml.safe_dump(body, sort_keys=False, allow_unicode=True, width=120), encoding="utf-8")
     return path
 
@@ -101,6 +110,17 @@ def score(path: Path) -> dict:
                            "wrong": [f for f in FIELDS if (x.get("answer") or {}).get(f) == "wrong"],
                            "note": x.get("note")} for x in data["items"]
                           if any((x.get("answer") or {}).get(f) == "wrong" for f in FIELDS)]
+    flags = data.get("prefilter") or []
+    answers = Counter(x.get("noise") for x in flags)
+    bad = sorted(set(answers) - {"yes", "no", None})
+    if bad:
+        raise SystemExit(f"{path}: prefilter noise answers must be yes, no or null, found {bad}")
+    judged = answers["yes"] + answers["no"]
+    out["prefilter"] = {"flagged": len(flags), "noise_yes": answers["yes"], "noise_no": answers["no"], "n": judged,
+                        "unanswered": answers[None],
+                        "precision": round(answers["yes"] / judged, 3) if judged else None,
+                        "relevant_flagged": [{"id": x["id"], "title": x["title"]} for x in flags
+                                             if x.get("noise") == "no"]}
     path.with_suffix(".results.json").write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     return out
 
@@ -117,13 +137,18 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("path", type=Path)
     args = ap.parse_args(argv)
     if args.cmd == "make":
-        print(f"wrote {make(args.run, args.sample, args.seed)}")
+        path = make(args.run, args.sample, args.seed)
+        flags = len(yaml.safe_load(path.read_text(encoding="utf-8")).get("prefilter") or [])
+        print(f"wrote {path} (pre-filter shadow flags in this run: {flags})")
     else:
         res = score(args.path)
         for group, g in res["groups"].items():
             print(f"{group:4} items {g['items']:>3}: " + "; ".join(
                 f"{f} {g[f]['right']} of {g[f]['n']} right" + (f" ({g[f]['unanswered']} unanswered)"
                                                                 if g[f]["unanswered"] else "") for f in FIELDS))
+        p = res["prefilter"]
+        print(f"prefilter (shadow): flagged {p['flagged']}; noise {p['noise_yes']} of {p['n']} judged"
+              + (f", relevant flagged: {[x['id'] for x in p['relevant_flagged']]}" if p["relevant_flagged"] else ""))
         print(f"wrote {args.path.with_suffix('.results.json')}")
     return 0
 

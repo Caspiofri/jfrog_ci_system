@@ -21,11 +21,17 @@ def store(tmp_path, monkeypatch):
     rows = [raw(f"auto{n:02d}", f"https://www.theregister.com/{n}", f"Story {n}", "2026-10-31T01:00:00Z", RUN2)
             for n in range(25)]
     rows += [raw("held1", "https://gbhackers.com/h", "Aggregator story", "2026-10-31T01:00:00Z", RUN2)]
+    stock = raw("stock1", "https://finance.example.com/s", "GitLab Reaches a Fresh 52-Week High",
+                "2026-10-31T01:00:00Z", RUN2)
     with Store(store_path) as s:
-        s.add_items(rows, RUN2, START2)
-        s.save_outputs(RUN2, "fp", [Classification(id=r["id"], competitor="github", category="Security", noise=False,
-                                                   mentions_jfrog=False, confidence=0.9, method="llm") for r in rows],
-                       [Ranked(id=r["id"], raw_score=3, score=3, reason="r", confidence=0.9) for r in rows])
+        s.add_items(rows + [stock], RUN2, START2)
+        cls = [Classification(id=r["id"], competitor="github", category="Security", noise=False, mentions_jfrog=False,
+                              confidence=0.9, method="llm") for r in rows]
+        cls.append(Classification(id="stock1", competitor="gitlab", category=None, noise=True, mentions_jfrog=False,
+                                  confidence=0.9, method="llm", shadow_prefilter="stock chatter: 52-week high/low"))
+        s.save_outputs(RUN2, "fp", cls, [Ranked(id=r["id"], raw_score=3, score=3, reason="r", confidence=0.9)
+                                         for r in rows] + [Ranked(id="stock1", raw_score=None, score=None, noise=True,
+                                                                  reason="noise", confidence=0.9)])
     monkeypatch.setattr(reliability.ci_config, "load", lambda: reliability.ci_config.CIConfig(competitors=[]))
     return store_path
 
@@ -67,3 +73,17 @@ def test_score_counts_right_and_wrong_per_field_with_n(store, tmp_path):
     path.write_text(yaml.safe_dump(data, sort_keys=False))
     with pytest.raises(SystemExit, match="right, wrong or null"):
         reliability.score(path)
+
+
+def test_the_shadow_prefilters_flags_are_listed_for_a_noise_answer_and_scored(store, tmp_path):
+    path = reliability.make(store_path=store, out_dir=tmp_path / "reviews", now=MORNING)
+    data = yaml.safe_load(path.read_text())
+    assert data["prefilter"] == [{"id": "stock1", "title": "GitLab Reaches a Fresh 52-Week High",
+                                  "url": "https://finance.example.com/s",
+                                  "would_drop_because": "stock chatter: 52-week high/low", "classifier_noise": True,
+                                  "status": "dropped", "noise": None}]
+    assert "stock1" not in [x["id"] for x in data["items"]]  # noise is neither held nor auto-published
+    data["prefilter"][0]["noise"] = "yes"
+    path.write_text(yaml.safe_dump(data, sort_keys=False))
+    p = reliability.score(path)["prefilter"]
+    assert (p["flagged"], p["noise_yes"], p["n"], p["precision"], p["relevant_flagged"]) == (1, 1, 1, 1.0, [])
