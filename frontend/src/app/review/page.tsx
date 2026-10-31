@@ -1,9 +1,11 @@
 "use client";
 import { Suspense, useState } from "react";
-import { ShieldCheck, Undo2 } from "lucide-react";
+import { Check, ChevronDown, Pencil, ShieldCheck, Undo2, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Async, Empty, ErrorNote, HBars, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
+import { Async, Empty, ErrorNote, ExtLink, HBars, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ItemRow } from "@/components/ItemRow";
@@ -103,7 +105,7 @@ function ReviewScreen() {
                     row.kind === "item" ? (
                       <QueueItem key={row.item.item_id} row={row} level={r.level} disabled={previewing} onTrusted={setTrustMsg} />
                     ) : (
-                      <ChangeRow key={`c${row.change_id}`} row={row} />
+                      <ChangeRow key={`c${row.change_id}`} row={row} disabled={previewing} />
                     ),
                   )
                 ) : (
@@ -345,18 +347,83 @@ function TrustedSources() {
   );
 }
 
-function ChangeRow({ row }: { row: ReviewChangeRow }) {
+const CHANGE_DISMISS: Record<string, string> = {
+  wrong_extraction: "Wrong extraction",
+  cosmetic: "Cosmetic change",
+  not_a_change: "Not a change",
+};
+
+function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean }) {
   const { data: meta } = useMeta();
+  const refresh = useRefreshAll();
+  const [err, setErr] = useState<ApiError | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(row.new_value ?? "");
+  const id = encodeURIComponent(row.change_id);
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await fn();
+      setEditing(false);
+      await refresh();
+    } catch (e) {
+      setErr(e as ApiError);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const off = disabled || busy;
   return (
-    <div className="flex items-start gap-3 border-t border-line py-2.5 first:border-t-0 bg-[#fff7e6] px-2.5">
+    <div className="flex items-start gap-3 border-t border-line bg-[#fff7e6] px-2.5 py-2.5 first:border-t-0">
       <Tag className="bg-[#f59e0b] text-white">Cell</Tag>
       <div className="min-w-0 flex-1">
-        <div className="font-semibold">{competitorName(meta, row.competitor)} · {row.axis ?? "axis unknown"}: head-to-head cell changed</div>
-        <div className="mt-1 grid gap-1 text-xs md:grid-cols-2">
-          <div><span className="text-mute">Was: </span>{row.old_value ?? "—"}</div>
-          <div><span className="text-mute">Now: </span>{row.new_value ?? "—"}</div>
+        <div className="font-semibold">{competitorName(meta, row.competitor)} · {row.axis_label ?? row.axis ?? "axis unknown"}: head-to-head cell changed</div>
+        <div className="mt-1 grid gap-2 text-xs md:grid-cols-2">
+          <div><div className="text-mute">Was</div>{row.old_value || "—"}{row.old_evidence ? <div className="mt-0.5 italic text-mute">&ldquo;{row.old_evidence}&rdquo;</div> : null}</div>
+          <div><div className="text-mute">Now</div>{row.new_value || "—"}{row.new_evidence ? <div className="mt-0.5 italic text-mute">&ldquo;{row.new_evidence}&rdquo;</div> : null}</div>
         </div>
-        <div className="mt-1 text-xs text-mute">Read-only here: cell actions come with the Competitors screen.</div>
+        {row.tier_changes?.length ? (
+          <ul className="m-0 mt-1.5 list-none p-0 text-xs">
+            {row.tier_changes.map((t, i) => (
+              <li key={i}><b className="font-semibold">{t.tier}</b> {t.change}{t.old_name ? ` (was ${t.old_name})` : ""}: {t.old || "—"} → {t.new || "—"}</li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="mt-1 flex flex-wrap gap-2 text-xs text-mute">
+          {row.held_since ? <span>Detected {fmtDateTime(row.held_since)}</span> : null}
+          {row.page_url ? <ExtLink href={row.page_url}>tracked page</ExtLink> : null}
+          <span>Held at every level (D9)</span>
+        </div>
+        {editing ? (
+          <div className="mt-2 flex flex-col gap-1.5">
+            <Textarea value={value} onChange={(e) => setValue(e.target.value)} rows={2} aria-label="Corrected cell value" className="bg-white" />
+            <div className="flex gap-1.5">
+              <Button size="sm" className="h-7 text-xs" disabled={off || !value.trim()} onClick={() => run(() => send("PATCH", `/api/v1/changes/${id}`, { value }))}>Save value</Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : null}
+        {err ? <div className="mt-1.5"><ErrorNote error={err} /></div> : null}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+        <Button size="sm" variant="outline" className="h-7 border-jgreen px-2.5 text-xs text-jgreen-d hover:bg-jgreen hover:text-white" disabled={off}
+          onClick={() => run(() => send("POST", `/api/v1/changes/${id}/approve`, {}))}>
+          <Check className="size-3.5" /> Approve
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs" disabled={off}><X className="size-3.5" /> Dismiss <ChevronDown className="size-3" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel className="text-xs text-mute">Dismiss restores the old value</DropdownMenuLabel>
+            {Object.entries(CHANGE_DISMISS).map(([k, v]) => (
+              <DropdownMenuItem key={k} onSelect={() => run(() => send("POST", `/api/v1/changes/${id}/dismiss`, { reason: k }))}>{v}</DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs" disabled={off} onClick={() => setEditing(true)}><Pencil className="size-3.5" /> Edit</Button>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 Fields or endpoints the UI needs that the API contract (`docs/plans/2026-10-31-api-contract.md`) doesn't provide yet.
 The frontend never edits backend code; each request waits here for Ofri.
 
-## 1. Brief: mark a backfill (import-anchored) Brief
+## 1. Brief: mark a backfill (import-anchored) Brief — done (fd6e933, `anchor_kind`)
 
 - **Where:** `GET /api/v1/brief` → `window`, and `GET /api/v1/briefs` rows.
 - **Ask:** add the anchor run's kind, e.g. `"anchor_kind": "daily" | "import"` (or `"backfill": true`).
