@@ -1,5 +1,7 @@
 # Jessi web UI (Next.js)
 
+<img src="public/brand/jessi-full-light.svg" alt="Jessi: JFrog's Engine for Strategic Signals & Intelligence" width="360">
+
 Jessi is JFrog's Engine for Strategic Signals & Intelligence (D46).
 
 The CI tool's web UI: Next.js + Tailwind + shadcn/ui + Recharts (PRD D3). Every number comes from the CI API
@@ -40,6 +42,15 @@ Mock mode is local `next dev` only, and separate from demo mode (`CI_MODE=demo`,
 - At runtime, mock stays off until `/meta` reports `mode: "live"`.
 - `.dockerignore` keeps env files and `public/mock/` out of images.
 - `npm test` checks all of this.
+
+## Brand (D46)
+
+`public/brand/` holds the logo files. Each is the original SVG with only the root attributes changed (viewBox set,
+width/height removed), so they are transparent and scale freely:
+- `jessi-full.svg`: logo with the white tagline, for dark backgrounds. `jessi-full-light.svg`: the same with the
+  tagline in #1f2937, for light backgrounds.
+- `jessi-mark.svg`: splash and wordmark, no tagline groups. Used in the app header at 40px high.
+- `jessi-icon.svg`: the favicon, viewBox cropped to the splash. `jessi-icon-32.png` is its 32px fallback.
 
 ## Rules
 
