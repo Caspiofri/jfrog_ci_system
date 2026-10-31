@@ -48,4 +48,6 @@ UI says the value isn't reported. Dev mock mode (`NEXT_PUBLIC_CI_MOCK=1`, see RE
   word for word from rubric v2.
 - **3g. Operational counts on Health.** `GET /health` → `brief`: `{"date", "kpis": [...]}` with Found late, Mentions
   JFrog and the vs-previous values that leave the Brief. Until then Health reads `kpis` from `GET /brief`.
+  Please include `prev_anchor_kind` (`"daily"` or `"import"`): when the previous Brief is the import, Health shows
+  "previous Brief was the initial import" instead of a delta. Until then the UI reads `anchor_kind` from `/briefs`.
 - **3h. Brief shows scores 3+ only** (D44 part 2). The UI doesn't filter, so 1s and 2s show until the API enforces it.
