@@ -6,11 +6,11 @@ Competitors and Health come in the next step. Insights are served when stored; "
 until the setting insights_enabled is "true" (D37: not before Ofri's expected-insights file is saved).
 """
 import json
-import sqlite3
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Header, Query, Request
@@ -21,6 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ci import config as ci_config
 from ci import eval_golden, insights, route, sources
+from ci.api import competitors as competitors_api
 from ci.api import service as svc
 from ci.api.service import Snapshot
 from ci.classify import CATEGORIES
@@ -294,23 +295,9 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                  "published": sum(not route.is_held(r, lv) for r in reasons.values()), "n": len(nonnoise)}
                 for lv in route.LEVELS]
 
-    def change_rows() -> list[dict]:
-        if not changes_path.exists():
-            return []
-        db = sqlite3.connect(f"file:{changes_path}?mode=ro", uri=True)
-        try:
-            rows = db.execute("SELECT id, run_id, item FROM changes").fetchall()
-        finally:
-            db.close()
-        out = []
-        for change_id, run_id, item in rows:
-            data = json.loads(item)
-            out.append({"kind": "change", "change_id": change_id, "run_id": run_id,
-                        "competitor": data.get("competitor"), "axis": data.get("axis"),
-                        "old_value": data.get("old_value"), "new_value": data.get("new_value"),
-                        "hold_reasons": [{"code": h.code, "detail": h.detail, "held_at": list(h.held_at)}
-                                         for h in route.change_hold_reasons()]})
-        return out
+    def change_rows(competitor: list[str] | None) -> list[dict]:
+        rows = competitors_api.awaiting_change_rows(changes_path)
+        return [r for r in rows if not competitor or r["competitor"] in competitor]
 
     @app.get("/api/v1/review")
     def get_review(level: Level | None = None, reason: Multi = None,
@@ -334,7 +321,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                               "trust_source": s.trust_info(s.items[i]["url"])}, forced))
             rows.sort(key=lambda x: (not x[1], -(x[0]["item"]["score"] or 0), x[0]["held_since"] or ""))
             out = [r for r, _ in rows] if not kind or "item" in kind else []
-            changes = change_rows() if not kind or "change" in kind else []
+            changes = change_rows(competitor) if not kind or "change" in kind else []
             if changes:
                 counts["changed_cell"] += len(changes)
             body = {"level": lv, "levels": level_block(s, scope),
@@ -565,4 +552,8 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             rows.sort(key=lambda r: (r[sort] or "", r["item_id"] or ""), reverse=True)
         return ok({"counts": counts, **page(rows, limit, offset)})
 
+    deps = SimpleNamespace(ok=ok, snap=snap, item_out=item_out, page=page, ApiError=ApiError, cfg=cfg, now=now,
+                           changes_path=changes_path, store_path=store_path, runs_dir=runs_dir,
+                           store=lambda: Store(store_path))
+    competitors_api.register(app, deps)
     return app

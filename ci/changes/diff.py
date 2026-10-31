@@ -292,6 +292,9 @@ class CellStore:
         # every Changes item, with the run that wrote it to output/changes/<run_id>.jsonl ('' = not yet written)
         self._db.execute("CREATE TABLE IF NOT EXISTS changes (id TEXT PRIMARY KEY, run_id TEXT, item TEXT, "
                          "published_in TEXT)")
+        # the analyst's review of a Changes item (D9, D13); no row = awaiting review
+        self._db.execute("CREATE TABLE IF NOT EXISTS change_state (change_id TEXT PRIMARY KEY, status TEXT, "
+                         "reason TEXT, note TEXT, value TEXT, decided_at TEXT)")
         # aws_codeartifact -> aws: cells keep the newer of a colliding pair; history rows are all renamed
         ci_config.migrate_legacy_keys(self._db, ["cells", "cell_history"], unique={"cells": ("axis",)})
         self._migrate_unpublished_items()
@@ -375,6 +378,62 @@ class CellStore:
         with self._db:
             self._db.executemany("UPDATE cells SET checked_at = ? WHERE competitor = ? AND axis = ? AND stale = 0",
                                  [(checked_at.isoformat(), competitor, a) for a in axes])
+
+    def set_note(self, competitor: str, axis: str, note: str) -> None:
+        with self._db:
+            self._db.execute("UPDATE cells SET note = ? WHERE competitor = ? AND axis = ?", (note, competitor, axis))
+
+    # ---- review of Changes items (D9, D13) -------------------------------------------------------------------------
+
+    def changes(self) -> list[tuple[ChangeItem, dict]]:
+        """Every Changes item with its review state ({"status": "awaiting_review"} when undecided), oldest first."""
+        rows = self._db.execute("SELECT c.item, s.status, s.reason, s.note, s.value, s.decided_at FROM changes c "
+                                "LEFT JOIN change_state s ON s.change_id = c.id ORDER BY c.rowid").fetchall()
+        return [(ChangeItem.model_validate_json(r[0]),
+                 {"status": r[1] or "awaiting_review", "reason": r[2], "note": r[3], "value": r[4],
+                  "decided_at": r[5]}) for r in rows]
+
+    def change(self, change_id: str) -> tuple[ChangeItem, dict] | None:
+        return next(((c, st) for c, st in self.changes() if c.id == change_id), None)
+
+    def decide(self, change_id: str, decision: str, *, now: datetime, reason: str | None = None,
+               note: str | None = None, value: str | None = None) -> Cell:
+        """approve: the new value stands. dismiss: the cell goes back to the old value (wrong extraction, cosmetic,
+        not a change). edit: the cell takes the analyst's value. One transaction: cell, history and state.
+        ValueError("decided") if already decided; ValueError("superseded") if the cell moved on since this change."""
+        found = self.change(change_id)
+        if found is None:
+            raise KeyError(change_id)
+        item, state = found
+        if state["status"] != "awaiting_review":
+            raise ValueError("decided")
+        cell = self.get(item.competitor, item.axis)
+        if cell is None or cell.value != item.new_value:
+            raise ValueError("superseded")
+        if decision == "approve":
+            new, event, status = cell, "approved", "approved"
+        elif decision == "dismiss":
+            new = cell.model_copy(update={"value": item.old_value, "evidence": item.old_evidence,
+                                          "confidence": item.old_confidence, "tiers": item.old_tiers,
+                                          "as_of": item.old_as_of, "checked_at": now, "stale": False,
+                                          "stale_reason": "", "needs_review": False, "review_reason": ""})
+            event, status = "dismissed", "dismissed"
+        elif decision == "edit":
+            if not (value or "").strip():
+                raise ValueError("value")
+            new = cell.model_copy(update={"value": value.strip(), "evidence": "", "checked_at": now, "stale": False,
+                                          "stale_reason": "", "needs_review": False, "review_reason": ""})
+            event, status = "analyst_edit", "edited"
+        else:
+            raise ValueError(f"decision must be approve, dismiss or edit, got {decision!r}")
+        with self._db:
+            row = self._values(new)
+            self._db.execute(f"INSERT OR REPLACE INTO cells VALUES ({', '.join('?' * len(row))})", row)
+            self._db.execute(f"INSERT INTO cell_history VALUES ({', '.join('?' * (len(row) + 3))})",
+                             (*row, "analyst", event, change_id))
+            self._db.execute("INSERT INTO change_state VALUES (?, ?, ?, ?, ?, ?)",
+                             (change_id, status, reason, note, value, now.isoformat()))
+        return new
 
     def mark_stale(self, competitor: str, axis: str, reason: str) -> None:
         with self._db:

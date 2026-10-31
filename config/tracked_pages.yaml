@@ -18,7 +18,14 @@ competitors:
     - key: artifactory
       url: https://jfrog.com/artifactory/
       page_type: product
-      axes: [package_coverage, security_scanning, curation_gating, ai_mcp, cicd_integration]
+      axes: [package_coverage, curation_gating, ai_mcp, cicd_integration]
+    # D31 Q9: the security baseline must be able to cite contextual analysis (JFrog's reachability); the Artifactory
+    # page only said "integrates natively with Xray". This page names Xray SCA, Contextual Analysis (applicability),
+    # secrets and IaC detection (fetched Oct 31 2026, 3,181 chars).
+    - key: advanced_security
+      url: https://jfrog.com/advanced-security/
+      page_type: product
+      axes: [security_scanning]
 
   cloudsmith:
     # dropped: https://cloudsmith.com/pricing (and /pricing/, /plans, /platform, /features) answer 429 with a
@@ -57,6 +64,17 @@ competitors:
       url: https://github.com/security/advanced-security
       page_type: product
       axes: [security_scanning, ai_mcp]
+    # Oct 31: pages for the two empty cells (fetched live: npm, Maven, NuGet, RubyGems, Docker, Gradle named)
+    - key: packages
+      url: https://docs.github.com/en/packages/learn-github-packages/introduction-to-github-packages
+      page_type: docs
+      axes: [package_coverage]
+    # gating at pull-request time (blocks a PR that adds a vulnerable dependency); no public package-firewall docs
+    # page was found (the guessed URL returns no text)
+    - key: dependency_review
+      url: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review
+      page_type: docs
+      axes: [curation_gating]
 
   gitlab:
     # the tier prices are rendered by JavaScript; the text keeps the tiers and the GitLab Credits model
@@ -69,6 +87,16 @@ competitors:
       url: https://about.gitlab.com/platform/
       page_type: product
       axes: [security_scanning, ai_mcp, cicd_integration]
+    # Oct 31: the "supported package managers" page returns no text; the registry overview names the formats
+    - key: package_registry
+      url: https://docs.gitlab.com/user/packages/package_registry/
+      page_type: docs
+      axes: [package_coverage]
+    # gating by merge request approval and scan execution policies
+    - key: security_policies
+      url: https://docs.gitlab.com/user/application_security/policies/
+      page_type: docs
+      axes: [curation_gating]
 
   snyk:
     # the Team plan price is rendered by JavaScript; the text keeps the plans and the credit model (1 credit = $1)
@@ -81,8 +109,16 @@ competitors:
       url: https://snyk.io/product/open-source-security-management/
       page_type: product
       axes: [security_scanning, package_coverage, ai_mcp, cicd_integration]
+    # Oct 31: deployment = multi-tenant regions and single-tenant options. No page for curation_gating: the
+    # Artifactory Gatekeeper plugin docs return no text at both known URLs.
+    - key: hosting
+      url: https://docs.snyk.io/snyk-data-and-governance/regional-hosting-and-data-residency
+      page_type: docs
+      axes: [deployment]
 
   aws:  # was aws_codeartifact
+    # no security_scanning or ai_mcp page: the CodeArtifact pages fetched on Oct 31 cover neither (Amazon Inspector
+    # scans ECR, not CodeArtifact), so those cells stay untracked rather than filled from another product
     # the rate tables are loaded by JavaScript; the text keeps the pay-per-use model and the free tier
     - key: pricing
       url: https://aws.amazon.com/codeartifact/pricing/

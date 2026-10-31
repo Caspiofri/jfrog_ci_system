@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ci.changes.config import JFROG, TrackedPage, TrackedPages
+from ci.changes.config import JFROG, PRICES_OFF_PAGE_NOTE, TrackedPage, TrackedPages
 from ci.changes.diff import Cell, CellStore, ChangeItem, make_change, same_field, section_diff, tier_changes
 from ci.changes.extract import AxisField, extract_fields, quote_in_text
 from ci.changes.snapshot import Fetch, FetchError, SnapshotStore, content_hash, http_fetch, normalize_text
@@ -61,9 +61,18 @@ def new_run_id(now: datetime) -> str:
     return f"{now.strftime('%Y%m%dT%H%MZ')}-{uuid.uuid4().hex[:6]}"
 
 
+def cell_note(page: TrackedPage, axis: str) -> str:
+    """The page note a cell carries. The default "prices rendered client-side" note is about prices, so it goes on the
+    pricing_model cell only (it once leaked onto GitLab's Deployment cell); an explicit page note goes on every cell."""
+    if page.note == PRICES_OFF_PAGE_NOTE and axis != "pricing_model":
+        return ""
+    return page.note
+
+
 def _cell(competitor: str, page: TrackedPage, f: AxisField, now: datetime) -> Cell:
     return Cell(competitor=competitor, axis=f.axis, value=f.value, evidence=f.evidence, confidence=f.confidence,
-                tiers=f.tiers, source_url=page.url, page_key=page.key, as_of=now, checked_at=now, note=page.note)
+                tiers=f.tiers, source_url=page.url, page_key=page.key, as_of=now, checked_at=now,
+                note=cell_note(page, f.axis))
 
 
 def _usable(f: AxisField) -> bool:
@@ -99,6 +108,10 @@ def check_page(res: PageResult, name: str, page: TrackedPage, *, fetch: Fetch, l
     res.hash = content_hash(text)
     prev = snapshots.latest(competitor, page.key)
     stored = [c for a in page.axes if (c := cells.get(competitor, a))]
+    if llm is not None:  # repair notes stored before cell_note existed; no history event, the value is unchanged
+        for c in stored:
+            if c.note != cell_note(page, c.axis):
+                cells.set_note(competitor, c.axis, cell_note(page, c.axis))
     if prev and prev.hash == res.hash and len(stored) == len(page.axes):
         if llm is not None:
             cells.touch(competitor, page.axes, now)

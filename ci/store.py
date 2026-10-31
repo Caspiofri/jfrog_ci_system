@@ -304,6 +304,16 @@ class Store:
                 (item_id, action, reason, note, json.dumps(payload or {}, ensure_ascii=False), now))
         return {**new, "action_id": cur.lastrowid, "at": now}
 
+    def log_action(self, target_kind: str, target_id: str, action: str, reason: str | None, note: str | None,
+                   payload: dict) -> int:
+        """An analyst action on something whose state lives elsewhere (a changed cell: changes.sqlite)."""
+        with self._db:
+            cur = self._db.execute(
+                "INSERT INTO analyst_actions (target_kind, target_id, action, reason, note, payload, at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (target_kind, target_id, action, reason, note, json.dumps(payload, ensure_ascii=False), _now()))
+        return cur.lastrowid
+
     def actions(self, target_id: str | None = None) -> list[dict]:
         sql, args = "SELECT * FROM analyst_actions", ()
         if target_id is not None:
