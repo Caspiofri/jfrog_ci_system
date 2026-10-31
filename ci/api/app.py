@@ -1,4 +1,4 @@
-"""The CI API v1 (docs/plans/2026-10-31-api-contract.md): Brief, Review and Log, plus meta and the item drawer.
+"""The CI API v1 (docs/api-contract.md): Brief, Review and Log, plus meta and the item drawer.
 
     python -m ci.api [--port 8010]     binds 127.0.0.1 only (no auth in the demo, contract 2.1)
 
