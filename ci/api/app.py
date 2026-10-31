@@ -86,7 +86,24 @@ class ItemOut(BaseModel):
     run_id: str | None
     fingerprint: str | None
     event_id: str | None
-    lens: dict | None  # D42: {axis, capability_quote, relation, why}; None when no lens passed its quote check
+    lens: dict | None  # D42: {axis, capability_quote, relation, why_it_matters, why}; None when none passed its check
+    text_basis: "TextBasisOut"  # D39/D44
+
+
+class TextBasisOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: str
+    source: str
+    label: str
+    failure_reason: str | None
+    failure_detail: list[str] | None
+    chars_used_for_scoring: int
+
+
+ItemOut.model_rebuild()
+
+REFRESH_MARK = "insights_refreshing:"  # + Brief date -> the refresh's start time ("" when none is running)
+REFRESH_STALE = timedelta(minutes=10)  # a mark older than this is a crashed refresh, not a running one
 
 
 class Note(BaseModel):
@@ -127,8 +144,10 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                insights_llm: Callable[[], object] | None = None, embed_fn=None,
                evals_dir: Path = eval_golden.EVALS_OUT_DIR, coverage_dir: Path = coverage.COVERAGE_DIR,
                events_path: Path = coverage.EVENTS_PATH, changes_out_dir: Path = OUTPUT_DIR / "changes",
-               labels_path: Path = eval_golden.LABELS_PATH, sheet_path: Path = lens_mod.SHEET_PATH) -> FastAPI:
+               labels_path: Path = eval_golden.LABELS_PATH, sheet_path: Path = lens_mod.SHEET_PATH,
+               brief_config_path: Path = svc.BRIEF_CONFIG_PATH) -> FastAPI:
     cfg = cfg or ci_config.load()
+    min_score = svc.brief_min_score(brief_config_path)
     app = FastAPI(title="JFrog CI API", version=API_VERSION)
 
     def meta() -> dict:
@@ -209,15 +228,36 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 "mentions_jfrog": sum(s.item(i)["mentions_jfrog"] for i in ids),
                 "by_urgency": dict(Counter(svc.URGENCY.get(x) for x in scores if x))}
 
+    def refreshing(store: Store, date: str) -> bool:
+        started = svc.parse_ts(store.setting(REFRESH_MARK + date, "") or None)
+        return started is not None and now() - started < REFRESH_STALE
+
+    def insights_state(enabled: bool, stored: dict | None, kept: list, running: bool) -> str:
+        """D44: disabled | refreshing | not_run | failed | none_passed | ok (no internal ids in what the UI shows)."""
+        if not enabled:
+            return "disabled"
+        if running:
+            return "refreshing"
+        if stored is None:
+            return "not_run"
+        if stored.get("status") == "failed":
+            return "failed"
+        return "ok" if kept else "none_passed"
+
     @app.get("/api/v1/briefs")
     def list_briefs(limit: int = 50, offset: int = 0):
         store, s = snap()
         with store:
             rows = []
             for date, run in reversed(s.anchors()):
-                c = brief_counts(s, s.window(date))
+                w = s.window(date)
+                c = brief_counts(s, w)
+                _, summary = s.brief_summary(w, min_score)
                 rows.append({"date": date, "anchor_run_id": run["run_id"], "anchor_kind": run["kind"],
-                             "items": c["items"],
+                             "published_in_brief": summary["published_in_brief"],
+                             "published_in_brief_4plus": summary["published_in_brief_4plus"],
+                             "held_total": summary["held_total"],
+                             "items": c["items"],  # deprecated (D44): every published item, whatever the score
                              "found_late": c["found_late"], "awaiting_review": c["awaiting_review"]})
         return ok(page(rows, limit, offset))
 
@@ -232,10 +272,12 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             date = date or anchors[-1][0]
             w = s.window(date)
             if w is None:
-                return ok({"date": date, "status": "missing", "window": None, "counts": None, "kpis": [],
-                           "insights": {"status": "missing", "items": []}, "intensity": None,
+                return ok({"date": date, "status": "missing", "window": None, "brief_min_score": min_score,
+                           "summary": None, "counts": None, "kpis": [], "insights_status": None,
+                           "insights": {"status": "missing", "items": [], "rejected_count": 0}, "intensity": None,
                            "items": page([], limit, offset)})
-            rows = [item_out(s, i, badge=s.badge(i, w)) for i in s.brief_ids(w)]
+            listed, summary = s.brief_summary(w, min_score)
+            rows = [item_out(s, i, badge=s.badge(i, w)) for i in listed]
             rows = [r for r in rows if (not competitor or r["competitor"] in competitor)
                     and (not category or r["category"] in category) and (not badge or r["badge"] in badge)]
             rows.sort(key=svc.sort_key)
@@ -244,12 +286,15 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             kpis = [{"key": k, "value": counts[k], "prev": prev[k] if prev else None}
                     for k in ("items", "important", "found_late", "mentions_jfrog")]
             stored = store.latest_insights(date)
+            enabled = insights_enabled()
             if stored:
                 generated = stored.pop("insights", [])
-                ins = {**stored, "items": generated, "enabled": insights_enabled()}
+                ins = {**stored, "items": generated, "enabled": enabled,
+                       "rejected_count": len(stored.get("rejected") or [])}
             else:
-                ins = {"status": "not_generated", "items": [], "enabled": insights_enabled()}
-            body = {"date": date, "status": "ok",
+                ins = {"status": "not_generated", "items": [], "enabled": enabled, "rejected_count": 0}
+            body = {"date": date, "status": "ok", "brief_min_score": min_score, "summary": summary,
+                    "insights_status": insights_state(enabled, stored, ins["items"], refreshing(store, date)),
                     "window": {"prev_anchor": svc.iso(w["prev_anchor"]), "anchor": svc.iso(w["anchor"]),
                                "anchor_run_id": w["anchor_run_id"], "anchor_kind": w["anchor_kind"],
                                "hours": round((w["anchor"] - w["prev_anchor"]).total_seconds() / 3600, 2),
@@ -283,9 +328,16 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                     if s.status(i) in svc.PUBLISHED]
             if insights_llm is None:
                 raise ApiError(503, "llm_unavailable", "no insights model configured")
-            res = insights.generate(rows, insights_llm(), embed_fn, anchor=w["anchor"], prev_anchor=w["prev_anchor"],
-                                    level=s.level, trigger="refresh", now=now, sheet=lens_mod.load_sheet(sheet_path))
-            store.save_insights(date, res.to_json())
+            if refreshing(store, date):
+                raise ApiError(409, "refresh_running", f"insights for {date} are already being refreshed")
+            store.set_setting(REFRESH_MARK + date, svc.iso(now()))  # the Brief shows insights_status "refreshing"
+            try:
+                res = insights.generate(rows, insights_llm(), embed_fn, anchor=w["anchor"],
+                                        prev_anchor=w["prev_anchor"], level=s.level, trigger="refresh", now=now,
+                                        sheet=lens_mod.load_sheet(sheet_path))
+                store.save_insights(date, res.to_json())
+            finally:
+                store.set_setting(REFRESH_MARK + date, "")
         return ok({"date": date, "status": res.status, "insights": len(res.insights), "rejected": len(res.rejected),
                    "generated_at": res.generated_at})
 
@@ -309,13 +361,18 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     @app.get("/api/v1/review")
     def get_review(level: Level | None = None, reason: Multi = None,
                    competitor: Multi = None, date_from: str | None = None, date_to: str | None = None,
-                   kind: Kinds = None, limit: int = 50, offset: int = 0):
+                   brief_date: str | None = None, kind: Kinds = None, limit: int = 50, offset: int = 0):
         store, s = snap()
         with store:
             lv = level or s.level
-            scope = [i for i in s.classified_ids() if in_dates(s, i, date_from, date_to)
+            w = s.window(brief_date) if brief_date else None
+            if brief_date and w is None:
+                raise ApiError(404, "not_found", f"no Brief for {brief_date}")
+            base = s.window_ids(w) if w else s.classified_ids()  # D44: the Brief links to its own window's held items
+            scope = [i for i in base if in_dates(s, i, date_from, date_to)
                      and (not competitor or s.item(i)["competitor"] in competitor)]
             held = [i for i in scope if s.status(i, lv) == "awaiting_review"]
+            backlog_total = sum(s.status(i, lv) == "awaiting_review" for i in s.classified_ids())
             reasons_at = {i: [r for r in s.reasons(i) if lv in r.held_at] for i in held}
             if reason:
                 held = [i for i in held if any(r.code in reason for r in reasons_at[i])]
@@ -328,12 +385,17 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                               "trust_source": s.trust_info(s.items[i]["url"])}, forced))
             rows.sort(key=lambda x: (not x[1], -(x[0]["item"]["score"] or 0), x[0]["held_since"] or ""))
             out = [r for r, _ in rows] if not kind or "item" in kind else []
-            changes = change_rows(competitor) if not kind or "change" in kind else []
+            # changed cells belong to no Brief window: listed only in the unfiltered queue
+            changes = change_rows(competitor) if (not kind or "change" in kind) and not w else []
             if changes:
                 counts["changed_cell"] += len(changes)
             body = {"level": lv, "levels": level_block(s, scope),
-                    "scope": {"date_from": date_from, "date_to": date_to, "competitor": competitor},
-                    "counts_by_reason": dict(counts), **page(changes + out, limit, offset)}
+                    "scope": {"brief_date": brief_date,
+                              "window": {"prev_anchor": svc.iso(w["prev_anchor"]), "anchor": svc.iso(w["anchor"])}
+                              if w else None,
+                              "date_from": date_from, "date_to": date_to, "competitor": competitor},
+                    "counts_by_reason": dict(counts), **page(changes + out, limit, offset),
+                    "backlog_total": backlog_total}
         return ok(body)
 
     @app.get("/api/v1/settings/autonomy-level")

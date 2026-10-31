@@ -108,7 +108,8 @@ def test_brief_window_badges_order_and_published_only(env):
     assert [x["badge"] for x in items] == ["new", "late"]
     assert items[1]["published_at"] == "2026-10-20T00:00:00Z" and items[1]["discovery_lag_hours"] == 253.2
     assert b["counts"]["found_late"] == 1 and b["counts"]["awaiting_review"] == 3
-    assert b["insights"] == {"status": "not_generated", "items": [], "enabled": False}
+    assert b["insights"] == {"status": "not_generated", "items": [], "enabled": False, "rejected_count": 0}
+    assert b["insights_status"] == "disabled"
     assert len(b["intensity"]["series"]) == 14 and b["intensity"]["series"][-1] == {"date": "2026-10-30",
                                                                                      "score": 7, "items": 2}
 

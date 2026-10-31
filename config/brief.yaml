@@ -1,0 +1,3 @@
+# Daily Brief display policy (PRD D44, rubric v2 "Shown in", D29). Read by the API only; not part of any fingerprint.
+# The Brief lists published items scored min_score or higher; 2 belongs to the competitor profile, 1 to the timeline.
+min_score: 3

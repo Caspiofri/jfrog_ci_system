@@ -11,11 +11,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import yaml
+
 from ci import config as ci_config
 from ci import route, sources
 from ci.classify import CATEGORIES, content_text
 from ci.packet import INDUSTRY
+from ci.rank import LLM_TEXT_CHARS as RANKER_TEXT_CHARS
 from ci.store import Store
+from config.settings import CONFIG_DIR
 
 TZ = ZoneInfo("Asia/Jerusalem")
 EXCERPT_CHARS = 280
@@ -26,6 +30,35 @@ DISMISS_REASONS = ("not_relevant", "wrong_competitor", "wrong_category", "duplic
 HELD_OUT = "held_out"  # status of a golden-set test-split item: stored, no prediction until after the test eval
 SUGGEST_APPROVALS = 3  # D36 Q-C: suggest trusting a host after 3+ approvals and 0 dismissals
 URGENCY = {5: "act_now", 4: "this_week", 3: "monitor", 2: "fyi", 1: "fyi"}
+BRIEF_CONFIG_PATH = CONFIG_DIR / "brief.yaml"
+HELD_SCORE_KEYS = ("5", "4", "3", "<=2", "noise")
+TEXT_BASIS_LABELS = {"full": "Full article", "partial": "Partial article", "snippet": "Headline and teaser only",
+                     "junk": "Teaser only (the page text was not the article)"}
+
+
+def brief_min_score(path: Path = BRIEF_CONFIG_PATH) -> int:
+    """D44: the Brief lists published items scored this or higher (config/brief.yaml min_score, default 3)."""
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else None
+    value = (data or {}).get("min_score", 3)
+    if not isinstance(value, int) or not 1 <= value <= 5:
+        raise ValueError(f"{path}: min_score must be an int 1..5, got {value!r}")
+    return value
+
+
+def text_basis(raw: dict) -> dict:
+    """D39/D44: what the score rests on: the text status, where it came from, why the article is missing, and how
+    many characters the ranker read."""
+    status = raw.get("text_status") or "snippet"
+    fetch = raw.get("fetch_status")
+    if status in ("full", "partial"):
+        reason, detail = None, None
+    elif status == "junk":
+        reason, detail = "not_article", list(raw.get("extraction_reasons") or []) or None
+    else:
+        reason, detail = (fetch if fetch and fetch != "ok" else "not_recorded"), None
+    return {"status": status, "source": raw.get("text_source") or "teaser",
+            "label": TEXT_BASIS_LABELS.get(status, status), "failure_reason": reason, "failure_detail": detail,
+            "chars_used_for_scoring": len(content_text(raw)[:RANKER_TEXT_CHARS])}
 
 
 def parse_ts(value) -> datetime | None:
@@ -138,6 +171,7 @@ class Snapshot:
             "run_id": out["run_id"] if out else None, "fingerprint": out["fingerprint"] if out else None,
             "event_id": None,  # events are not built (D33)
             "lens": self.lens_out(item_id),
+            "text_basis": text_basis(raw),
         }
 
     def lens_out(self, item_id: str) -> dict | None:
@@ -145,8 +179,9 @@ class Snapshot:
         row = self.lens.get(item_id)
         if not row or row["status"] != "ok":
             return None
-        return {"axis": row["axis"], "capability_quote": row["capability_quote"] or "", "relation": row["relation"],
-                "why": row["why"] or ""}
+        why = row["why"] or None
+        return {"axis": row["axis"], "capability_quote": row["capability_quote"] or None, "relation": row["relation"],
+                "why_it_matters": why, "why": why}  # why: deprecated alias of why_it_matters (D44)
 
     def classified_ids(self) -> list[str]:
         return [i for i, o in self.outputs.items()]
@@ -178,6 +213,34 @@ class Snapshot:
         return [i for i in self.classified_ids()
                 if w["prev_anchor"] < parse_ts(self.items[i]["discovered_at"]) <= w["anchor"]
                 and self.status(i, level) in PUBLISHED]
+
+    def window_ids(self, w: dict) -> list[str]:
+        """Classified items discovered in (prev_anchor, anchor]: the one query behind a Brief's list and summary."""
+        return [i for i in self.classified_ids()
+                if w["prev_anchor"] < parse_ts(self.items[i]["discovered_at"]) <= w["anchor"]]
+
+    def brief_summary(self, w: dict, min_score: int, level: str | None = None) -> tuple[list[str], dict]:
+        """D44: (the ids the Brief lists, its summary block), both from window_ids. Listed = published and scored
+        min_score or higher; held = awaiting review at the level, counted by the model's (preliminary) score."""
+        listed, below, held = [], 0, Counter({k: 0 for k in HELD_SCORE_KEYS})
+        for i in self.window_ids(w):
+            status = self.status(i, level)
+            score = self.item(i)["score"]  # an analyst's edit wins over the model's score
+            if status in PUBLISHED:
+                if (score or 0) >= min_score:
+                    listed.append(i)
+                else:
+                    below += 1
+            elif status == "awaiting_review":
+                key = "noise" if self.outputs[i]["classification"].get("noise") else (
+                    str(score) if (score or 0) >= 3 else "<=2")
+                held[key] += 1
+        scores = [self.item(i)["score"] or 0 for i in listed]
+        return listed, {"brief_min_score": min_score, "published_in_brief": len(listed),
+                        "published_in_brief_4plus": sum(x >= 4 for x in scores), "published_below_brief": below,
+                        "held_total": sum(held.values()),
+                        "held_by_preliminary_score": {k: held[k] for k in HELD_SCORE_KEYS},
+                        "level": level or self.level}
 
     def badge(self, item_id: str, w: dict) -> str:
         published = parse_ts(self.items[item_id]["published_at"])
