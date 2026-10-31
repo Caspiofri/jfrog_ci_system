@@ -11,7 +11,8 @@ The quote is checked in code against the sheet's row for the chosen axis (case a
 drops the lens for that item and is logged with the reason; nothing is repaired or guessed. not_related needs no
 quote. Article text goes into the prompt in delimited tags marked as content, not instructions (D32).
 
-The sheet is docs/specs/JFrog capabilities.md (local, not in git); without it the step is skipped.
+The sheet is config/jfrog_capabilities.md (committed, so a clean clone has it; copied unchanged from Ofri's
+docs/specs/JFrog capabilities.md); without it the step is skipped.
 """
 import hashlib
 import inspect
@@ -23,11 +24,11 @@ from pathlib import Path
 from ci.changes.config import AXES
 from ci.classify import content_text, delimited_items
 from ci.llm import JsonLLM
-from config.settings import ROOT
+from config.settings import CONFIG_DIR
 
 log = logging.getLogger(__name__)
 
-SHEET_PATH = ROOT / "docs" / "specs" / "JFrog capabilities.md"
+SHEET_PATH = CONFIG_DIR / "jfrog_capabilities.md"
 RELATIONS = ("closes_gap", "opens_gap", "improves_shared", "not_related")
 BATCH_SIZE = 10
 TEXT_CHARS = 1500

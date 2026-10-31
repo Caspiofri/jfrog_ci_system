@@ -140,3 +140,9 @@ def test_the_daily_run_stores_the_lens_and_insights_only_when_enabled(paths, she
         assert s.latest_insights(res.report["insights"]["brief_date"])["sheet"] is True
     json.dumps(res.report)  # the report stays serializable
     assert row  # imported fixture helper is used by the daily fixtures
+
+
+def test_the_committed_sheet_is_where_the_lens_reads_it_and_parses():
+    """D42: a clean clone has the sheet (config/, committed), and all 7 axis rows parse."""
+    assert lens.SHEET_PATH.parent.name == "config" and lens.SHEET_PATH.exists()
+    assert set(lens.load_sheet()) == set(lens.SHEET_AXES.values())
