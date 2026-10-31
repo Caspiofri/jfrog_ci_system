@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Async, CategoryTag, ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { useApi } from "@/lib/api";
-import { HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { ItemDetail } from "@/lib/types";
 
@@ -65,7 +65,7 @@ function DrawerBody({ id }: { id: string }) {
                     <div>{it.why_it_matters}</div>
                   </div>
                 ) : null}
-                {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : null}
+                {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
                 <ExtLink href={it.url} className="inline-flex items-center gap-1 text-jgreen-d">
                   Open the source <ExternalLink className="size-3" />
                 </ExtLink>

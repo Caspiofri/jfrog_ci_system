@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ExternalLink } from "lucide-react";
 import { CategoryTag, ExtLink, ScoreBadge, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
-import { fmtPublished } from "@/lib/format";
+import { NO_TEXT, fmtPublished } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { Item } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -57,7 +57,11 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
           {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
         </div>
         {item.why_it_matters ? <div className="mt-1 text-[#44516a]">{item.why_it_matters}</div> : null}
-        {item.excerpt ? <div className="mt-1 line-clamp-2 text-xs text-mute">{item.excerpt}</div> : null}
+        {item.excerpt ? (
+          <div className="mt-1 line-clamp-2 text-xs text-mute">{item.excerpt}</div>
+        ) : (
+          <div className="mt-1 text-xs italic text-mute">{NO_TEXT}</div>
+        )}
         {extra}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div> : null}

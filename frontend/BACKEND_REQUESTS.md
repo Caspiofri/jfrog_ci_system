@@ -17,4 +17,4 @@ The frontend never edits backend code; each request waits here for Ofri.
 
 - On the dev copy, 11 of the 32 `google_news` items in the 2026-10-30 Brief have `excerpt: ""` (every other source has
   one); the same holds in the 2026-10-31 Brief, e.g. `402191752c14807f`. The contract says it is the first 280 characters of the stored text, or the teaser
-  when the page is junk. The UI hides the excerpt line when it is empty.
+  when the page is junk. The UI shows "Text couldn't be extracted" in its place.

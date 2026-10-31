@@ -2,6 +2,9 @@
 
 export const TZ = "Asia/Jerusalem";
 
+/** Shown where the API returns an empty excerpt. */
+export const NO_TEXT = "Text couldn't be extracted";
+
 /** One importance color scale (build notes: urgency dropped, the score is the only scale). */
 export const SCORE_COLOR: Record<number, [string, string]> = {
   5: ["#9b1c1c", "#fff"],
