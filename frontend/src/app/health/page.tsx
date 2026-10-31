@@ -1,12 +1,13 @@
 "use client";
 import { Suspense } from "react";
-import { Async, Empty, ErrorNote, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { Async, Empty, ErrorNote, KpiTile, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ChangeDetection, Coverage, EvalCards, Extraction, Funnel, SilentAlert, SilentTable, SourcesTable } from "@/components/health/parts";
 import { path, useApi } from "@/lib/api";
-import { LEVEL_LABEL, fmtDateTime, label } from "@/lib/format";
+import { LEVEL_LABEL, delta, fmtDateTime, fmtLongDate, label } from "@/lib/format";
+import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
-import type { Health, Page, RunInfo } from "@/lib/types";
+import type { Brief, Health, Kpi, Page, RunInfo } from "@/lib/types";
 
 export default function HealthPage() {
   return (
@@ -50,6 +51,8 @@ function HealthScreen() {
 
             {h.silent_sources ? <SilentAlert s={h.silent_sources} /> : null}
 
+            <BriefCounts served={(h as Health & { brief?: { date: string; kpis: Kpi[] } }).brief} />
+
             <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
               <Panel title="Where do items drop off?" cap={h.funnel ? `All sources, this run · published and held at ${label(LEVEL_LABEL, h.funnel.level)}` : undefined}>
                 {h.funnel ? <Funnel totals={h.funnel.totals} /> : <Empty>No funnel for this run.</Empty>}
@@ -83,5 +86,35 @@ function HealthScreen() {
         )}
       </Async>
     </>
+  );
+}
+
+const KPI_LABEL: Record<string, string> = {
+  items: "Published in the Brief",
+  important: "Rated 4 or 5",
+  found_late: "Found late",
+  mentions_jfrog: "Mention JFrog",
+};
+
+/** Operational counts that left the Brief (D44): from /health `brief` when served (BACKEND_REQUESTS.md 3g),
+ * else the latest Brief's `kpis`. Each with the previous Brief. */
+function BriefCounts({ served }: { served?: { date: string; kpis: Kpi[] } }) {
+  const { data: meta } = useMeta();
+  const date = served ? null : meta?.latest_brief_date;
+  const q = useApi<Brief>(date ? path("/brief", { date, limit: 1 }) : null);
+  const src = served ?? (q.data ? { date: q.data.date, kpis: q.data.kpis } : null);
+  return (
+    <Panel title="How did the latest Brief's counts move?" cap={src ? `Brief of ${fmtLongDate(src.date)} · vs the previous Brief` : undefined}>
+      {q.error ? <ErrorNote error={q.error} onRetry={() => q.mutate()} /> : !src ? (
+        meta && !meta.latest_brief_date ? <Empty>No Brief yet.</Empty> : <Loading rows={1} />
+      ) : (
+        <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
+          {src.kpis.map((k) => {
+            const d = delta(k.value, k.prev);
+            return <KpiTile key={k.key} value={k.value} label={KPI_LABEL[k.key] ?? k.key} sub={<span className={d.cls}>{d.text}</span>} />;
+          })}
+        </div>
+      )}
+    </Panel>
   );
 }
