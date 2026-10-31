@@ -96,14 +96,15 @@ class Snapshot:
     cfg: ci_config.CIConfig
     vetted_lists: dict = field(default_factory=dict)
     lens: dict = field(default_factory=dict)  # item_id -> latest lens row (D42)
+    now: datetime = field(default_factory=lambda: datetime.now(UTC))  # the request's clock (scheduled_for)
 
     @classmethod
-    def read(cls, store: Store, cfg: ci_config.CIConfig) -> "Snapshot":
+    def read(cls, store: Store, cfg: ci_config.CIConfig, now: datetime | None = None) -> "Snapshot":
         return cls(outputs={o["item_id"]: o for o in store.outputs()},
                    items={i["item_id"]: i for i in store.all_items()},
                    rejections=store.rejection_reasons(), states=store.item_states(), trusted=store.trusted_hosts(),
                    skips=store.skips(), runs=store.runs(), sightings=store.sightings(), level=store.autonomy_level(),
-                   cfg=cfg, vetted_lists=sources.load(), lens=store.lens())
+                   cfg=cfg, vetted_lists=sources.load(), lens=store.lens(), now=now or datetime.now(UTC))
 
     # ---- vetting and routing ----
 
@@ -150,6 +151,7 @@ class Snapshot:
         edited = {k: state[f"edit_{k}"] for k in ("competitor", "category", "score") if state.get(f"edit_{k}")
                   is not None}
         published, discovered = parse_ts(row["published_at"]), parse_ts(row["discovered_at"])
+        source_date = parse_ts(raw.get("published_at_source"))  # a future source date, stored as the discovery time
         score = edited.get("score", r.get("score"))
         reasons = self.reasons(item_id) if out else []
         return {
@@ -162,6 +164,8 @@ class Snapshot:
             "confidence": c.get("confidence"), "mentions_jfrog": bool(c.get("mentions_jfrog", False)),
             "reason": r.get("reason") or "", "why_it_matters": r.get("why_it_matters") or "",
             "published_at": iso(published), "date_precision": raw.get("date_precision", "time"),
+            "published_at_source": iso(source_date),
+            "scheduled_for": iso(source_date) if source_date and source_date > self.now else None,
             "discovered_at": iso(discovered),
             "discovery_lag_hours": round((discovered - published).total_seconds() / 3600, 1)
             if published and discovered else None,

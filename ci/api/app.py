@@ -75,6 +75,8 @@ class ItemOut(BaseModel):
     why_it_matters: str
     published_at: str | None
     date_precision: str
+    published_at_source: str | None  # the source's own date when it was after our collection (else null)
+    scheduled_for: str | None  # that date while it is still in the future: "scheduled for <date> per source"
     discovered_at: str | None
     discovery_lag_hours: float | None
     badge: Literal["new", "late"] | None
@@ -158,7 +160,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     def snap() -> tuple[Store, Snapshot]:
         store = Store(store_path)
-        return store, Snapshot.read(store, cfg)
+        return store, Snapshot.read(store, cfg, now())
 
     def item_out(s: Snapshot, item_id: str, level: str | None = None, badge: str | None = None) -> dict:
         return ItemOut.model_validate(s.item(item_id, level, badge)).model_dump()
@@ -441,7 +443,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             except ValueError:
                 raise ApiError(409, "conflict", "the item changed since you read it (If-Match)",
                                {"version": state.get("version", 0)}) from None
-            after = Snapshot.read(store, cfg).item(item_id)
+            after = Snapshot.read(store, cfg, now()).item(item_id)
         return ok({"action_id": res["action_id"], "target_kind": "item", "target_id": item_id, "action": action,
                    "reason": reason, "status": after["status"], "flagged": after["flagged"],
                    "version": after["version"], "measures": measures(before), "at": res["at"]})
@@ -513,7 +515,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 raise ApiError(409, "conflict", f"{h} is already trusted")
             before = held_ids(s)
             added = store.trust(h, body.note, body.from_item_id)
-            after_snap = Snapshot.read(store, cfg)
+            after_snap = Snapshot.read(store, cfg, now())
             after = held_ids(after_snap)
             mine = {i for i in before if after_snap.trusted_match(s.items[i]["url"]) == h}
         return ok({"host": h, "group": "trusted", "added_at": added["added_at"], "action_id": added["action_id"],

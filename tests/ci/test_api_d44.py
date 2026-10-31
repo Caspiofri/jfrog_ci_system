@@ -205,3 +205,19 @@ def test_insight_states(env):
     assert c.post("/api/v1/brief/2026-11-01/insights/refresh").status_code == 200
     with Store(store_path) as s:
         assert s.setting("insights_refreshing:2026-11-01") == ""  # cleared after the refresh
+
+
+def test_a_scheduled_item_carries_its_source_date_while_it_is_in_the_future(env, tmp_path):
+    """C2 follow-up: published_at stays the discovery time; the UI says "scheduled for <date> per source" from
+    scheduled_for, which is set only while the source's date is still ahead of now."""
+    c, store_path = env
+    it = c.get("/api/v1/items/fut").json()["item"]  # NOW is 3 Nov: the source's 2 Nov 05:00Z has passed
+    assert it["published_at_source"] == "2026-11-02T05:00:00Z" and it["scheduled_for"] is None
+    early = TestClient(create_app(store_path=store_path, runs_dir=tmp_path / "runs", changes_path=tmp_path / "x.sqlite",
+                                  cfg=CFG, now=lambda: datetime(2026, 11, 1, 9, tzinfo=UTC)))
+    it = early.get("/api/v1/items/fut").json()["item"]
+    assert it["published_at"] == "2026-11-01T04:00:00Z" and it["scheduled_for"] == "2026-11-02T05:00:00Z"
+    listed = next(x for x in brief(early, "2026-11-01")["items"]["items"] if x["item_id"] == "fut")
+    assert listed["scheduled_for"] == "2026-11-02T05:00:00Z"
+    s5 = early.get("/api/v1/items/s5").json()["item"]
+    assert s5["published_at_source"] is None and s5["scheduled_for"] is None

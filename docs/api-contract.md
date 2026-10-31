@@ -519,8 +519,16 @@ Every `Item` gains `text_basis`, and `lens` gains `why_it_matters`:
 ### 10.6 `published_at` is never in the future (D24)
 
 - A source date later than the collection time is stored as the collection time: we know the item existed then, not when it will claim to be published.
-  - The source's own date is kept in the stored item as `published_at_source` (live only, not in the API).
+  - The source's own date is kept as `published_at_source`.
   - The store enforces it too: no item's `published_at` is later than its `discovered_at`.
+- **Item fields** (every `Item`, 🔧):
+
+  | Field | Type | Meaning |
+  |---|---|---|
+  | `published_at_source` | …Z \| null | the date the source gave, when it was later than our collection; else null |
+  | `scheduled_for` | …Z \| null | `published_at_source` while it is still after the request time; null once it has passed |
+
+- **UI:** when `scheduled_for` is set, the date reads "scheduled for <date> per source" instead of the publication date. Once the date has passed, `scheduled_for` is null and the UI shows `published_at` as usual. It may still note the source's date from `published_at_source`.
 - The case that found it: Snyk's changelog RSS listed "Kubernetes connector reaches end of life - 02-Nov-202" with `pubDate: Sun, 01 Nov 2026 05:00:00 GMT`, a scheduled entry already in the feed on 31 Oct. The title's date is the end-of-life date, not the publication date.
 
 ### 10.7 Names changed from the first D44 draft (31 Oct)
