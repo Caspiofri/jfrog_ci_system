@@ -141,3 +141,47 @@ export function delta(value: number, prev: number | null): { text: string; cls: 
   if (d === 0) return { text: `same as previous Brief (${prev})`, cls: "text-mute" };
   return { text: `${d > 0 ? "+" : ""}${d} vs previous Brief (${prev})`, cls: "text-mute" };
 }
+
+// ---- D44: score labels, lens relations, text basis ----
+
+/** Rubric v2 (config/rubric_v2.md, frozen under D29), copied word for word. Replaced by /meta rubric when served.
+ * Only 3–5 have a label: the Brief shows 3+ (D44); never invent other severity words. */
+export const RUBRIC: Record<number, { label: string; competitor: string; industry: string }> = {
+  5: {
+    label: "Strategic move",
+    competitor: "Strategic move at significant scale against a JFrog core product (Artifactory, Xray, Curation) or its positioning; a material acquisition",
+    industry: "A market-changing event (rare)",
+  },
+  4: {
+    label: "Material change",
+    competitor: "Material competitive change backed by evidence: a capability-level gap opened or closed, or a business/security event with direct competitive impact",
+    industry: "A major event in JFrog's market: a broad supply-chain attack on a package or AI-tooling ecosystem, new regulation",
+  },
+  3: {
+    label: "Relevant development",
+    competitor: "Relevant development without a proven material change: improves an existing capability, a sub-feature, a partnership, a customer win, a security event with indirect impact",
+    industry: "A relevant vulnerability or incident of limited scope",
+  },
+};
+
+export const RELATION_LABEL: Record<string, string> = {
+  closes_gap: "Closes a gap: gains a capability JFrog already has",
+  opens_gap: "Opens a gap: a capability JFrog doesn't have",
+  improves_shared: "Improves a capability both already have",
+};
+
+const BASIS_REASON: Record<string, string> = {
+  cloudflare_challenge: "the site blocks text extraction",
+  http_403: "the site blocks text extraction",
+  timeout: "the page timed out",
+  empty: "the page had no readable text",
+};
+
+/** The text an item was scored from, in words (D39). null when the API doesn't report it. */
+export function textBasisWords(b: { status: string; source?: string | null; reason?: string | null } | null | undefined): string | null {
+  if (!b) return null;
+  if (b.status === "full") return b.source === "feed" ? "Full text from the feed" : "Full text";
+  if (b.status === "partial") return "Partial text";
+  const why = (b.reason && BASIS_REASON[b.reason]) || (b.status === "junk" ? "the page text was unusable" : "the full text wasn't available");
+  return `Scored from headline and teaser; ${why}`;
+}

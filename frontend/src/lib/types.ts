@@ -32,6 +32,28 @@ export interface HoldReason {
   held_at: Level[];
 }
 
+export interface Lens {
+  axis: string;
+  capability_quote: string;
+  relation: "closes_gap" | "opens_gap" | "improves_shared" | "not_related" | string;
+  why: string;
+  source_url?: string | null; // request 3d
+  source_label?: string | null;
+}
+
+export interface TextBasis {
+  status: "full" | "partial" | "snippet" | "junk" | string;
+  source?: "page" | "feed" | "teaser" | string | null;
+  reason?: string | null;
+}
+
+export interface RubricLine {
+  score: number;
+  label: string;
+  competitor: string;
+  industry: string;
+}
+
 export interface Item {
   item_id: string;
   title: string;
@@ -63,7 +85,9 @@ export interface Item {
   run_id: string | null;
   fingerprint: string | null;
   event_id: string | null;
-  lens?: { axis: string; capability_quote: string; relation: string; why: string } | null; // D42
+  lens?: Lens | null; // D42: only when its quote check passed
+  text_basis?: TextBasis | null; // D44 request 3c
+  mock?: string[]; // dev mock mode only: the fields filled with stand-in values
 }
 
 export interface Competitor {
@@ -84,6 +108,7 @@ export interface Meta {
   latest_brief_date: string | null;
   latest_run_id: string | null;
   insights_enabled: boolean;
+  rubric?: RubricLine[]; // request 3f
   meta: ApiMeta;
 }
 
@@ -134,12 +159,22 @@ export interface BriefInsights {
   window?: { from?: string; to?: string; days?: number; items?: number; stories?: number };
   rejected?: number | unknown[];
   items: Insight[];
+  mock?: boolean; // dev mock mode only
 }
 
 export interface Kpi {
   key: "items" | "important" | "found_late" | "mentions_jfrog";
   value: number;
   prev: number | null;
+}
+
+export interface BriefSummary {
+  published: number;
+  published_high: number | null;
+  held: number;
+  held_high: number | null;
+  level?: string;
+  mock?: string[]; // dev mock mode only
 }
 
 export interface Brief {
@@ -163,6 +198,7 @@ export interface Brief {
     mentions_jfrog: number;
   } | null;
   kpis: Kpi[];
+  summary?: BriefSummary | null; // D44, request 3a
   insights: BriefInsights;
   intensity: { days: number; by: string; series: { date: string; score: number; items: number }[] } | null;
   level?: Level;
@@ -238,6 +274,7 @@ export interface Review extends Page<ReviewItemRow | ReviewChangeRow> {
   level: Level;
   levels: LevelCount[];
   counts_by_reason: Record<string, number>;
+  scope?: { date_from?: string | null; date_to?: string | null; competitor?: unknown; brief?: string | null };
   meta: ApiMeta;
 }
 

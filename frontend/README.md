@@ -25,6 +25,14 @@ For `npm run build && npm start`, set `CI_API_URL` at **build** time: Next.js wr
 To check a production build while `npm run dev` is running, use `npm run build:check`: it builds into
 `.next-build/`. A plain `npm run build` writes `.next/` and breaks a running dev server.
 
+### Dev mock mode (D44 fields the API doesn't serve yet)
+
+`NEXT_PUBLIC_CI_MOCK=1 NEXT_DIST_DIR=.next-mock npx next dev -p 3012` fills the missing D44 fields
+(`BACKEND_REQUESTS.md` #3) with stand-ins, each marked "mock" on screen. Off by default. On the Brief:
+`?mock=empty` or `?mock=all_held` shows those windows, and `?mock_insights=disabled|failed|none_passed` shows those
+insight states. The text basis comes from `public/mock/text-basis.local.json` (gitignored), exported from the local
+store copy. Delete each block in `src/lib/mock.ts` once its field lands.
+
 ## Rules
 
 - API strings are untrusted (D32): rendered as React text only. ESLint fails on `dangerouslySetInnerHTML` and

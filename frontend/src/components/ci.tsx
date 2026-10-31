@@ -40,14 +40,14 @@ export function Panel({ title, cap, children, className, right }: {
   );
 }
 
-export function ScoreBadge({ score, noise }: { score: number | null; noise?: boolean }) {
+export function ScoreBadge({ score, noise, title }: { score: number | null; noise?: boolean; title?: string }) {
   const n = noise ? 0 : (score ?? 0);
   const [bg, fg] = SCORE_COLOR[n] ?? SCORE_COLOR[0];
   return (
     <span
       className="inline-flex h-6 min-w-[26px] shrink-0 items-center justify-center rounded px-[7px] text-xs font-semibold tabular-nums"
       style={{ background: bg, color: fg }}
-      title={noise ? "Noise" : score ? `Importance ${score} of 5` : "No score"}
+      title={title ?? (noise ? "Noise" : score ? `Importance ${score} of 5` : "No score")}
     >
       {noise ? "N" : score ? String(score) : "–"}
     </span>
