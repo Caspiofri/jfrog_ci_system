@@ -118,8 +118,6 @@ function BriefScreen() {
 
                 <SummaryBlock date={b.date} s={b.summary} />
 
-                <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
-
                 <Panel
                   title="What was published in this Brief?"
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
@@ -137,6 +135,8 @@ function BriefScreen() {
                   )}
                   <FeedFooter total={b.items.total} all={all} offset={offset} set={set} />
                 </Panel>
+
+                <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
               </>
             )
           }
@@ -232,6 +232,10 @@ function insightState(ins: BriefInsights): string | null {
   }
 }
 
+/** The analyst's manual check of the insights (1 Nov). Insights stay experimental until summaries stop overstating. */
+const INSIGHTS_CHECK =
+  "Checked on 1 Nov (n = 4 insights, 12 claims): 11 of 12 claims supported, 12 of 12 citations correct; summaries overstated in all 4.";
+
 function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
   date: string; insights: BriefInsights; hl: string | null; setHl: (id: string | null) => void; onRefreshed: () => void;
 }) {
@@ -257,7 +261,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
   const state = insightState(insights);
   return (
     <Panel
-      title="What patterns matter today?"
+      title="Experimental: cross-item patterns"
       cap={cap}
       right={
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={refresh} disabled={busy || !enabled || insights.status === "refreshing"}
@@ -266,6 +270,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         </Button>
       }
     >
+      <p className="m-0 mb-2 text-xs text-[#44516a]">{INSIGHTS_CHECK}</p>
       {insights.mock ? <div className="mb-2"><MockTag what="this insights state" /></div> : null}
       {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
       {busy || state === "refreshing" ? (

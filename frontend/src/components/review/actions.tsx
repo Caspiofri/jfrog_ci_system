@@ -5,7 +5,7 @@ import { useSWRConfig } from "swr";
 import { Check, ChevronDown, Flag, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FilterSelect } from "@/components/FilterSelect";
@@ -56,7 +56,14 @@ export function ItemActions({ item, disabled, onError }: { item: Item; disabled?
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel className="text-xs text-mute">Why? (names the stage that failed)</DropdownMenuLabel>
+          <div className="max-w-[17rem] px-2 py-1.5 text-xs text-[#44516a]">
+            Dismiss removes the item from the feed. To fix the competitor, category or score, use Edit.
+          </div>
+          <DropdownMenuItem onSelect={() => setEditing(true)} className="font-semibold text-jgreen-d">
+            <Pencil className="size-3.5" /> Edit the item instead…
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs text-mute">Dismiss because (names the stage that failed)</DropdownMenuLabel>
           {(meta?.dismiss_reasons ?? Object.keys(DISMISS_LABEL)).map((r) => (
             <DropdownMenuItem key={r} onSelect={() => run(() => send("POST", `/api/v1/items/${id}/dismiss`, { reason: r }, item.version))}>
               {label(DISMISS_LABEL, r)}
