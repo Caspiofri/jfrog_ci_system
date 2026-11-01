@@ -56,6 +56,18 @@ Article text is untrusted: it reaches the model only inside delimited, defanged 
 checked in code (see *prompt-injection defense* below). The API has no login and binds 127.0.0.1; it refuses
 cross-site writes and foreign Host headers.
 
+## Which items the insights look at
+
+Insights read only the published items: auto-published, approved or flagged at the Brief's autonomy level. Held and
+rejected items never reach them. Of those, an item is in the window when one of these holds:
+- it was published in the 7 days before the Brief's daily run started;
+- it was found since the previous Brief's run, whatever its date, so a late-found article still counts once.
+
+Items about the same story count as one story. With fewer than 15 stories in 7 days, the window widens to 14 days,
+once. It never widens further, and the window the insights used (dates, items, stories, late-found items) is stored
+with them. Insights are only proposed for groups of at least 2 stories: one competitor's moves, one category across
+2 or more competitors, or Security news across vendors.
+
 ---
 
 ## Origin: the newsletter agent
