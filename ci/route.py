@@ -87,11 +87,11 @@ def hold_reasons(x: RouteInput, vetted: Callable[[str], bool] = sources.is_vette
         elif x.text_status == "junk":
             out.append(HoldReason("junk_extraction", f"score {x.score} with page text judged junk", STRICT_BALANCED))
     if x.category == PRICING:
-        out.append(HoldReason("pricing", "Pricing & Packaging is always reviewed (D9)", ALL))
+        out.append(HoldReason("pricing", "Pricing & Packaging is always reviewed", ALL))
     if x.category == M_AND_A:
-        out.append(HoldReason("m_and_a", "Funding/M&A/Partnerships is always reviewed (D9)", ALL))
+        out.append(HoldReason("m_and_a", "Funding/M&A/Partnerships is always reviewed", ALL))
     if x.mentions_jfrog:
-        out.append(HoldReason("mentions_jfrog", "the item mentions JFrog (D9, D11)", ALL))
+        out.append(HoldReason("mentions_jfrog", "the item mentions JFrog", ALL))
     if x.classifier_degraded or x.ranker_degraded:
         which = " and ".join(n for n, d in (("classifier", x.classifier_degraded), ("ranker", x.ranker_degraded)) if d)
         out.append(HoldReason("model_failure", f"{which} gave no usable answer", ALL))
@@ -102,7 +102,7 @@ def hold_reasons(x: RouteInput, vetted: Callable[[str], bool] = sources.is_vette
 
 def change_hold_reasons() -> list[HoldReason]:
     """A changed head-to-head cell is reviewed at every level (D9, D13)."""
-    return [HoldReason("changed_cell", "every changed head-to-head cell is reviewed (D9)", ALL)]
+    return [HoldReason("changed_cell", "every changed head-to-head cell is reviewed", ALL)]
 
 
 def is_held(reasons: Iterable[HoldReason], level: str) -> bool:

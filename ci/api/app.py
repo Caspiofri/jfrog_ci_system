@@ -322,7 +322,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     @app.post("/api/v1/brief/{date}/insights/refresh")
     def refresh_insights(date: str):
         if not insights_enabled():
-            raise ApiError(409, "insights_disabled", "insights are not enabled yet (D37: they wait for the "
+            raise ApiError(409, "insights_disabled", "insights are not enabled yet (they wait for the "
                                                      "expected-insights file)")
         store, s = snap()
         with store:
@@ -338,9 +338,13 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             store.set_setting(REFRESH_MARK + date, svc.iso(now()))  # the Brief shows insights_status "refreshing"
             try:
                 llm_obj = insights_llm()
-                res = insights.generate(rows, llm_obj, embed_fn, anchor=w["anchor"],
-                                        prev_anchor=w["prev_anchor"], level=s.level, trigger="refresh", now=now,
-                                        sheet=lens_mod.load_sheet(sheet_path))
+                try:
+                    res = insights.generate(rows, llm_obj, embed_fn, anchor=w["anchor"],
+                                            prev_anchor=w["prev_anchor"], level=s.level, trigger="refresh", now=now,
+                                            sheet=lens_mod.load_sheet(sheet_path))
+                except Exception as e:  # the earlier generation stays on the Brief
+                    raise ApiError(502, "insights_failed", f"insights generation failed: {type(e).__name__}: "
+                                                           f"{str(e)[:200]}") from e
                 store.save_insights(date, {**res.to_json(), "metadata": run_meta.safe_collect(
                     model=getattr(llm_obj, "model", None))})
             finally:

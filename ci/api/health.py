@@ -197,7 +197,7 @@ def register(app, d) -> None:
             if is_test_eval(r):
                 tests.append((r.get("created_at") or "", p, r))
         if not tests:
-            return {"status": "none", "note": "the test-split eval has not run (D23: once, on a frozen fingerprint)"}
+            return {"status": "none", "note": "the test-split eval has not run (it runs once, on a frozen fingerprint)"}
         _, path, r = max(tests, key=lambda t: t[0])
         return {"status": "ok", "report": path.name, "created_at": r.get("created_at"), "split": "test",
                 "fingerprint": r.get("fingerprint"), "model": r.get("model"), "n": r.get("n"),
@@ -223,7 +223,7 @@ def register(app, d) -> None:
         def count(x: dict) -> dict:
             return {"captured": x.get("captured", 0), "n": x.get("events", 0)}
 
-        return {"status": "ok", "run_id": run_id, "list": "dev (D26: found and fixed on it, so optimistic)",
+        return {"status": "ok", "run_id": run_id, "list": "dev (misses were found and fixed on it, so optimistic)",
                 "window": rep.get("window"), "overall": count(rep["overall"]),
                 "important": {**count(rep["high_importance"]), "min_score": rep["high_importance"].get("min")},
                 "by_source_kind": {k: count(v) for k, v in rep.get("by_source_kind", {}).items()},

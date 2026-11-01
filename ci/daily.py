@@ -346,7 +346,9 @@ def explain_and_summarize(store: Store, run_id: str, started_at: str, to_model: 
     try:
         with steps.step("insights"):
             out["insights"] = generate_insights(store, run_id, llm, cfg, sheet, embed_fn, trigger="daily")
-        if out["insights"]["status"] == "failed":
+        if out["insights"]["status"] == "skipped":
+            steps.skip("insights", out["insights"]["reason"])
+        elif out["insights"]["status"] == "failed":
             errors.append(f"insights failed: {out['insights'].get('error', '')}")
             steps.fail("insights", errors[-1])
     except Exception as e:
@@ -365,11 +367,21 @@ def generate_insights(store: Store, run_id: str, llm: JsonLLM, cfg: ci_config.CI
     run = store.run(run_id)
     anchor = svc.parse_ts(run["started_at"])  # this run is still "running": it can't be looked up as an anchor yet
     brief = svc.israel_date(anchor)
+    owner = dict(s.anchors()).get(brief)
+    if owner is not None and owner["run_id"] != run_id:  # a second run that day: the Brief keeps its first window
+        return {"status": "skipped", "brief_date": brief,
+                "reason": f"the {brief} Brief is anchored on run {owner['run_id']}; its insights keep that window"}
     earlier = [svc.parse_ts(r["started_at"]) for d, r in s.anchors() if d < brief]
     prev_anchor = max(earlier) if earlier else anchor - timedelta(hours=24)
     rows = [insights.item_from_output(s.outputs[i]) for i in s.classified_ids() if s.status(i) in svc.PUBLISHED]
-    res = insights.generate(rows, llm, embed_fn or default_embedding_fn(), anchor=anchor, prev_anchor=prev_anchor,
-                            level=s.level, trigger=trigger, sheet=sheet)
+    try:
+        res = insights.generate(rows, llm, embed_fn or default_embedding_fn(), anchor=anchor,
+                                prev_anchor=prev_anchor, level=s.level, trigger=trigger, sheet=sheet)
+    except Exception as e:  # stored as failed, so the Brief says failed, not "never ran" (D45)
+        log.exception("insights generation failed")
+        res = insights.Result(status="failed", window={}, level=s.level, trigger=trigger, sheet=bool(sheet),
+                              model=getattr(llm, "model", "") or "", fingerprint=insights.fingerprint(),
+                              generated_at=datetime.now(UTC).isoformat(), error=f"{type(e).__name__}: {e}"[:300])
     store.save_insights(brief, {**res.to_json(), "metadata": run_meta.safe_collect(model=getattr(llm, "model", None))})
     return {"status": res.status, "brief_date": brief, "insights": len(res.insights), "rejected": len(res.rejected),
             "rejected_reasons": [{"title": r.get("title"), "reason": r.get("reason")} for r in res.rejected],
