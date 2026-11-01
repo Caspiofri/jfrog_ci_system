@@ -76,6 +76,8 @@ services:
     build:
       context: ./frontend
       dockerfile: ../docker/ui.Dockerfile
+      additional_contexts:
+        config: ./config  # the capability sheet the /capabilities page renders
       args:
         CI_API_URL: http://api:8011
         CI_MODE: demo
