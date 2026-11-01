@@ -180,7 +180,7 @@ function SummaryBlock({ date, s }: { date: string; s: BriefSummary }) {
       </div>
       <div className="mt-2 text-xs text-mute">
         {s.held
-          ? `At ${level}, items from unvetted sources and sensitive ones (pricing, M&A, mentions of JFrog) wait for an analyst before they reach the Brief. Until then they are not verified and not part of it.`
+          ? `At ${level}, some items wait for an analyst before they reach the Brief, for example ${s.level === "strict" ? "items from a source that isn't vetted, or " : ""}items about pricing or M&A, or that mention JFrog. Until then they are not verified and not part of it.`
           : "Nothing from this window is waiting for review."}
       </div>
     </section>
