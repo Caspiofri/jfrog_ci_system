@@ -3,7 +3,7 @@
 It runs ci.eval_golden.run unchanged, with LangSmith tracing off (D51), and writes <report>.inputs.json next to the
 report: what the eval ran with (ci.run_meta: the three fingerprints, sheet_sha, models, call settings, the combined
 fingerprint and the commit), plus the split, n and the report's own fingerprint. eval_golden.py is not edited, so
-the classify_rank fingerprint stays c837f4fdaf70. The report itself is written exactly as before.
+the runner leaves the classify_rank fingerprint untouched. The report itself is written exactly as before.
 """
 import argparse
 import json

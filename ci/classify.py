@@ -212,14 +212,24 @@ def strip_urls(text: str) -> str:
     return URL_RE.sub(" ", text or "")
 
 
+# D51: an <item_text> tag in article text or a field, in any letter case and spacing, opening or closing, is defanged
+# (item_text -> item-text), the same rule as ci.insights.escape_tags
+ITEM_TAG_RE = re.compile(r"<(\s*/?\s*)item_text", re.IGNORECASE)
+
+
+def escape_item_tags(text: str) -> str:
+    return ITEM_TAG_RE.sub(lambda m: "<" + m.group(1) + "item-text", text or "")
+
+
 def delimited_items(payload: list[dict], text_key: str = "text") -> str:
-    """D32 part 2: each item's fields as one JSON line, its article text in <item_text> tags after it. A closing tag
-    inside the text is neutralized, so a page can't end its own block early."""
+    """D32 part 2: each item's fields as one JSON line, its article text in <item_text> tags after it. A tag inside
+    the text or the fields is defanged whatever its letter case, so a page can't end its own block early or open one
+    for another id (D51)."""
     out = []
     for row in payload:
-        text = str(row.get(text_key) or "").replace("</item_text", "</item-text")
-        meta = {k: v for k, v in row.items() if k != text_key}
-        out.append(f"{json.dumps(meta, ensure_ascii=False)}\n<item_text id=\"{row['id']}\">\n{text}\n</item_text>")
+        text = escape_item_tags(str(row.get(text_key) or ""))
+        meta = escape_item_tags(json.dumps({k: v for k, v in row.items() if k != text_key}, ensure_ascii=False))
+        out.append(f"{meta}\n<item_text id=\"{row['id']}\">\n{text}\n</item_text>")
     return "\n\n".join(out)
 
 

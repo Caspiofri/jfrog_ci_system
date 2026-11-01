@@ -32,7 +32,8 @@ def test_the_runner_writes_the_report_unchanged_and_its_inputs_next_to_it(train_
     assert (inputs["split"], inputs["n"], inputs["report_fingerprint"]) == ("train", 3, report["fingerprint"])
     meta = inputs["metadata"]
     assert meta["fingerprints"]["classify_rank"] == report["fingerprint"]
-    assert set(meta) == {"fingerprints", "sheet_sha", "models", "call_settings", "combined", "commit"}
+    assert set(meta) == {"fingerprints", "sheet_sha", "models", "call_settings", "combined", "commit",
+                         "fingerprint_changes"}
     assert meta["models"]["llm"] == report["model"] and meta["call_settings"]["temperature"] == 0.0
     assert len(meta["sheet_sha"]) == 12 and len(meta["commit"]["sha"]) == 40
     assert not (out / "test_runs.log").exists()  # train only: nothing was logged as a test run
@@ -93,3 +94,14 @@ def test_metadata_combines_everything_but_the_commit(tmp_path):
     assert c["sheet_sha"] != a["sheet_sha"] and c["combined"] != a["combined"]
     assert run_meta.collect(fingerprints={"classify_rank": "c", "lens": "l", "insights": "i"},
                             model="other")["combined"] != a["combined"]
+
+
+def test_the_recorded_fingerprint_changes_end_at_the_current_values():
+    """D51/D53: each deliberate change is recorded old -> new; the newest entry per fingerprint is the live value."""
+    from ci import insights, lens
+
+    latest = {c["fingerprint"]: c["new"] for c in run_meta.FINGERPRINT_CHANGES}
+    assert latest == {"classify_rank": eval_golden.fingerprint(), "insights": insights.fingerprint()}
+    cr = next(c for c in run_meta.FINGERPRINT_CHANGES if c["fingerprint"] == "classify_rank")
+    assert cr["old"] == "c837f4fdaf70" and cr["prompt_diff"]["differences"] == 0
+    assert lens.fingerprint() == cr["lens_unchanged"] == "1692c04ba7df"

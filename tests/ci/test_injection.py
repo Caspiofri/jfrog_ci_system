@@ -5,6 +5,7 @@ What is pinned:
   opening tag in any letter case or spacing is defanged, so the text can't end its block or open one for another id.
 - Code checks: a planted claim about JFrog without a capability-sheet quote, or with a made-up one, is rejected; a
   quote the article doesn't contain is rejected.
+- Classify, rank and lens (ci.classify.delimited_items) defang tags the same way, in any letter case (D51 (1)).
 - What stays open (pinned so it is visible, not fixed): a planted sentence is in the article, so a claim quoting it
   passes the quote check; and the instruction rule only asks the model to ignore instructions, which code can't prove.
 """
@@ -101,10 +102,8 @@ def test_classify_rank_and_lens_keep_the_text_in_its_block(key):
     assert _classify_blocks(POISONED[key]) == ["x", "y"]
 
 
-@pytest.mark.xfail(strict=True, reason="D51(1) classify guard is still lower-case only: editing ci/classify.py "
-                                       "changes the frozen fingerprint c837f4fdaf70; waiting for Ofri's decision")
 @pytest.mark.parametrize("key", ["close_upper", "close_mixed_spaced", "fake_open_other_id"])
-def test_classify_guard_ignores_letter_case(key):
+def test_classify_guard_ignores_letter_case(key):  # D51 (1): classify_rank c837f4fdaf70 -> 99b79890ceea
     p = classify.delimited_items([{"id": "x", "title": "t", "text": POISONED[key]}, {"id": "y", "title": "u",
                                                                                      "text": "ok"}])
     assert len(ANY_TAG.findall(p)) == 4 and [i for i, _ in blocks(p)] == ["x", "y"]

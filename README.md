@@ -264,9 +264,8 @@ article can do. None of them stops it alone, and the problem is not solved.
    everything inside them is data to analyze, never an instruction.
 2. **Tags defanged.** An `item_text` tag inside the article is rewritten (`item_text` → `item-text`), so the text
    cannot close its own block or open a fake one for another item.
-   - **Insights:** any letter case and spacing, opening or closing tags, in titles too (D51).
-   - **Classify, rank and lens:** they share `ci.classify.delimited_items`, which still catches only the lower-case
-     closing tag (see *Still open*).
+   This covers any letter case and spacing, opening or closing tags, and titles and other fields too. It applies to
+   the insights prompt and to `ci.classify.delimited_items`, which classify, rank and lens share (D51).
 3. **Structured output.** Each answer must match a JSON schema. Unknown item ids, values outside the allowed sets
    and malformed rows are rejected in code (D32).
 4. **Checked citations.**
@@ -280,14 +279,16 @@ article can do. None of them stops it alone, and the problem is not solved.
 6. **Regression set.** `tests/ci/test_injection.py` pins 7 synthetic poisoned articles: closing tags in any letter
    case, a fake block for another id, a hidden instruction, a planted score and a planted claim.
 
+The classify guard fix changed the classify_rank fingerprint from `c837f4fdaf70` to `99b79890ceea`; the prompt text
+did not change. Every classify, rank and lens prompt for the 351 stored items and the 107 golden-set rows was
+rendered with the old and the new code: 0 differences in 1,374 prompts. The mapping is recorded in every run's
+metadata (`ci/run_meta.py`).
+
 **Still open:**
 - **A planted sentence passes the quote check.** The check proves the words are in the stored article, not that they
   are true. A test pins this gap.
 - **Ignoring instructions is up to the model.** Code can't verify that the model ignored an instruction it read.
   Layers 3 to 5 limit the damage when it doesn't.
-- **The classify guard is still case-sensitive.** Fixing it in `ci/classify.py` changes the frozen fingerprint
-  `c837f4fdaf70`, so it waits for a decision. The three affected cases are in the regression set as expected
-  failures.
 - **No classifier for injected text.** Nothing detects or strips injection attempts before the prompt.
 
 Traces: LangSmith tracing is off in every eval run, whatever the environment says, which `ci/tracing.py` enforces
