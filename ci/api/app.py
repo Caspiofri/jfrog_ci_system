@@ -27,6 +27,7 @@ from ci.api import health as health_api
 from ci.api import service as svc
 from ci.api.service import Snapshot
 from ci.classify import CATEGORIES
+from ci.csrf import CSRFMiddleware
 from ci.pipeline import RUNS_DIR
 from ci.store import STORE_PATH, Store
 from config.settings import DATA_DIR, EVALS_DIR, OUTPUT_DIR
@@ -151,6 +152,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     cfg = cfg or ci_config.load()
     min_score = svc.brief_min_score(brief_config_path)
     app = FastAPI(title="JFrog CI API", version=API_VERSION)
+    app.add_middleware(CSRFMiddleware)  # no login, so a cross-site page must not change state
 
     def meta() -> dict:
         return {"mode": "live", "now": svc.iso(now()), "api_version": API_VERSION}

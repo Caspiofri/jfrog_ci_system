@@ -38,3 +38,8 @@ docs/plans/
 docs/superpowers/
 PRD*.md
 docs/PRD-upgrade.md
+
+# Labels and review marks (Ofri's judgment; never committed). evals/golden_set.json is the older tracked file.
+evals/golden_set.jsonl
+evals/analyst_labels.jsonl
+*.marks.json

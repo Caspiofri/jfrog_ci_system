@@ -53,6 +53,7 @@ Every field in this document carries one of these markers.
   - The snapshot keeps only the allowlisted fields: title, URL, dates, source, competitor, category, score, status, reason, our summary (`why_it_matters`) and `excerpt`.
   - Every field below that isn't on the list is marked **(live only)**, and the demo API returns it as `null`.
   - The demo API is the same code and the same response models.
+- **Cross-site writes (CSRF).** The API binds 127.0.0.1 and has no login, so every POST, PUT, PATCH and DELETE is refused with `403 csrf_refused` when the browser marks it cross-site: `Sec-Fetch-Site` other than `same-origin` or `none`, or, without that header, an `Origin` that is neither a loopback host nor the request's own host. The UI's same-origin calls through its `/api/v1` proxy and requests without browser headers (curl, scripts) are unaffected; extra origins go in `CI_ALLOWED_ORIGINS`. Reads are never blocked (`ci/csrf.py`).
 - **Times.** UTC `…Z`. `date` is an Israel date (`YYYY-MM-DD`). `published_at` is the publication time; `discovered_at` is when our first run saw the item.
 - **Unit of a row.** In v1 a row is an **item** (`item_id`), not an event. Events (plan 1.4–1.7) aren't built: dedupe drops point to the kept item through `duplicate_of`, and that's all.
   - `event_id` is in the contract as ❌ and `null` until events land.

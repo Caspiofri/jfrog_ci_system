@@ -5,6 +5,8 @@ import uvicorn
 
 from ci.api.app import create_app
 
+HOST = "127.0.0.1"  # loopback only, never a CLI option: the API has no login (contract 2.1)
+
 
 def build_app():
     """The live app: Refresh insights (D37) gets the Gemini model and the embedding function the daily run uses."""
@@ -18,7 +20,7 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="python -m ci.api", description=__doc__)
     ap.add_argument("--port", type=int, default=8010)
     args = ap.parse_args(argv)
-    uvicorn.run(build_app(), host="127.0.0.1", port=args.port)
+    uvicorn.run(build_app(), host=HOST, port=args.port)
 
 
 if __name__ == "__main__":

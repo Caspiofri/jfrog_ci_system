@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from ci import config, reliability
 from ci import rank as rank_mod
+from ci.csrf import CSRFMiddleware
 from ci.labeling import audit, relabel, reliability_page, stratified
 from ci.packet import NON_COMPETITOR
 from ci.store import STORE_PATH
@@ -212,6 +213,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         competitors = [c.key for c in cfg.competitors]
     competitors = [*competitors, NON_COMPETITOR]  # always offered, so an off-target story can be relabeled
     app = FastAPI(title="JFrog CI labeling")
+    app.add_middleware(CSRFMiddleware)  # labels are written without a login; refuse cross-site writes
     reliability_page.add_routes(app, reviews_dir or reliability.REVIEW_DIR, store_path or STORE_PATH)
     write_lock = threading.Lock()  # one write at a time (FastAPI runs sync handlers in a thread pool)
     queue_lock = threading.Lock()  # one queue build per run, even when two tabs open it at once
