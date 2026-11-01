@@ -206,6 +206,8 @@ def test_trust_this_source_releases_and_can_be_undone(env):
     assert c.post("/api/v1/sources/trust", json={"host": "gbhackers.com"}).status_code == 409
     assert c.post("/api/v1/sources/trust", json={"host": "theregister.com"}).status_code == 409  # in the yaml
     assert c.post("/api/v1/sources/trust", json={"host": "github.com"}).status_code == 409  # vetted per org (D49)
+    assert c.post("/api/v1/sources/trust", json={"host": "gitlab.com"}).status_code == 409  # vetted per org (D53)
+    assert c.post("/api/v1/sources/trust", json={"host": "gist.github.com"}).status_code == 409  # never vetted
     assert c.post("/api/v1/sources/trust", json={"host": "not a host"}).status_code == 422
     assert {"host": "gbhackers.com", "group": "trusted"}.items() <= next(
         x for x in c.get("/api/v1/sources").json()["items"] if x["host"] == "gbhackers.com").items()

@@ -36,3 +36,36 @@ def test_every_tracked_repo_owner_is_a_vetted_org():
 
     owners = {r.split("/")[0].lower() for c in load().competitors for r in c.github_repos}
     assert owners and owners <= sources.github_orgs()
+
+
+def test_inside_a_vetted_org_only_the_orgs_own_pages_are_vetted():
+    """D53 (3): releases, tags, blob/tree and changelog pages are the org's; issues, discussions, PRs and
+    advisories can be written by anyone, so they are held for review (D56: advisories stay unvetted for now)."""
+    gh = "https://github.com/github/codeql-action"
+    for vetted in ("/releases/tag/v4", "/releases", "/tags", "/blob/main/README.md", "/tree/main/src",
+                   "/blob/main/CHANGELOG.md", "/wiki/Changelog"):
+        assert sources.is_vetted(gh + vetted), vetted
+    for unvetted in ("", "/issues/12", "/discussions/3", "/pull/9", "/pulls", "/security/advisories/GHSA-x",
+                     "/wiki/Home", "/actions"):
+        assert not sources.is_vetted(gh + unvetted), unvetted
+    assert not sources.is_vetted("https://github.com/github")  # the org page is not a release
+    assert not sources.is_vetted("https://github.com/cognitionai/devin-vuln-fixes/releases/tag/v1")  # not a vetted org
+
+
+def test_gist_is_never_vetted():
+    assert not sources.is_vetted("https://gist.github.com/github/0123abcd")
+    assert not sources.is_vetted("https://gist.github.com/anyone/0123abcd")
+
+
+def test_gitlab_com_is_vetted_only_for_gitlab_org_and_gitlab_com():
+    assert sources.gitlab_orgs() == {"gitlab-org", "gitlab-com"}
+    assert sources.is_vetted("https://gitlab.com/gitlab-org/gitlab/-/releases/v19.5.1-ee")
+    assert sources.is_vetted("https://gitlab.com/gitlab-org/security/gitlab/-/tags/v19.5.1")  # nested group
+    assert sources.is_vetted("https://gitlab.com/gitlab-com/www-gitlab-com/-/blob/master/CHANGELOG.md")
+    assert sources.is_vetted("https://gitlab.com/gitlab-org/gitlab/-/tree/master/doc")
+    for unvetted in ("https://gitlab.com/gitlab-org/gitlab/-/issues/1", "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/2",
+                     "https://gitlab.com/gitlab-org/gitlab", "https://gitlab.com/someone/gitlab/-/releases/v1",
+                     "https://gitlab.com/"):
+        assert not sources.is_vetted(unvetted), unvetted
+    assert sources.is_vetted("https://about.gitlab.com/releases/2026/10/22/x/")  # GitLab's own hosts are unchanged
+    assert sources.is_vetted("https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/")

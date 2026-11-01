@@ -1,6 +1,6 @@
 {
 "run_id": "20261030T1312Z-389e71",
-"note": "routing inputs only: host (plus the org for github.com, D49), category, flags, confidence, score, text_status; no titles or text",
+"note": "routing inputs only: host (plus the org and page kind for github.com, D49, D53), category, flags, confidence, score, text_status; no titles or text",
 "items": [
 {
 "item_id": "00c85acf9d22d94f",
@@ -134,7 +134,7 @@
 },
 {
 "item_id": "0a08f045320bac69",
-"url": "https://github.com/github/",
+"url": "https://github.com/github/codeql-action/releases/",
 "noise": false,
 "category": "Product & Features",
 "mentions_jfrog": false,
@@ -446,7 +446,7 @@
 },
 {
 "item_id": "1bff53baf689cdcf",
-"url": "https://github.com/github/",
+"url": "https://github.com/github/codeql-action/releases/",
 "noise": false,
 "category": "Product & Features",
 "mentions_jfrog": false,
@@ -1005,7 +1005,7 @@
 },
 {
 "item_id": "4829a17fbe9b3902",
-"url": "https://github.com/github/",
+"url": "https://github.com/github/codeql-action/releases/",
 "noise": false,
 "category": "Product & Features",
 "mentions_jfrog": false,
@@ -1421,7 +1421,7 @@
 },
 {
 "item_id": "67d9c3c8ce4c1f1d",
-"url": "https://github.com/github/",
+"url": "https://github.com/github/github-mcp-server/releases/",
 "noise": false,
 "category": "AI & Agents",
 "mentions_jfrog": false,
@@ -2032,7 +2032,7 @@
 },
 {
 "item_id": "9af00851dc7b591e",
-"url": "https://github.com/github/",
+"url": "https://github.com/github/github-mcp-server/releases/",
 "noise": false,
 "category": "AI & Agents",
 "mentions_jfrog": false,
@@ -2279,7 +2279,7 @@
 },
 {
 "item_id": "add230111b8e37e7",
-"url": "https://github.com/github/",
+"url": "https://github.com/github/codeql-action/releases/",
 "noise": false,
 "category": "Product & Features",
 "mentions_jfrog": false,
@@ -2370,7 +2370,7 @@
 },
 {
 "item_id": "b436d3d9ddb4ae47",
-"url": "https://github.com/cloudsmith-io/",
+"url": "https://github.com/cloudsmith-io/cloudsmith-cli/releases/",
 "noise": false,
 "category": "Product & Features",
 "mentions_jfrog": false,
@@ -3319,7 +3319,7 @@
 },
 {
 "item_id": "fe3c64c6092315b5",
-"url": "https://github.com/cloudsmith-io/",
+"url": "https://github.com/cloudsmith-io/cloudsmith-cli/releases/",
 "noise": false,
 "category": "Product & Features",
 "mentions_jfrog": false,

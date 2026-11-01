@@ -6,7 +6,7 @@ first_party:   # competitor-owned hosts (feeds, repos, blogs, docs, status pages
   - githubstatus.com
   - about.gitlab.com
   - docs.gitlab.com
-  - gitlab.com
+  - gitlab.com          # only the orgs in gitlab_orgs below (D53)
   - snyk.io            # includes updates.snyk.io
   - sonatype.com
   - cloudsmith.com
@@ -35,9 +35,14 @@ trade_press:   # 20 developer, DevOps and security trade outlets
 # Left off (unvetted unless trusted later): press wires (businesswire.com, prnewswire.com: official releases, but
 # anyone can post), security aggregators (gbhackers.com, cybersecuritynews.com, cyberpress.org), vendor blogs that are
 # not competitors (endorlabs.com, ox.security, socradar.io, blog.gitguardian.com, kaspersky.com), finance sites.
-# github.com is vetted per org (D49): a github.com URL counts as first party only under one of these orgs, the owners
-# of the repositories config/competitors.yaml tracks. Any other repository on github.com is unvetted (held at strict).
+# github.com and gitlab.com are vetted per org (D49, D53): a URL there counts as first party only under one of these
+# orgs, the owners of the repositories config/competitors.yaml tracks, and only for releases, tags, blob/tree and
+# changelog pages. Issues, discussions, pull/merge requests and advisories are unvetted (held at strict), as is any
+# other repository. gist.github.com is never vetted (ci/sources.py NEVER_VETTED).
 github_orgs:
   - github
   - cloudsmith-io
   - sonatype
+gitlab_orgs:
+  - gitlab-org
+  - gitlab-com
