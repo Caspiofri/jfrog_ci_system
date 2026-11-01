@@ -252,7 +252,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
   };
   const rejected = insights.rejected;
   const cap = insights.generated_at && insights.items.length
-    ? `Generated ${fmtDateTime(insights.generated_at)}${insights.trigger === "refresh" ? " (refreshed)" : ""}${insights.window?.from ? ` · window ${fmtDate(insights.window.from)}–${fmtDate(insights.window.to)}` : ""}${rejected ? ` · ${rejected} rejected by the checks` : ""}`
+    ? `Generated ${fmtDateTime(insights.generated_at)}${insights.trigger === "refresh" ? " (refreshed)" : ""}${rejected ? ` · ${rejected} rejected by the checks` : ""}`
     : undefined;
   const state = insightState(insights);
   return (
@@ -276,6 +276,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         <Empty>{state}</Empty>
       ) : (
         <>
+          <WindowLine w={insights.window} />
           <div className="mb-3 flex items-center gap-1.5 rounded border border-[#f59e0b]/60 bg-[#fff7e6] px-2.5 py-1.5 text-xs font-semibold text-[#8a5a00]">
             <Sparkles className="size-3.5 shrink-0" aria-hidden /> AI-generated — check the cited sources
           </div>
@@ -288,6 +289,18 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         </>
       )}
     </Panel>
+  );
+}
+
+/** Why insights can cite items outside the Brief: they read a wider window. Every value comes from the API's
+ * insights.window (the window the generator actually used); nothing is shown when it isn't served. */
+function WindowLine({ w }: { w: BriefInsights["window"] }) {
+  if (!w?.days) return null;
+  const span = w.from && w.to ? ` (${fmtDate(w.from)}–${fmtDate(w.to)}${w.stories != null ? `, ${w.stories} ${w.stories === 1 ? "story" : "stories"}` : ""})` : "";
+  return (
+    <p className="m-0 mb-2 text-xs text-mute">
+      Patterns across items from the last {w.days} days{span}, so they can cite items outside today&apos;s Brief.
+    </p>
   );
 }
 
