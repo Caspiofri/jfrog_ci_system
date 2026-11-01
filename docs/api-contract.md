@@ -639,3 +639,23 @@ Every `meta` block says which data it serves. Every success body and every route
 | 400 | `untrusted_host` | A `Host` header other than localhost, 127.0.0.1, ::1 or a name in `CI_TRUSTED_HOSTS` |
 
 These three bodies are `{"error": {code, message, details}}` with no `meta`.
+
+## 13. Analyst actions: reopen and per-field edit notes (1 Nov; as built)
+
+### 13.1 `POST /api/v1/items/{id}/reopen`: undo a dismiss
+
+- **Body:** optional `{"note": "…"}`. **If-Match:** the item version, optional, as for the other actions (a stale one answers 409 `conflict`).
+- **Allowed from:** `dismissed` only. Any other status answers `409 conflict` with `{status, allowed_from: ["dismissed"]}`; an unknown item `404 not_found`. In demo mode, 403 `demo_read_only`.
+- **What it does:** appends a `reopen` action; the dismiss stays in the history. The decision and flag go back to what they were before the latest dismiss, so the item returns to the status it had then:
+
+  | Status before the dismiss | After reopen |
+  |---|---|
+  | `awaiting_review` / `auto_published` | no decision: routing decides again, at the current level and vetted list |
+  | `approved` | `approved` |
+  | `flagged` | `flagged` (and the decision under the flag comes back too) |
+
+  Edits made before or after the dismiss are kept. Nothing is written to `evals/analyst_labels.jsonl`.
+- **Response:** the action envelope (`action_id`, `action: "reopen"`, `status`, `flagged`, `version`, `at`, `meta`…) plus `reopens_action_id` (the dismiss it undid) and `status_before_dismiss`.
+- **Reads:** `GET /items/{id}` → `actions[]` gets `{action: "reopen", payload: {before, state_before, reopens_action_id, status_before_dismiss}}`. The Log row shows the new status, with `dismiss_reason: null`.
+- From 1 Nov every item action's payload also holds `state_before: {decision, flagged}`. A dismiss logged before that has none and is restored from its `before.status` (the table above).
+

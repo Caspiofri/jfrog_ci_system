@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS analyst_actions (
     action_id INTEGER PRIMARY KEY AUTOINCREMENT,
     target_kind TEXT NOT NULL,       -- item | source
     target_id TEXT NOT NULL,
-    action TEXT NOT NULL,            -- approve | dismiss | edit | flag | unflag | trust | untrust
+    action TEXT NOT NULL,            -- approve | dismiss | reopen | edit | flag | unflag | trust | untrust
     reason TEXT,
     note TEXT,
     payload TEXT NOT NULL,           -- before/after values, what the action measures
