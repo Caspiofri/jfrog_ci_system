@@ -118,17 +118,19 @@ export function fmtLongDate(date: string): string {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-/** Publication date with precision: day-precision dates say "date only". */
+/** The item's date as the feed gave it (Google News, not the article page), with precision: day-precision says "date only". */
 export function fmtPublished(iso: string | null, precision: string): string {
-  if (!iso) return "publication date unknown";
+  if (!iso) return "unknown";
   return precision === "day" ? `${fmtDate(iso, true)} (date only)` : fmtDate(iso, true);
 }
 
-/** The date line for an item (contract §10.6): a future source date reads "scheduled for <date> per source",
- * never as a publication date. Once it passes, the API clears scheduled_for and published_at shows as usual. */
-export function itemDateText(it: { published_at: string | null; date_precision: string; scheduled_for?: string | null }): string {
-  if (it.scheduled_for) return `scheduled for ${fmtDate(it.scheduled_for, true)} per source`;
-  return `Published ${fmtPublished(it.published_at, it.date_precision)}`;
+/** The date line for an item, labeled "Feed date": the date comes from the feed, not the article page. A future
+ * feed date reads as scheduled (contract §10.6). Once it passes, the API clears scheduled_for. */
+export function itemDateText(it: { published_at: string | null; date_precision: string; scheduled_for?: string | null; published_at_source?: string | null }): string {
+  if (it.scheduled_for) return `Feed date ${fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)`;
+  // A feed date later than our collection is stored as the collection time; the feed's own date is published_at_source.
+  if (it.published_at_source) return `Feed date ${fmtDate(it.published_at_source, true)}`;
+  return `Feed date ${fmtPublished(it.published_at, it.date_precision)}`;
 }
 
 /** Only http(s) links are clickable; anything else from a collected page is shown as text (D32). */

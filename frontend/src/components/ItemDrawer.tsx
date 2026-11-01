@@ -103,14 +103,15 @@ function DrawerBody({ id }: { id: string }) {
                   <Field k="Competitor">{competitorName(meta, it.competitor)}{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>
                   {it.scheduled_for ? (
-                    <Field k="Scheduled">{fmtDate(it.scheduled_for, true)} per source (not yet published)</Field>
+                    <Field k="Feed date">{fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)</Field>
                   ) : (
-                    <Field k="Published">
-                      {fmtPublished(it.published_at, it.date_precision)}
-                      {it.published_at_source ? <span className="text-mute"> · the source dated it {fmtDate(it.published_at_source, true)}</span> : null}
+                    <Field k="Feed date">
+                      {it.published_at_source ? (
+                        <>{fmtDate(it.published_at_source, true)}<span className="text-mute"> · later than when we collected it ({fmtDate(it.published_at, true)})</span></>
+                      ) : fmtPublished(it.published_at, it.date_precision)}
                     </Field>
                   )}
-                  <Field k="Discovered">{fmtDateTime(it.discovered_at)}{it.discovery_lag_hours != null ? ` (${Math.round(it.discovery_lag_hours)} h after publication)` : ""}</Field>
+                  <Field k="Discovered">{fmtDateTime(it.discovered_at)}{it.discovery_lag_hours != null ? ` (${Math.round(it.discovery_lag_hours)} h after the feed date)` : ""}</Field>
                   <Field k="Score reason">{it.reason || "—"}</Field>
                   {it.why_it_matters ? <Field k="Ranker's summary">{it.why_it_matters}</Field> : null}
                   {d.ranking?.raw_score != null && d.ranking.raw_score !== it.score ? <Field k="Model score">{d.ranking.raw_score} (adjusted to {it.score ?? "—"})</Field> : null}

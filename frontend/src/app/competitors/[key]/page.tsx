@@ -65,7 +65,7 @@ function Profile() {
               </Panel>
 
               <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-                <Panel title="How active are they?" cap={`Published items per day by publication date, ${p.activity.days} days · ${p.activity.total} published in total`}>
+                <Panel title="How active are they?" cap={`Published items per day by feed date, ${p.activity.days} days · ${p.activity.total} published in total`}>
                   {p.activity.series.some((r) => r.items) ? <ActivityChart series={p.activity.series} /> : <Empty>No published items in the last {p.activity.days} days.</Empty>}
                 </Panel>
                 <Panel title="What are they focused on?" cap="Published items this week">
@@ -88,7 +88,7 @@ function Profile() {
                 <Panel title="How do they compare with JFrog?"><Empty>{p.name} is a channel, not a vendor: no head-to-head.</Empty></Panel>
               )}
 
-              <Panel title="What did they do lately?" cap={`Newest publication first · ${p.latest_items.total} published items`}>
+              <Panel title="What did they do lately?" cap={`Newest feed date first · ${p.latest_items.total} published items`}>
                 {p.latest_items.items.length ? p.latest_items.items.map((it) => <ItemRow key={it.item_id} item={it} showBadge={false} />) : <Empty>No published items.</Empty>}
                 {p.latest_items.total > PAGE ? (
                   <div className="mt-2.5 flex items-center justify-end gap-2">

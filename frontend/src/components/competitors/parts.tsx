@@ -89,7 +89,7 @@ export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; sh
       <table className="w-full border-collapse">
         <thead>
           <tr>
-            {["Date", ...(showCompetitor ? ["Competitor"] : []), "Title", "Source", "Status"].map((h) => (
+            {["Feed date", ...(showCompetitor ? ["Competitor"] : []), "Title", "Source", "Status"].map((h) => (
               <th key={h} className="border-b border-line px-2.5 py-2 text-left text-xs font-semibold text-mute">{h}</th>
             ))}
           </tr>
