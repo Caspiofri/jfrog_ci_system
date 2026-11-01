@@ -384,7 +384,7 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
   const [bg, fg] = SCORE_COLOR[main.score ?? 0] ?? SCORE_COLOR[0];
   return (
     <li className="flex gap-2.5 text-xs">
-      <span title={SCORE_TIP} className="flex w-7 shrink-0 items-start justify-center rounded pt-1 text-sm font-semibold tabular-nums"
+      <span title={SCORE_TIP} className="flex w-7 shrink-0 items-center justify-center self-stretch rounded text-sm font-semibold tabular-nums"
         style={{ background: bg, color: fg }}>
         {main.score ?? "–"}
       </span>
