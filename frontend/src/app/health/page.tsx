@@ -2,7 +2,7 @@
 import { Suspense } from "react";
 import { Async, Empty, ErrorNote, KpiTile, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
-import { ChangeDetection, Coverage, EvalCards, Extraction, Funnel, SilentAlert, SilentTable, SourcesTable } from "@/components/health/parts";
+import { ChangeDetection, Coverage, EvalCards, Extraction, Funnel, LivenessAlert, MARKER, RunHistory, SilentAlert, SilentTable, SourcesTable, TestEvalBlock } from "@/components/health/parts";
 import { path, useApi } from "@/lib/api";
 import { LEVEL_LABEL, delta, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
@@ -29,7 +29,7 @@ function HealthScreen() {
         sub="Does the system run, and is it correct"
         tools={runs.data?.items.length ? (
           <FilterSelect ariaLabel="Run" allLabel="Latest daily run" value={runId} onChange={(v) => set({ run: v })} className="h-8 min-w-[16rem] bg-white text-[13px]"
-            options={runs.data.items.map((r) => ({ value: r.run_id, label: `${fmtDateTime(r.started_at)} · ${r.kind} · ${r.status}` }))} />
+            options={runs.data.items.map((r) => ({ value: r.run_id, label: `${fmtDateTime(r.started_at)} · ${r.kind} · ${MARKER[r.marker ?? r.status]?.label ?? r.status}` }))} />
         ) : null}
       />
       {runs.error ? <ErrorNote error={runs.error} onRetry={() => runs.mutate()} /> : null}
@@ -49,7 +49,14 @@ function HealthScreen() {
               </div>
             ) : null}
 
+            {h.liveness ? <LivenessAlert l={h.liveness} /> : null}
             {h.silent_sources ? <SilentAlert s={h.silent_sources} /> : null}
+
+            <Panel title="Did each run finish?" cap="Newest first · pick a run to see its numbers below">
+              {runs.data?.items.length ? (
+                <RunHistory runs={runs.data.items} selected={runId || h.run?.run_id || null} metrics={h.run_metrics} onSelect={(v) => set({ run: v })} />
+              ) : runs.error ? null : runs.data ? <Empty>No runs yet.</Empty> : <Loading rows={2} />}
+            </Panel>
 
             <BriefCounts />
 
@@ -70,7 +77,11 @@ function HealthScreen() {
               {h.extraction ? <Extraction e={h.extraction} /> : <Empty>No extraction data.</Empty>}
             </Panel>
 
-            <Panel title="How accurate is the system?" cap="Single labeler · golden set">
+            <Panel title="What does the held-out test split say?" cap="The reported accuracy · runs once, on a frozen system">
+              <TestEvalBlock t={h.test_eval} />
+            </Panel>
+
+            <Panel title="How accurate is the system?" cap="Single labeler · golden set · newest eval of any split">
               {h.eval ? <EvalCards ev={h.eval} /> : <Empty>No eval report yet.</Empty>}
             </Panel>
 

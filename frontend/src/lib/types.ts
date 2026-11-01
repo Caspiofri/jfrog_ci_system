@@ -458,6 +458,55 @@ export interface RunInfo {
   llm_calls: number | null;
   error?: string | null;
   errors?: unknown[];
+  /** Contract §11.2: on /runs rows. stale = still running more than 1 h after it started. */
+  marker?: RunMarker;
+}
+
+export type RunMarker = "ok" | "degraded" | "failed" | "running" | "stale";
+
+// Contract §11.2 (D48).
+export interface Liveness {
+  state: RunMarker | "overdue" | "none";
+  latest_run_id: string | null;
+  latest_status: string | null;
+  hours_since_latest: number | null;
+  stale_run_ids: string[];
+  stale_after_hours: number;
+  overdue_after_hours: number;
+}
+
+// Contract §11.1: only the parts Health shows.
+export interface RunStep {
+  step: string;
+  status: "ok" | "degraded" | "failed" | "skipped" | string;
+  seconds?: number | null;
+  llm_calls?: number | null;
+  errors?: unknown[];
+  item_ids?: string[];
+  reason?: string;
+}
+
+export interface RunMetrics {
+  run_id: string;
+  status: string;
+  error?: string | null;
+  steps: RunStep[];
+  fingerprints?: Record<string, string | null> | null;
+  metadata?: { commit?: string | null; [k: string]: unknown } | null;
+}
+
+// Contract §11.3: the test-split eval. status "none" until it has run.
+export interface TestEval {
+  status: "ok" | "none" | string;
+  note?: string;
+  report?: string;
+  created_at?: string;
+  split?: string;
+  fingerprint?: string;
+  model?: string;
+  n?: number;
+  test_runs?: number;
+  cards?: EvalCard[];
 }
 
 export type FunnelRow = Record<string, number | string | unknown[]> & { source: string };
@@ -492,6 +541,9 @@ export interface EvalCard {
 
 export interface Health {
   run: RunInfo | null;
+  liveness?: Liveness | null;
+  run_metrics?: RunMetrics | null;
+  test_eval?: TestEval | null;
   funnel: { run_id: string; level: Level; sources: FunnelRow[]; totals: Record<string, number> } | null;
   silent_sources: {
     runs_so_far: number;

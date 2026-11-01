@@ -1,12 +1,12 @@
 "use client";
 // Health blocks (contract §9). Every eval number carries its n; coverage is counts with n, never a rate.
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, ExtLink, N, Tag } from "@/components/ci";
 import { SOURCE_LABEL, fmtDateTime, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
-import type { ExtractionBlock, ExtractionRow, Health } from "@/lib/types";
+import type { EvalCard, ExtractionBlock, ExtractionRow, Health, Liveness, RunInfo, RunMetrics, RunStep, TestEval } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${Math.round(v * 100)}%`);
@@ -244,6 +244,27 @@ const METRIC_LABEL: Record<string, string> = {
   funding_m_and_a: "Funding/M&A",
 };
 
+export function MetricCards({ cards }: { cards: EvalCard[] }) {
+  return (
+    <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
+      {cards.map((c) => (
+        <div key={c.metric} className={cn("rounded-md border border-line bg-card px-4 py-3", c.untested && "bg-page")}>
+          <div className="text-[26px] font-semibold leading-tight tabular-nums">
+            {c.untested ? <span className="text-mute">—</span> : pct(c.value)}
+            <N n={c.n} />
+          </div>
+          <div className="mt-0.5 text-mute">{METRIC_LABEL[c.metric] ?? c.metric.replace(/_/g, " ")}</div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {c.untested ? <Tag className="bg-track">untested</Tag> : null}
+            {c.weak && !c.untested ? <Tag className="bg-[#fff4e0] text-[#8a5a00]" title="n < 10, or an important-item metric">weak evidence</Tag> : null}
+          </div>
+          {c.note ? <div className="mt-1.5 text-[11px] text-mute">{c.note}</div> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function EvalCards({ ev }: { ev: NonNullable<Health["eval"]> }) {
   return (
     <div className="flex flex-col gap-3">
@@ -262,22 +283,7 @@ export function EvalCards({ ev }: { ev: NonNullable<Health["eval"]> }) {
           The test-split eval hasn&apos;t run yet. These numbers are not the reported ones.
         </div>
       ) : null}
-      <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
-        {ev.cards.map((c) => (
-          <div key={c.metric} className={cn("rounded-md border border-line bg-card px-4 py-3", c.untested && "bg-page")}>
-            <div className="text-[26px] font-semibold leading-tight tabular-nums">
-              {c.untested ? <span className="text-mute">—</span> : pct(c.value)}
-              <N n={c.n} />
-            </div>
-            <div className="mt-0.5 text-mute">{METRIC_LABEL[c.metric] ?? c.metric.replace(/_/g, " ")}</div>
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {c.untested ? <Tag className="bg-track">untested</Tag> : null}
-              {c.weak && !c.untested ? <Tag className="bg-[#fff4e0] text-[#8a5a00]" title="n < 10, or an important-item metric">weak evidence</Tag> : null}
-            </div>
-            {c.note ? <div className="mt-1.5 text-[11px] text-mute">{c.note}</div> : null}
-          </div>
-        ))}
-      </div>
+      <MetricCards cards={ev.cards} />
     </div>
   );
 }
@@ -350,6 +356,154 @@ export function ChangeDetection({ c }: { c: NonNullable<Health["change_detection
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ---- run history and liveness (D48, contract §11.2) ----
+
+/** One look per marker: ok green, degraded amber, failed / stale / overdue red. */
+export const MARKER: Record<string, { label: string; color: string; bg: string; text: string; tip: string }> = {
+  ok: { label: "OK", color: "#41be57", bg: "#eef7f0", text: "#1f7a33", tip: "Every step finished" },
+  degraded: { label: "Degraded", color: "#f59e0b", bg: "#fff4e0", text: "#8a5a00", tip: "The run finished, but some items fell back (see its steps)" },
+  running: { label: "Running", color: "#5b7bb5", bg: "#e8eefb", text: "#3f5b8f", tip: "Started under an hour ago and still running" },
+  failed: { label: "Failed", color: "#d14343", bg: "#fdeaea", text: "#a32d2d", tip: "The run stopped; the step it stopped at is marked" },
+  stale: { label: "Stale", color: "#9b1c1c", bg: "#fdeaea", text: "#9b1c1c", tip: "Still marked running more than an hour after it started: killed or hung" },
+  overdue: { label: "Overdue", color: "#9b1c1c", bg: "#fdeaea", text: "#9b1c1c", tip: "No daily run has started in the expected time" },
+  none: { label: "No daily run", color: "#8a94a6", bg: "#eef1f5", text: "#44516a", tip: "The store has no daily run yet" },
+};
+
+export function MarkerTag({ marker, title }: { marker: string | null | undefined; title?: string }) {
+  const m = MARKER[marker ?? ""] ?? { label: marker ?? "—", color: "#8a94a6", bg: "#eef1f5", text: "#44516a", tip: "" };
+  return (
+    <span title={title ?? m.tip} className="inline-flex items-center gap-1.5 rounded-[3px] px-2 py-px text-xs font-semibold" style={{ background: m.bg, color: m.text }}>
+      <i className="inline-block size-2 rounded-full" style={{ background: m.color }} aria-hidden />
+      {m.label}
+    </span>
+  );
+}
+
+/** Is the daily run alive? Overdue shows here because a run that never started leaves no row. */
+export function LivenessAlert({ l }: { l: Liveness }) {
+  const good = l.state === "ok";
+  const warn = l.state === "degraded" || l.state === "running";
+  const hours = l.hours_since_latest != null ? `${l.hours_since_latest} h ago` : null;
+  const text =
+    l.state === "overdue" ? `No daily run has started for ${l.hours_since_latest ?? "?"} h (expected within ${l.overdue_after_hours} h)`
+    : l.state === "none" ? "No daily run yet"
+    : l.state === "stale" ? "The latest daily run is stuck: still running more than an hour after it started"
+    : l.state === "failed" ? "The latest daily run failed"
+    : l.state === "degraded" ? "The latest daily run finished degraded"
+    : l.state === "running" ? "A daily run is in progress"
+    : "The latest daily run finished";
+  return (
+    <div role={good || warn ? undefined : "alert"}
+      className={cn("flex flex-wrap items-center gap-2 rounded-md border border-line border-l-[3px] px-4 py-3",
+        good ? "border-l-jgreen bg-card" : warn ? "border-l-[#f59e0b] bg-[#fffaf0]" : "border-l-[#d14343] bg-[#fff5f5]")}>
+      {good ? <CheckCircle2 className="size-4 text-jgreen-d" /> : warn ? <Clock className="size-4 text-[#8a5a00]" /> : <AlertTriangle className="size-4 text-[#d14343]" />}
+      <b className="font-semibold">{text}</b>
+      <MarkerTag marker={l.state} />
+      <span className="text-mute">
+        {l.latest_run_id ? `· ${l.latest_run_id}` : ""}{hours && l.state !== "overdue" ? ` · started ${hours}` : ""}
+        {l.stale_run_ids.length ? ` · stuck: ${l.stale_run_ids.join(", ")}` : ""}
+      </span>
+    </div>
+  );
+}
+
+const STEP_COLOR: Record<string, string> = { ok: "#41be57", degraded: "#f59e0b", failed: "#d14343", skipped: "#8a94a6" };
+
+function StepChip({ s }: { s: RunStep }) {
+  const extra = [
+    s.seconds != null ? `${s.seconds} s` : null,
+    s.llm_calls ? `${s.llm_calls} LLM calls` : null,
+    s.item_ids?.length ? `${s.item_ids.length} items fell back` : null,
+    s.reason ? s.reason : null,
+  ].filter(Boolean).join(" · ");
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-line bg-white px-2 py-0.5 text-xs" title={`${s.step}: ${s.status}${extra ? ` · ${extra}` : ""}`}>
+      <i className="inline-block size-2 rounded-full" style={{ background: STEP_COLOR[s.status] ?? "#8a94a6" }} aria-hidden />
+      <b className="font-semibold">{s.step}</b>
+      <span className="text-mute">{s.status === "ok" ? (s.seconds != null ? `${Math.round(s.seconds)} s` : "ok") : s.status}</span>
+    </span>
+  );
+}
+
+/** The run list, newest first, with each run's marker. Picking a row selects that run for the whole page. */
+export function RunHistory({ runs, selected, metrics, onSelect }: {
+  runs: RunInfo[]; selected: string | null; metrics: RunMetrics | null | undefined; onSelect: (runId: string) => void;
+}) {
+  const th = "border-b border-line px-2.5 py-2 text-left text-xs font-semibold text-mute";
+  const td = "border-b border-line px-2.5 py-2 align-top";
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse">
+          <thead><tr>{["Started (Israel time)", "Kind", "Status", "Duration", "LLM calls", "Run"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {runs.map((r) => {
+              const on = r.run_id === selected;
+              const mins = r.finished_at ? Math.round((Date.parse(r.finished_at) - Date.parse(r.started_at)) / 60000) : null;
+              return (
+                <tr key={r.run_id} className={cn("cursor-pointer hover:bg-page", on && "bg-[#f3fbf4]")} onClick={() => onSelect(r.run_id)}
+                  aria-selected={on} tabIndex={0} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect(r.run_id))}>
+                  <td className={cn(td, "tabular-nums", on && "font-semibold")}>{fmtDateTime(r.started_at)}</td>
+                  <td className={td}><Tag>{r.kind}</Tag></td>
+                  <td className={td}><MarkerTag marker={r.marker ?? r.status} /></td>
+                  <td className={cn(td, "tabular-nums text-mute")}>{mins == null ? "—" : `${mins} min`}</td>
+                  <td className={cn(td, "tabular-nums text-mute")}>{r.llm_calls ?? "—"}</td>
+                  <td className={cn(td, "font-mono text-[11px] text-mute")}>{r.run_id}{r.error ? <div className="font-sans text-[#a32d2d]">{r.error}</div> : null}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div className="mb-1.5 text-xs font-semibold text-mute">Steps of the selected run</div>
+        {metrics?.steps?.length ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {metrics.steps.map((s, i) => <StepChip key={`${s.step}-${i}`} s={s} />)}
+            {metrics.metadata?.commit ? <span className="text-[11px] text-mute">· commit {String(metrics.metadata.commit).slice(0, 7)}</span> : null}
+          </div>
+        ) : (
+          <div className="text-xs text-mute">No step record for this run (runs before Oct 31 night have none).</div>
+        )}
+        {metrics?.error ? <div className="mt-1 text-xs text-[#a32d2d]">{metrics.error}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+/** The test-split eval: the reported numbers. A slot with its three facts (n, date, fingerprint) until it runs. */
+export function TestEvalBlock({ t }: { t: TestEval | null | undefined }) {
+  const ran = t?.status === "ok";
+  const fact = (k: string, v: React.ReactNode) => (
+    <div className="rounded-md border border-line bg-card px-4 py-3">
+      <div className={cn("text-lg font-semibold tabular-nums", !ran && "text-mute")}>{v}</div>
+      <div className="text-xs text-mute">{k}</div>
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-3">
+      {!ran ? (
+        <div className="flex items-center gap-2 rounded border-l-[3px] border-[#8a94a6] bg-page px-3 py-2 text-xs">
+          <FlaskConical className="size-3.5 shrink-0 text-mute" aria-hidden />
+          <span>{t?.note ? `${t.note.charAt(0).toUpperCase()}${t.note.slice(1)}.` : "Not run yet."} Until it runs, the accuracy numbers below are development numbers, not the reported ones.</span>
+        </div>
+      ) : t.test_runs && t.test_runs > 1 ? (
+        <div role="alert" className="rounded border-l-[3px] border-[#d14343] bg-[#fff5f5] px-3 py-2 text-xs">
+          The test split has been evaluated {t.test_runs} times; it should run once. The newest report is shown.
+        </div>
+      ) : null}
+      <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
+        {fact("Items scored (n)", ran ? t.n ?? "—" : "—")}
+        {fact("Run on", ran && t.created_at ? fmtDateTime(t.created_at) : "—")}
+        {fact("Fingerprint", ran && t.fingerprint ? <span className="font-mono text-sm">{t.fingerprint}</span> : "—")}
+        {ran && t.model ? fact("Model", <span className="text-sm">{t.model}</span>) : null}
+      </div>
+      {ran && t.cards?.length ? <MetricCards cards={t.cards} /> : null}
+      {ran && t.report ? <div className="text-[11px] text-mute">Report {t.report}</div> : null}
     </div>
   );
 }
