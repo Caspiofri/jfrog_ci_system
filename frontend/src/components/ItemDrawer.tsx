@@ -4,9 +4,9 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Async, CategoryTag, ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { LensView } from "@/components/LensView";
 import { useApi } from "@/lib/api";
-import Link from "next/link";
-import { AXIS_LABEL, HOLD_LABEL, LEVEL_LABEL, NO_TEXT, RELATION_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { ItemDetail, Lens } from "@/lib/types";
 
@@ -38,36 +38,12 @@ function Field({ k, children }: { k: string; children: ReactNode }) {
   );
 }
 
-/** The JFrog lens (contract §10.5): relation, axis, the capability-sheet line it rests on, and its sentence.
- * No lens and "not related" are different answers. */
-function LensBlock({ lens: l }: { lens?: Lens | null }) {
-  const notRelated = l && (l.relation === "not_related" || !l.capability_quote);
+/** The JFrog lens as the card shows it (D58): the closest capability only, no relation or lens sentence. */
+function LensBlock({ lens }: { lens?: Lens | null }) {
   return (
     <div className="rounded border-l-4 border-jgreen bg-[#f8fbf8] px-3 py-2">
       <div className="mb-1 text-xs font-semibold text-mute">Why it matters to JFrog</div>
-      {!l ? (
-        <div className="text-mute">Not analyzed yet</div>
-      ) : notRelated ? (
-        <>
-          <div className="text-mute">No direct link to a JFrog capability</div>
-          {l.why_it_matters || l.why ? <div className="mt-1 text-xs text-[#44516a]">{l.why_it_matters || l.why}</div> : null}
-        </>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          <div><span className="text-xs text-mute">Relation: </span><b className="font-semibold">{RELATION_LABEL[l.relation] ?? l.relation.replace(/_/g, " ")}</b></div>
-          <div>
-            <span className="text-xs text-mute">Capability: </span>
-            {l.axis ? (
-              <Link href={`/capabilities#${encodeURIComponent(l.axis)}`} className="text-jgreen-d hover:underline">{AXIS_LABEL[l.axis] ?? l.axis}</Link>
-            ) : "—"}
-          </div>
-          {l.why_it_matters || l.why ? <div className="text-[#44516a]">{l.why_it_matters || l.why}</div> : null}
-          <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-xs text-mute">
-            <span className="italic">&ldquo;{l.capability_quote}&rdquo;</span>
-            <span className="not-italic"> — JFrog capability sheet</span>
-          </blockquote>
-        </div>
-      )}
+      <LensView lens={lens} />
     </div>
   );
 }

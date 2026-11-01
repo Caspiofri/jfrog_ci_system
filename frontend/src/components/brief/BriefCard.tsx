@@ -2,11 +2,11 @@
 // A published item in the Brief (D44): score with its rubric label, then three labeled rows.
 // Every collected string renders as React text (D32); links go through safeHref via ExtLink.
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { CategoryTag, ExtLink, ScoreBadge, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
-import { AXIS_LABEL, RELATION_LABEL, RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
+import { LensView } from "@/components/LensView";
+import { RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { Item, Meta } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -58,33 +58,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** "Why it matters to JFrog" is the lens only (D42). No lens row and "not related" are different answers. */
-function LensView({ item }: { item: Item }) {
-  const l = item.lens;
-  if (!l) return <span className="text-mute">Not analyzed yet</span>;
-  if (l.relation === "not_related" || !l.capability_quote) {
-    return <span className="text-mute">No direct link to a JFrog capability</span>;
-  }
-  const why = l.why_it_matters || l.why;
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="font-medium">{RELATION_LABEL[l.relation] ?? l.relation.replace(/_/g, " ")}</span>
-      {why ? <span className="text-[#44516a]">{why}</span> : null}
-      <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-xs text-mute">
-        <span className="italic">&ldquo;{l.capability_quote}&rdquo;</span>{" "}
-        <span className="not-italic">
-          —{" "}
-          {l.axis ? (
-            <Link href={`/capabilities#${encodeURIComponent(l.axis)}`} className="text-jgreen-d hover:underline">
-              JFrog capability sheet · {AXIS_LABEL[l.axis] ?? l.axis}
-            </Link>
-          ) : "JFrog capability sheet"}
-        </span>
-      </blockquote>
-    </div>
-  );
-}
-
 export function BriefCard({ item, showLate = true, highlight = false }: { item: Item; showLate?: boolean; highlight?: boolean }) {
   const { data: meta } = useMeta();
   const drawer = useItemDrawer();
@@ -117,7 +90,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         <Row label="What happened">
           {item.excerpt.trim() ? <span className="text-[#44516a]">{item.excerpt}</span> : <span className="text-mute">Only the headline is available.</span>}
         </Row>
-        <Row label="Why it matters to JFrog"><LensView item={item} /></Row>
+        <Row label="Why it matters to JFrog"><LensView lens={item.lens} /></Row>
         <Row label="Evidence">
           <span className="text-xs text-mute">
             {item.publisher} · {itemDateText(item)} ·{" "}
