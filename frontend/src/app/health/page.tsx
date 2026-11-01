@@ -44,7 +44,7 @@ function HealthScreen() {
                 <span>{fmtDateTime(h.run.started_at)} → {fmtDateTime(h.run.finished_at)}</span>
                 {h.run.model ? <span>· {h.run.model}</span> : null}
                 {h.run.llm_calls !== null && h.run.llm_calls !== undefined ? <span>· {h.run.llm_calls} LLM calls</span> : null}
-                {h.run.fingerprint ? <span>· fingerprint {h.run.fingerprint}</span> : null}
+                {h.run.fingerprint ? <span>· {runId ? "this run's" : "latest run's"} fingerprint <span className="font-mono">{h.run.fingerprint}</span></span> : null}
                 {h.run.error ? <span className="text-[#a32d2d]">· {h.run.error}</span> : null}
               </div>
             ) : null}

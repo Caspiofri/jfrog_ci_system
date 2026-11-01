@@ -328,7 +328,10 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
       <div className="flex flex-wrap items-center gap-1.5">
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
         {ins.max_score ? <span className="text-xs text-mute">top importance {ins.max_score}</span> : null}
-        <span className="text-xs text-mute">· {ins.story_ids.length} {ins.story_ids.length === 1 ? "story" : "stories"}</span>
+        <span className="text-xs text-mute">
+          · {ins.story_ids.length} {ins.story_ids.length === 1 ? "story" : "stories"}
+          {ins.item_ids.length !== ins.story_ids.length ? `, ${ins.item_ids.length} ${ins.item_ids.length === 1 ? "item" : "items"}` : ""}
+        </span>
       </div>
       <h3 className="m-0 text-sm font-semibold">{ins.title}</h3>
       <p className="m-0 text-[#44516a]">{ins.summary}</p>
