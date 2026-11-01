@@ -5,9 +5,10 @@ import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Async, CategoryTag, ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { useApi } from "@/lib/api";
-import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import Link from "next/link";
+import { AXIS_LABEL, HOLD_LABEL, LEVEL_LABEL, NO_TEXT, RELATION_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
-import type { ItemDetail } from "@/lib/types";
+import type { ItemDetail, Lens } from "@/lib/types";
 
 const Ctx = createContext<{ open: (id: string) => void }>({ open: () => {} });
 export const useItemDrawer = () => useContext(Ctx);
@@ -37,6 +38,40 @@ function Field({ k, children }: { k: string; children: ReactNode }) {
   );
 }
 
+/** The JFrog lens (contract §10.5): relation, axis, the capability-sheet line it rests on, and its sentence.
+ * No lens and "not related" are different answers. */
+function LensBlock({ lens: l }: { lens?: Lens | null }) {
+  const notRelated = l && (l.relation === "not_related" || !l.capability_quote);
+  return (
+    <div className="rounded border-l-4 border-jgreen bg-[#f8fbf8] px-3 py-2">
+      <div className="mb-1 text-xs font-semibold text-mute">Why it matters to JFrog</div>
+      {!l ? (
+        <div className="text-mute">Not analyzed yet</div>
+      ) : notRelated ? (
+        <>
+          <div className="text-mute">No direct link to a JFrog capability</div>
+          {l.why_it_matters || l.why ? <div className="mt-1 text-xs text-[#44516a]">{l.why_it_matters || l.why}</div> : null}
+        </>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <div><span className="text-xs text-mute">Relation: </span><b className="font-semibold">{RELATION_LABEL[l.relation] ?? l.relation.replace(/_/g, " ")}</b></div>
+          <div>
+            <span className="text-xs text-mute">Capability: </span>
+            {l.axis ? (
+              <Link href={`/capabilities#${encodeURIComponent(l.axis)}`} className="text-jgreen-d hover:underline">{AXIS_LABEL[l.axis] ?? l.axis}</Link>
+            ) : "—"}
+          </div>
+          {l.why_it_matters || l.why ? <div className="text-[#44516a]">{l.why_it_matters || l.why}</div> : null}
+          <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-xs text-mute">
+            <span className="italic">&ldquo;{l.capability_quote}&rdquo;</span>
+            <span className="not-italic"> — JFrog capability sheet</span>
+          </blockquote>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DrawerBody({ id }: { id: string }) {
   const { data: meta } = useMeta();
   const q = useApi<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`);
@@ -59,12 +94,7 @@ function DrawerBody({ id }: { id: string }) {
                   {it.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">Mentions JFrog</Tag> : null}
                   {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
                 </div>
-                {it.why_it_matters ? (
-                  <div className="rounded border-l-4 border-jgreen bg-[#f8fbf8] px-3 py-2">
-                    <div className="text-xs font-semibold text-mute">Why it matters</div>
-                    <div>{it.why_it_matters}</div>
-                  </div>
-                ) : null}
+                <LensBlock lens={it.lens} />
                 {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
                 <ExtLink href={it.url} className="inline-flex items-center gap-1 text-jgreen-d">
                   Open the source <ExternalLink className="size-3" />
@@ -82,6 +112,7 @@ function DrawerBody({ id }: { id: string }) {
                   )}
                   <Field k="Discovered">{fmtDateTime(it.discovered_at)}{it.discovery_lag_hours != null ? ` (${Math.round(it.discovery_lag_hours)} h after publication)` : ""}</Field>
                   <Field k="Score reason">{it.reason || "—"}</Field>
+                  {it.why_it_matters ? <Field k="Ranker's summary">{it.why_it_matters}</Field> : null}
                   {d.ranking?.raw_score != null && d.ranking.raw_score !== it.score ? <Field k="Model score">{d.ranking.raw_score} (adjusted to {it.score ?? "—"})</Field> : null}
                   <Field k="Classified by">{d.classification?.method ?? "—"}{d.classification?.reason ? ` · ${d.classification.reason}` : ""}</Field>
                   <Field k="Confidence">{it.confidence != null ? it.confidence.toFixed(2) : "—"}</Field>
