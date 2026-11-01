@@ -1,7 +1,5 @@
 {
   "run_id": "20261030T1312Z-389e71",
-  "runs_dir": "output/runs",
-  "events_file": "/home/ofri/jfrog_project/agent_backbone/.claude/worktrees/github-changelog/evals/coverage_events.yaml",
   "window_days": 14,
   "window": {
     "first": "2026-10-16",
