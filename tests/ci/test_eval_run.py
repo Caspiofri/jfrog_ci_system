@@ -33,7 +33,7 @@ def test_the_runner_writes_the_report_unchanged_and_its_inputs_next_to_it(train_
     meta = inputs["metadata"]
     assert meta["fingerprints"]["classify_rank"] == report["fingerprint"]
     assert set(meta) == {"fingerprints", "sheet_sha", "models", "call_settings", "combined", "commit",
-                         "fingerprint_changes"}
+                         "portable", "fingerprint_changes"}
     assert meta["models"]["llm"] == report["model"] and meta["call_settings"]["temperature"] == 0.0
     assert len(meta["sheet_sha"]) == 12 and len(meta["commit"]["sha"]) == 40
     assert not (out / "test_runs.log").exists()  # train only: nothing was logged as a test run
@@ -97,11 +97,58 @@ def test_metadata_combines_everything_but_the_commit(tmp_path):
 
 
 def test_the_recorded_fingerprint_changes_end_at_the_current_values():
-    """D51/D53: each deliberate change is recorded old -> new; the newest entry per fingerprint is the live value."""
+    """D51/D53/D59: each deliberate change is recorded old -> new. The legacy classify_rank value hashes absolute
+    paths, so it is checked as recorded; the portable value is recomputed here, in whatever checkout runs the test."""
     from ci import insights, lens
 
-    latest = {c["fingerprint"]: c["new"] for c in run_meta.FINGERPRINT_CHANGES}
-    assert latest == {"classify_rank": eval_golden.fingerprint(), "insights": insights.fingerprint()}
-    cr = next(c for c in run_meta.FINGERPRINT_CHANGES if c["fingerprint"] == "classify_rank")
-    assert cr["old"] == "c837f4fdaf70" and cr["prompt_diff"]["differences"] == 0
+    latest = {c["fingerprint"]: c for c in run_meta.FINGERPRINT_CHANGES}
+    assert latest["insights"]["new"] == insights.fingerprint()
+    cr = latest["classify_rank"]
+    assert (cr["old"], cr["new"]) == ("c837f4fdaf70", "99b79890ceea") and cr["prompt_diff"]["differences"] == 0
+    assert run_meta.portable_classify_rank() == cr["portable"]
     assert lens.fingerprint() == cr["lens_unchanged"] == "1692c04ba7df"
+
+
+def _moved_checkout(tmp_path, monkeypatch, rubric_edit=""):
+    """The four path constants pointed at a copy of the repo under tmp_path, as in another checkout."""
+    from ci import classify, rank
+
+    root = tmp_path / "elsewhere" / "agent_backbone"
+    (root / "config").mkdir(parents=True)
+    (root / "output" / "runs").mkdir(parents=True)
+    (root / "config" / "rubric_v2.md").write_text(rank.RUBRIC_PATH.read_text(encoding="utf-8") + rubric_edit,
+                                                  encoding="utf-8")
+    monkeypatch.setattr(classify, "OUTPUT_DIR", root / "output")
+    monkeypatch.setattr(classify, "RUNS_DIR", root / "output" / "runs")
+    monkeypatch.setattr(rank, "CONFIG_DIR", root / "config")
+    monkeypatch.setattr(rank, "RUBRIC_PATH", root / "config" / "rubric_v2.md")
+    return root
+
+
+def test_the_portable_fingerprint_is_equal_in_another_checkout_where_the_legacy_one_is_not(tmp_path, monkeypatch):
+    here_portable, here_legacy = run_meta.portable_classify_rank(), eval_golden.fingerprint()
+    root = _moved_checkout(tmp_path, monkeypatch)
+    assert run_meta.portable_classify_rank(repo=root) == here_portable
+    assert eval_golden.fingerprint() != here_legacy  # the D59 finding, kept as the legacy behaviour
+
+
+def test_the_portable_fingerprint_changes_with_the_rubric(tmp_path, monkeypatch):
+    here = run_meta.portable_classify_rank()
+    root = _moved_checkout(tmp_path, monkeypatch, rubric_edit="\n- one more line\n")
+    assert run_meta.portable_classify_rank(repo=root) != here
+
+
+def test_the_portable_fingerprint_changes_with_a_relevant_config_value():
+    from ci import config as ci_config
+
+    cfg = ci_config.load()
+    other = cfg.model_copy(deep=True)
+    other.competitors[0].name = other.competitors[0].name + " Inc."
+    assert run_meta.portable_classify_rank(cfg) != run_meta.portable_classify_rank(other)
+
+
+def test_the_metadata_records_both_fingerprints():
+    meta = run_meta.collect()
+    assert meta["portable"]["classify_rank"] == run_meta.portable_classify_rank()
+    assert meta["fingerprints"]["classify_rank"] == eval_golden.fingerprint()  # the legacy value, as before
+    assert meta["portable"]["combined"] and meta["portable"]["combined"] != meta["combined"]
