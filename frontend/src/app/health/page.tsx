@@ -70,7 +70,7 @@ function HealthScreen() {
               {h.extraction ? <Extraction e={h.extraction} /> : <Empty>No extraction data.</Empty>}
             </Panel>
 
-            <Panel title="How accurate is the system?" cap="Single labeler · golden set (D17, D23)">
+            <Panel title="How accurate is the system?" cap="Single labeler · golden set">
               {h.eval ? <EvalCards ev={h.eval} /> : <Empty>No eval report yet.</Empty>}
             </Panel>
 
@@ -78,7 +78,7 @@ function HealthScreen() {
               <Panel title="Do we miss real events?" cap="Coverage check · counts with n, not a rate">
                 {h.coverage ? <Coverage cv={h.coverage} /> : <Empty>No coverage check yet.</Empty>}
               </Panel>
-              <Panel title="Did the tracked pages change?" cap="Head-to-head change detection (D13)">
+              <Panel title="Did the tracked pages change?" cap="Head-to-head change detection">
                 {h.change_detection ? <ChangeDetection c={h.change_detection} /> : <Empty>No change-detection run yet.</Empty>}
               </Panel>
             </div>

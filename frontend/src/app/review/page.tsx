@@ -396,7 +396,7 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
         <div className="mt-1 flex flex-wrap gap-2 text-xs text-mute">
           {row.held_since ? <span>Detected {fmtDateTime(row.held_since)}</span> : null}
           {row.page_url ? <ExtLink href={row.page_url}>tracked page</ExtLink> : null}
-          <span>Held at every level (D9)</span>
+          <span>Held at every level</span>
         </div>
         {editing ? (
           <div className="mt-2 flex flex-col gap-1.5">

@@ -51,7 +51,7 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
           <span>{item.publisher}</span>
           <span>{itemDateText(item)}</span>
           {showBadge && item.badge === "late" ? (
-            <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after publication (D31)">Found late</Tag>
+            <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after publication">Found late</Tag>
           ) : null}
           {item.mentions_jfrog ? <Tag className="bg-[#eef7f0] font-semibold text-jgreen-d">Mentions JFrog</Tag> : null}
           {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}

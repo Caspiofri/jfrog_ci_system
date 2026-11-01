@@ -259,7 +259,7 @@ export function EvalCards({ ev }: { ev: NonNullable<Health["eval"]> }) {
       </div>
       {ev.test_eval_run === false ? (
         <div className="rounded border-l-[3px] border-[#f59e0b] bg-[#fffaf0] px-3 py-2 text-xs">
-          The test-split eval hasn&apos;t run yet (D23). These numbers are not the reported ones.
+          The test-split eval hasn&apos;t run yet. These numbers are not the reported ones.
         </div>
       ) : null}
       <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">

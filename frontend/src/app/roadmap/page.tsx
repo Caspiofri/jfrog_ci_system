@@ -40,7 +40,7 @@ const CONCEPTS: { slug: string; title: string; shows: string; missing: string; s
     title: "Deals: buyer, target and type",
     screen: "Competitors",
     shows: "Each funding, M&A or partnership item split into type (acquisition, funding, partnership), actor and target.",
-    missing: "An extraction step; today the deals block lists the items as collected (D36 Q-D).",
+    missing: "An extraction step; today the deals block lists the items as collected.",
   },
   {
     slug: "strength-radar",
@@ -61,14 +61,14 @@ const CONCEPTS: { slug: string; title: string; shows: string; missing: string; s
     title: "Who is each insight for?",
     screen: "Brief insights",
     shows: "Audience chips (Product, Sales, Strategy, Marketing, Pricing, Executive) and a suggested action on every insight.",
-    missing: "The insights generator produces no audience or action (D37); role-based digests are future scope (D19).",
+    missing: "The insights generator produces no audience or action; role-based digests are future scope.",
   },
   {
     slug: "battlefield",
     title: "Where is the pressure on JFrog?",
     screen: "Brief",
     shows: "JFrog products (Curation, Xray, Artifactory, AI/MCP) × competitors, each cell the day's top importance.",
-    missing: "jfrog_product per item and the capability baseline; D20 replaced the single matrix with per-competitor profiles.",
+    missing: "jfrog_product per item and the capability baseline; per-competitor profiles replaced the single matrix for now.",
   },
 ];
 
@@ -95,7 +95,7 @@ export default function RoadmapPage() {
     <>
       <PageHead title="Roadmap" sub="Concepts from the design prototype that need data the pipeline doesn't produce yet" />
       <div className="-mt-2 text-xs text-mute">
-        Every image here uses the prototype&apos;s sample data and isn&apos;t connected to the pipeline. The other screens show only real data (D35).
+        Every image here uses the prototype&apos;s sample data and isn&apos;t connected to the pipeline. The other screens show only real data.
       </div>
       <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))]">
         {CONCEPTS.map((c) => (
