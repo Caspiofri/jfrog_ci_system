@@ -13,7 +13,9 @@ COVERAGE = {"run_id": "r", "events": [{**EVENT, "id": "a", "captured": True, "ex
                                       {**EVENT, "id": "b", "captured": False, "expected_importance": 3}],
             "overall": {"events": 2, "captured": 1}, "high_importance": {"min": 4, "events": 1, "captured": 1},
             "by_competitor": {"github": {"events": 2, "captured": 1}},
-            "by_source_kind": {"feed": {"events": 2, "captured": 1}}}
+            "by_source_kind": {"feed": {"events": 2, "captured": 1}},
+            "runs_dir": "/home/someone/agent_backbone/output/runs",
+            "events_file": "/home/someone/agent_backbone/.claude/worktrees/x/evals/coverage_events.yaml"}
 
 
 @pytest.fixture
@@ -79,3 +81,16 @@ def test_check_finds_keys_article_text_and_leakage(pack):
     assert any("700 characters" in x for x in problems) and any("looks like a key" in x for x in problems)
     assert any("not on its split side" in x for x in problems)
     assert not repro.SECRET_RE.search("https://aws.amazon.com/whats-new/amazon-msk-connect-pause-resume-workers")
+
+
+def test_the_pack_drops_local_paths_and_check_flags_any_left(pack):
+    p, _ = pack
+    path = p / "reports" / "coverage" / "r.json"
+    r = json.loads(path.read_text())
+    assert not set(repro.LOCAL_PATH_KEYS) & set(r) and "/home/" not in path.read_text()
+    assert repro.recompute(p)["coverage/r.json"]["metrics"]["overall"]["same"]  # the numbers don't need the paths
+    r["note"] = "made from /home/someone/evals/coverage_events.yaml"
+    path.write_text(json.dumps(r))
+    assert repro.check(p) == ["reports/coverage/r.json.note: a local file path"]
+    for ok in ("https://www.businesswire.com/news/home/2026/en/GitLab", "see evals/coverage_events.yaml"):
+        assert not repro.LOCAL_PATH_RE.search(ok)

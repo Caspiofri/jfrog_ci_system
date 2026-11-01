@@ -13,7 +13,8 @@ Two different things, kept apart:
 
 The pack: labels.jsonl (each label's values with the item's URL, title and the sha256 of the text it was labeled
 on; no article text, no notes), split_assignments.json (as frozen), reports/evals/*.json (the train eval reports) and
-reports/coverage/*.json, plus manifest.json with each file's sha256. Label values are copied, never changed.
+reports/coverage/*.json (without the local paths they were run with), plus manifest.json with each file's sha256.
+Label values are copied, never changed.
 """
 import argparse
 import hashlib
@@ -36,6 +37,8 @@ REPORT_NAME = re.compile(r"\d{8}T\d{6}Z\.json")
 SECRET_RE = re.compile(r"AIza[0-9A-Za-z_\-]{30,}|(?<![\w-])sk-(?:proj-|ant-)?[A-Za-z0-9_]{20,}|lsv2_[A-Za-z0-9_]{20,}|"
                        r"(?:API_KEY|SECRET|TOKEN)\s*[=:]\s*\S{8,}")
 MAX_STRING_CHARS = 600  # longer than any title, reason or quote; an article body is far longer
+LOCAL_PATH_KEYS = ("events_file", "runs_dir")  # where the report was run on this machine: dropped from the pack
+LOCAL_PATH_RE = re.compile(r"(?:^|[\s\"'=:(])(?:/home/|/Users/|/tmp/|/root/|[A-Za-z]:\\)")
 HEADLINE = (("competitor_accuracy", "competitor", "accuracy", "n"), ("category_accuracy", "category", "accuracy", "n"),
             ("noise_precision", "noise", "precision", "precision_n"), ("noise_recall", "noise", "recall", "recall_n"),
             ("important_precision", "important", "precision", "precision_n"),
@@ -77,7 +80,11 @@ def build(out: Path, labels_path: Path = eval_golden.LABELS_PATH,
             shutil.copyfile(p, out / "reports" / "evals" / p.name)
             chosen.append(p.name)
     for p in sorted(coverage_dir.glob("*.json")):
-        shutil.copyfile(p, out / "reports" / "coverage" / p.name)
+        r = json.loads(p.read_text(encoding="utf-8"))
+        for k in LOCAL_PATH_KEYS:
+            r.pop(k, None)
+        (out / "reports" / "coverage" / p.name).write_text(json.dumps(r, indent=2, ensure_ascii=False) + "\n",
+                                                          encoding="utf-8")
     files = sorted(x for x in out.rglob("*") if x.is_file() and x.name != "manifest.json")
     manifest = {"labels": len(labels), "split_counts": dict(Counter(sides.values())), "eval_reports": chosen,
                 "coverage_reports": sorted(p.name for p in (out / "reports" / "coverage").glob("*.json")),
@@ -98,7 +105,8 @@ def _strings(value, path=""):
 
 
 def check(pack: Path) -> list[str]:
-    """Problems found (an empty list = clean): secrets, long text, labels in a report on the wrong split side."""
+    """Problems found (an empty list = clean): secrets, long text, local file paths, labels in a report on the wrong
+    split side."""
     problems = []
     sides = json.loads((pack / "split_assignments.json").read_text(encoding="utf-8"))["sides"]
     docs = [(p, [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()])
@@ -109,8 +117,10 @@ def check(pack: Path) -> list[str]:
         for where, s in _strings(doc):
             if SECRET_RE.search(s):
                 problems.append(f"{rel}{where}: looks like a key")
-            if len(s) > MAX_STRING_CHARS and not where.endswith(".events_file"):
+            if len(s) > MAX_STRING_CHARS:
                 problems.append(f"{rel}{where}: {len(s)} characters (article text?)")
+            if LOCAL_PATH_RE.search(s):
+                problems.append(f"{rel}{where}: a local file path")
             if where.endswith((".text", ".snapshot")) and len(s) > 0:
                 problems.append(f"{rel}{where}: an item text field")
     for p in sorted((pack / "reports" / "evals").glob("*.json")):
