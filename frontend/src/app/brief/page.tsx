@@ -8,7 +8,7 @@ import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
 import { ApiError, path, send, useApi } from "@/lib/api";
-import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
+import { LEVEL_LABEL, PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
@@ -148,6 +148,8 @@ function BriefScreen() {
 
 function SummaryBlock({ date, s }: { date: string; s: BriefSummary }) {
   const mock = s.mock ? <MockTag what="this count" /> : null;
+  const level = label(LEVEL_LABEL, s.level);
+  const unscored = s.held_by_preliminary_score?.unscored ?? 0;
   return (
     <section className="rounded-md border border-line bg-card px-[18px] py-4" aria-label="Brief summary">
       <div className="flex flex-wrap items-baseline gap-x-2 text-[15px]">
@@ -161,9 +163,14 @@ function SummaryBlock({ date, s }: { date: string; s: BriefSummary }) {
         {mock}
       </div>
       <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[15px]">
-        <span><b className="text-xl font-semibold tabular-nums text-[#8a5a00]">{s.held}</b> held for review</span>
+        <span><b className="text-xl font-semibold tabular-nums text-[#8a5a00]">{s.held}</b> held for review at {level}</span>
         <span className="text-mute">·</span>
         <span><b className="font-semibold tabular-nums">{s.held_high}</b> preliminarily rated 4–5</span>
+        {unscored ? (
+          <span className="text-[#a32d2d]" title="The ranker gave these no score (a model failure), so they aren't counted as low">
+            · <b className="font-semibold tabular-nums">{unscored}</b> not scored
+          </span>
+        ) : null}
         {mock}
         {s.held ? (
           <Link href={`/review?brief=${encodeURIComponent(date)}`} className="inline-flex items-center gap-1 font-semibold text-jgreen-d hover:underline">
@@ -171,7 +178,11 @@ function SummaryBlock({ date, s }: { date: string; s: BriefSummary }) {
           </Link>
         ) : null}
       </div>
-      <div className="mt-2 text-xs text-mute">Held items are not verified and are not part of the published Brief.</div>
+      <div className="mt-2 text-xs text-mute">
+        {s.held
+          ? `At ${level}, items from unvetted sources and sensitive ones (pricing, M&A, mentions of JFrog) wait for an analyst before they reach the Brief. Until then they are not verified and not part of it.`
+          : "Nothing from this window is waiting for review."}
+      </div>
     </section>
   );
 }
