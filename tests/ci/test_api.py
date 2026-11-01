@@ -97,6 +97,7 @@ def test_meta(env):
     m = c.get("/api/v1/meta").json()
     assert m["level"] == "strict" and m["latest_brief_date"] == "2026-10-31" and m["insights_enabled"] is False
     assert [x["key"] for x in m["competitors"]] == ["github", "snyk", "industry"] and m["meta"]["mode"] == "live"
+    assert "snapshot" not in m["meta"]  # the demo marker only exists in demo mode
 
 
 def test_brief_window_badges_order_and_published_only(env):

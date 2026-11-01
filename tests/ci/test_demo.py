@@ -50,7 +50,9 @@ def test_the_demo_api_serves_the_snapshot_read_only_with_a_marker(snap):
         b = c.get("/api/v1/brief").json()
         assert b["status"] == "ok" and b["items"]["total"] >= 1 and b["meta"]["mode"] == "demo"
         for path in ("/api/v1/review", "/api/v1/briefs", "/api/v1/health", "/api/v1/competitors", "/api/v1/runs"):
-            assert c.get(path).status_code == 200, path
+            r = c.get(path)
+            assert r.status_code == 200 and r.json()["meta"]["snapshot"]["date"] == manifest["date"], path
+        assert c.get("/api/v1/items/nope").json()["meta"]["snapshot"]["date"] == manifest["date"]  # route errors too
         item = c.get("/api/v1/items/pub1").json()["item"]
         assert len(item["excerpt"]) <= svc.EXCERPT_CHARS
         for method, path in (("post", "/api/v1/items/pub1/approve"), ("put", "/api/v1/settings/autonomy-level"),

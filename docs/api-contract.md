@@ -604,3 +604,37 @@ A run that stops before it writes its own row (another run held the lock, the sp
 - Until the test eval runs, the response is `{status: "none", note}`.
 - `health.eval` keeps showing the newest report of any split. A later train run therefore replaces the test numbers in `eval`, but not in `test_eval`.
 
+
+## 12. Demo mode and request guards (1 Nov; as built)
+
+### 12.1 The demo marker: `meta.mode` and `meta.snapshot`
+
+Every `meta` block says which data it serves. Every success body and every route error has one; the three guard errors in 12.2 answer before any route runs and have none.
+
+```json
+"meta": {
+  "mode": "demo",                       // "live" for the real store
+  "now": "2026-11-01T04:04:12+00:00",   // demo: frozen at the snapshot's as_of
+  "api_version": "…",
+  "snapshot": {                         // demo mode only; the key is absent in live mode
+    "date": "2026-11-01",               // the snapshot's Brief date (Israel date): show it in the badge
+    "as_of": "2026-11-01T04:04:12+00:00",
+    "label": "",                        // a note the builder gave, may be empty
+    "built_at": "…",
+    "commit": "…"                       // the commit the snapshot was built from
+  }
+}
+```
+
+- The date for the badge is **`meta.snapshot.date`**, e.g. "Demo snapshot 2026-11-01".
+- Live mode never has `meta.snapshot`; test `meta.mode === "demo"`, not the key's presence alone.
+
+### 12.2 Errors the guards return
+
+| Status | `error.code` | When |
+|---|---|---|
+| 403 | `demo_read_only` | Any POST, PUT, PATCH or DELETE in demo mode, before any route runs |
+| 403 | `csrf_refused` | A cross-site write (`Origin` / `Sec-Fetch-Site`) in either mode |
+| 400 | `untrusted_host` | A `Host` header other than localhost, 127.0.0.1, ::1 or a name in `CI_TRUSTED_HOSTS` |
+
+These three bodies are `{"error": {code, message, details}}` with no `meta`.
