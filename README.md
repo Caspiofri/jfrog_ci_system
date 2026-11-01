@@ -254,6 +254,47 @@ Prompts are recorded, so article and newsletter text is uploaded to LangSmith.
 
 ---
 
+## Jessi (`ci/`): prompt-injection defense
+
+Every article Jessi reads comes from a site JFrog doesn't control, and its text reaches four model prompts:
+classify, rank, the JFrog lens and the insights. The defense is a set of layers. Each one narrows what a poisoned
+article can do. None of them stops it alone, and the problem is not solved.
+
+1. **Delimited data.** Article text goes into the prompt inside `<item_text id="…">` tags. The prompt says that
+   everything inside them is data to analyze, never an instruction.
+2. **Tags defanged.** An `item_text` tag inside the article is rewritten (`item_text` → `item-text`), so the text
+   cannot close its own block or open a fake one for another item.
+   - **Insights:** any letter case and spacing, opening or closing tags, in titles too (D51).
+   - **Classify, rank and lens:** they share `ci.classify.delimited_items`, which still catches only the lower-case
+     closing tag (see *Still open*).
+3. **Structured output.** Each answer must match a JSON schema. Unknown item ids, values outside the allowed sets
+   and malformed rows are rejected in code (D32).
+4. **Checked citations.**
+   - Every insight claim must quote its cited article word for word.
+   - Every claim about JFrog must quote the capability sheet word for word.
+   - Each lens must quote its axis row of the sheet.
+   - All of these are checked in code. A claim that fails is dropped and logged.
+5. **Human review.** Items from unvetted sources are held for review at Strict, along with pricing, M&A, JFrog
+   mentions and snippet-only items with high scores (D9, D34, D36). An insight shows the items it cites, so a
+   reviewer can open each source.
+6. **Regression set.** `tests/ci/test_injection.py` pins 7 synthetic poisoned articles: closing tags in any letter
+   case, a fake block for another id, a hidden instruction, a planted score and a planted claim.
+
+**Still open:**
+- **A planted sentence passes the quote check.** The check proves the words are in the stored article, not that they
+  are true. A test pins this gap.
+- **Ignoring instructions is up to the model.** Code can't verify that the model ignored an instruction it read.
+  Layers 3 to 5 limit the damage when it doesn't.
+- **The classify guard is still case-sensitive.** Fixing it in `ci/classify.py` changes the frozen fingerprint
+  `c837f4fdaf70`, so it waits for a decision. The three affected cases are in the regression set as expected
+  failures.
+- **No classifier for injected text.** Nothing detects or strips injection attempts before the prompt.
+
+Traces: LangSmith tracing is off in every eval run, whatever the environment says, which `ci/tracing.py` enforces
+with a test. The daily run may trace only with `CI_LANGSMITH_TRACING=true`, which is off by default (D48, D51).
+
+---
+
 ## Tech stack
 
 | Layer | Choice | Why |
