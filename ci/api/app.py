@@ -119,11 +119,15 @@ class Dismiss(BaseModel):
     note: str | None = None
 
 
+EditField = Literal["competitor", "category", "score"]
+
+
 class Edit(BaseModel):
     competitor: str | None = None
     category: str | None = None
     score: int | None = Field(default=None, ge=1, le=5)
-    note: str | None = None
+    note: str | None = None  # for every changed field that has no note of its own in notes
+    notes: dict[EditField, str] | None = None  # a note per changed field
 
 
 class LevelBody(BaseModel):
@@ -549,9 +553,12 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     @app.patch("/api/v1/items/{item_id}")
     def edit(item_id: str, body: Edit, if_match: str | None = Header(default=None)):
-        fields = body.model_dump(exclude_none=True, exclude={"note"})
+        fields = body.model_dump(exclude_none=True, exclude={"note", "notes"})
         if not fields:
             raise ApiError(400, "bad_request", "give at least one of competitor, category, score")
+        notes = body.notes or {}
+        if set(notes) - set(fields):
+            raise ApiError(422, "validation_error", f"notes for fields not changed: {sorted(set(notes) - set(fields))}")
         if "competitor" in fields and fields["competitor"] not in svc.competitor_keys(cfg):
             raise ApiError(422, "validation_error", f"competitor {fields['competitor']!r} not in the config list")
         if "category" in fields and fields["category"] not in CATEGORIES:
@@ -559,14 +566,22 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
         if item_id in eval_golden.load_assignments(split_path) and \
                 eval_golden.load_assignments(split_path)[item_id] == "test":
             raise ApiError(409, "conflict", "a golden-set test-split item: no edits until after the test eval")
+        changes: list[dict] = []
+
+        def extra(before: dict, history: list[dict]) -> dict:  # each field: old value, new value, its own note
+            changes[:] = [{"field": k, "old": before[k], "new": v, "note": notes.get(k) or body.note}
+                          for k, v in fields.items()]
+            return {"changes": changes}
+
         res = act(item_id, "edit", ("awaiting_review", "auto_published", "approved", "flagged", "dismissed"),
                   lambda st, _: {f"edit_{k}": v for k, v in fields.items()}, if_match, note=body.note,
-                  measures=lambda it: "label_candidate")
+                  measures=lambda it: "label_candidate", extra=extra)
         labels_out.parent.mkdir(parents=True, exist_ok=True)
-        with labels_out.open("a", encoding="utf-8") as f:  # a candidate for Ofri to merge by hand, never a label
-            f.write(json.dumps({"id": item_id, **fields, "note": body.note, "source": "analyst",
-                                "at": res["at"]}, ensure_ascii=False) + "\n")
-        return res
+        with labels_out.open("a", encoding="utf-8") as f:  # candidates for Ofri to merge by hand, never labels
+            for ch in changes:  # one entry per changed field, all from the same action
+                f.write(json.dumps({"id": item_id, **ch, "source": "analyst", "action_id": res["action_id"],
+                                    "at": res["at"]}, ensure_ascii=False) + "\n")
+        return {**res, "changes": changes}
 
     # ---- Trust this source (D34) ----------------------------------------------------------------------------------
 

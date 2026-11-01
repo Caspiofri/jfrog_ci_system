@@ -195,9 +195,33 @@ def test_edit_validates_against_the_config_and_writes_a_candidate_not_a_label(en
     assert r["action"] == "edit"
     item = c.get("/api/v1/items/late").json()["item"]
     assert item["category"] == "Security" and item["edited"] == {"category": "Security"}
-    row = json.loads(labels.read_text().splitlines()[0])
-    assert row["id"] == "late" and row["source"] == "analyst" and row["category"] == "Security"
+    [row] = [json.loads(x) for x in labels.read_text().splitlines()]
+    assert (row["id"], row["field"], row["new"], row["note"], row["source"]) == \
+        ("late", "category", "Security", "it is", "analyst")
+    assert row["action_id"] == r["action_id"] and "old" in row
     assert c.patch("/api/v1/items/held_out", json={"score": 3}).status_code == 409  # test split: no edits
+
+
+def test_an_edit_writes_one_candidate_per_field_with_old_new_and_its_own_note(env):
+    c, store_path, labels = env
+    before = c.get("/api/v1/items/uv").json()["item"]
+    body = {"competitor": "industry", "score": 2, "category": "Security", "note": "shared",
+            "notes": {"competitor": "GitHub is the venue", "score": "no victims reported"}}
+    r = c.patch("/api/v1/items/uv", json=body).json()
+    rows = [json.loads(x) for x in labels.read_text().splitlines()]
+    assert [(x["field"], x["old"], x["new"], x["note"]) for x in rows] == [
+        ("competitor", before["competitor"], "industry", "GitHub is the venue"),
+        ("category", before["category"], "Security", "shared"),  # no note of its own: the shared one
+        ("score", before["score"], 2, "no victims reported")]
+    assert {x["action_id"] for x in rows} == {r["action_id"]} and r["changes"] == [
+        {k: x[k] for k in ("field", "old", "new", "note")} for x in rows]
+    with Store(store_path) as s:  # still one action in the history, with the per-field changes
+        [a] = s.actions("uv")
+    assert a["action"] == "edit" and a["note"] == "shared" and a["payload"]["changes"] == r["changes"]
+    assert c.get("/api/v1/items/uv").json()["actions"][-1]["payload"]["changes"] == r["changes"]
+    bad = c.patch("/api/v1/items/uv", json={"score": 3, "notes": {"competitor": "x"}})
+    assert bad.status_code == 422  # a note for a field the edit doesn't change
+    assert c.patch("/api/v1/items/uv", json={"score": 3, "notes": {"noise": "x"}}).status_code == 422
 
 
 def test_reopen_undoes_a_dismiss_and_keeps_it_in_the_history(env):

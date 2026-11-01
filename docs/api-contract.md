@@ -659,3 +659,9 @@ These three bodies are `{"error": {code, message, details}}` with no `meta`.
 - **Reads:** `GET /items/{id}` → `actions[]` gets `{action: "reopen", payload: {before, state_before, reopens_action_id, status_before_dismiss}}`. The Log row shows the new status, with `dismiss_reason: null`.
 - From 1 Nov every item action's payload also holds `state_before: {decision, flagged}`. A dismiss logged before that has none and is restored from its `before.status` (the table above).
 
+### 13.2 `PATCH /api/v1/items/{id}`: a note per changed field
+
+- **Body:** `{competitor?, category?, score?, note?, notes?: {competitor?, category?, score?}}`. `notes` keys must be fields this edit changes, else `422 validation_error`. A field without its own note gets `note`. `noise` isn't an editable field.
+- **Still one action** in the history: `action: "edit"`, `note` = the shared `note`, and `payload.changes: [{field, old, new, note}]`, one per changed field (`old` is the value the API showed before the edit). The response carries the same `changes`.
+- **Candidates:** `evals/analyst_labels.jsonl` gets one line per changed field: `{"id", "field", "old", "new", "note", "source": "analyst", "action_id", "at"}`. Lines written before 1 Nov have the old shape: one per edit, `{"id", <field>: <new value>…, "note", "source", "at"}`, with no old value.
+- **Where it shows:** `GET /items/{id}` → `actions[].payload.changes`. Log rows don't carry edits.
