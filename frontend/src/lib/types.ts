@@ -160,6 +160,17 @@ export interface Insight {
   jfrog_cell: Record<string, unknown> | null;
   baseline_note: string;
   jfrog_quotes?: string[];
+  /** Contract §10.4 (D50): one row per cited item, claim order. in_brief false = not in this Brief's list. */
+  cited_items?: CitedItemRow[];
+}
+
+export interface CitedItemRow {
+  item_id: string;
+  title: string;
+  score: number | null;
+  url: string;
+  status: string;
+  in_brief: boolean;
 }
 
 export interface BriefInsights {

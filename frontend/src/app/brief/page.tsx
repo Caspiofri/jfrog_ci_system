@@ -1,9 +1,9 @@
 "use client";
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Async, Empty, ErrorNote, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { Async, Empty, ErrorNote, ExtLink, Loading, PageHead, Panel, ScoreBadge, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
@@ -12,7 +12,7 @@ import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } 
 import { competitorName, useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
-import type { Brief, BriefInsights, BriefRow, BriefSummary, Insight, ItemDetail, Page } from "@/lib/types";
+import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Insight, ItemDetail, Page } from "@/lib/types";
 
 const TOP = 5;
 const PAGE = 50;
@@ -282,6 +282,11 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
 
 function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: boolean; onSelect: () => void }) {
   const top = SCORE_COLOR[ins.max_score ?? 0]?.[0] ?? "#e3e8ef";
+  const cited = useMemo(() => {
+    const m = new Map<string, CitedItemRow>();
+    for (const c of ins.cited_items ?? []) if (!m.has(c.item_id)) m.set(c.item_id, c);
+    return m;
+  }, [ins.cited_items]);
   return (
     <div
       role="button"
@@ -307,7 +312,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
             {c.quote ? (
               <blockquote className="m-0 border-l-2 border-line pl-2 text-mute">
                 <span className="italic">&ldquo;{c.quote}&rdquo;</span>
-                {c.quote_item_id ? <span className="not-italic"> — <CitedItem id={c.quote_item_id} /></span> : null}
+                {c.quote_item_id ? <span className="not-italic"> — <CitedItem id={c.quote_item_id} row={cited.get(c.quote_item_id)} /></span> : null}
               </blockquote>
             ) : null}
             {c.jfrog_quote ? (
@@ -319,24 +324,56 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
             {c.item_ids.length ? (
               <div className="flex flex-wrap items-center gap-1">
                 <span className="text-[11px] text-mute">Cites</span>
-                {c.item_ids.map((id) => <CitedItem key={id} id={id} />)}
+                {c.item_ids.map((id) => <CitedItem key={id} id={id} row={cited.get(id)} />)}
               </div>
             ) : null}
           </li>
         ))}
       </ul>
+      {cited.size ? <CitedList rows={[...cited.values()]} /> : null}
       {ins.baseline_note ? <div className="text-[11px] text-mute">{ins.baseline_note}</div> : null}
     </div>
   );
 }
 
+/** Every item the insight cites, with its score and a way to open it (D50). The generator reads every published item
+ * of its window, so some cited items aren't in this Brief's list: scored below its line, or outside its window. */
+function CitedList({ rows }: { rows: CitedItemRow[] }) {
+  const drawer = useItemDrawer();
+  return (
+    <div className="border-t border-line pt-2">
+      <div className="mb-1 text-[11px] font-semibold text-mute">Cited items ({rows.length})</div>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        {rows.map((r) => (
+          <li key={r.item_id} className="flex items-start gap-1.5 text-xs">
+            <ScoreBadge score={r.score} />
+            <button type="button" onClick={(e) => { e.stopPropagation(); drawer.open(r.item_id); }}
+              className="min-w-0 flex-1 text-left hover:text-jgreen-d hover:underline" title="Open the item">
+              {r.title}
+              {!r.in_brief ? (
+                <Tag className="ml-1.5 align-middle text-[10px]"
+                  title={r.score != null && r.score < 3 ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
+                  not in this Brief
+                </Tag>
+              ) : null}
+            </button>
+            <span onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <ExtLink href={r.url} className="text-mute hover:text-jgreen-d"><ExternalLink className="mt-0.5 size-3" aria-label="Open the source" /></ExtLink>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // A cited item as a chip that opens its drawer. Same SWR key as the drawer, so opening it reuses this fetch.
-function CitedItem({ id }: { id: string }) {
+function CitedItem({ id, row }: { id: string; row?: CitedItemRow }) {
   const drawer = useItemDrawer();
   const meta = useMeta();
-  const q = useApi<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`);
-  const it = q.data?.item;
-  const text = it ? `${competitorName(meta.data, it.competitor)}: ${it.title}` : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`;
+  const q = useApi<ItemDetail>(row ? null : `/api/v1/items/${encodeURIComponent(id)}`);
+  const it = row ? { title: row.title, competitor: null } : q.data?.item;
+  const text = it ? (it.competitor ? `${competitorName(meta.data, it.competitor)}: ${it.title}` : it.title) : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`;
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
       title={it ? `${it.title} · open the cited item` : "Open the cited item"}
