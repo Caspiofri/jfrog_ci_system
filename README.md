@@ -1,4 +1,69 @@
-# Newsletter Agent
+# Jessi
+
+**JFrog's Engine for Strategic Signals & Intelligence.** Jessi keeps JFrog's competitive-intelligence team updated
+daily on what the main competitors (GitHub, GitLab, Snyk, Sonatype, Cloudsmith, AWS) ship and say, and shows how
+JFrog compares. Every claim links to its source, and every number is reported with its n.
+
+> This README is the short version for the release; the full one (results, limits, screenshots) follows.
+
+## Run the demo (no API key)
+
+```bash
+git clone <this repo> && cd agent_backbone
+docker compose up --build        # first build takes a few minutes
+```
+
+Open **http://127.0.0.1:3000**. The UI runs on a **demo snapshot**: a frozen, read-only copy of a real daily run
+(`demo/snapshot/`), built by `python -m ci.demo build`. A "Demo snapshot" marker shows in the header. Nothing is
+simulated, no model is called, and writes (approve, dismiss, trust, refresh) are refused. Full article text is never in
+the snapshot: items keep the D34 field allowlist and a 280-character excerpt. The API is on
+http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+
+Without Docker: `pip install -r requirements.txt`, then `python -m ci.api --demo demo/snapshot --port 8011`, and the
+UI from `frontend/` (`npm install && CI_API_URL=http://127.0.0.1:8011 npm run dev`).
+
+The live system (a daily run that calls Gemini) needs `GOOGLE_API_KEY` in `.env`, the frozen split file and the
+pipeline services (`docker compose --profile pipeline ...`, with `APP_UID=$(id -u)`; see `docker-compose.yml`).
+
+## What is built now
+
+- **Daily run at 06:00** (`ci/daily_cron.sh`, `python -m ci.daily`): collect, dedupe, read, classify, rank, route,
+  explain, summarize. Each run records its commit, its fingerprints and its counts (`run_metrics`).
+- **Daily Brief:** the published items scored 3+ for the day, what is held for review (counted by preliminary
+  score), and insights across items, each claim quoting its source.
+- **Review queue** with three autonomy levels (Strict by default): unvetted sources, pricing, M&A, JFrog mentions
+  and snippet-only high scores are held for an analyst.
+- **Competitors:** a head-to-head per competitor against JFrog's capability sheet (`config/jfrog_capabilities.md`),
+  with source and as-of date per cell; change detection on tracked pricing and product pages.
+- **Health:** run history with ok / degraded / failed / stale / overdue, the funnel, extraction success and the eval
+  numbers with n.
+- **Evaluation:** a labeled golden set with a frozen train/test split, a coverage check against known events,
+  reliability checks of daily runs marked field by field, and a reproducibility pack: `python -m ci.repro recompute
+  repro` recomputes every reported metric from saved reports with no model call.
+
+## Architecture in short
+
+```
+collectors (Google News, vendor feeds, Hacker News, GitHub releases, tracked pages)
+  -> dedupe (URL, then embedding similarity)  -> full text + extraction check
+  -> classify (Gemini: competitor, category, noise)  -> rank (Gemini, rubric v2: score 1-5)
+  -> validate (schema + rules, D32)  -> route (hold reasons x autonomy level)
+  -> lens (closest JFrog capability, quote checked against the sheet)  -> insights (quotes checked in code)
+  -> SQLite store  -> FastAPI (ci/api)  -> Next.js UI (frontend/)
+```
+
+Article text is untrusted: it reaches the model only inside delimited, defanged blocks, and every quoted claim is
+checked in code (see *prompt-injection defense* below). The API has no login and binds 127.0.0.1; it refuses
+cross-site writes and foreign Host headers.
+
+---
+
+## Origin: the newsletter agent
+
+Jessi grew out of the newsletter agent below (collectors, dedupe, reader, ranker, eval harness). Its own setup still
+applies to `python main.py`.
+
+### Newsletter Agent
 
 An end-to-end multi-source AI pipeline. Parallel collectors gather articles from your Gmail newsletters, Medium tag feeds and Hacker News; a reader fetches the full text of a shortlist; an LLM ranker picks the best; and a personalized Hebrew digest is delivered to your inbox — fully automated, daily.
 
