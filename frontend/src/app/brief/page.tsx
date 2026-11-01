@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Async, Empty, ErrorNote, ExtLink, Loading, PageHead, Panel, ScoreBadge, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
@@ -9,10 +9,10 @@ import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
 import { ApiError, path, send, useApi } from "@/lib/api";
 import { LEVEL_LABEL, PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
+import { useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
-import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Insight, ItemDetail, Page } from "@/lib/types";
+import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Claim, Insight, ItemDetail, Page } from "@/lib/types";
 
 const TOP = 5;
 const PAGE = 50;
@@ -281,7 +281,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
             <Sparkles className="size-3.5 shrink-0" aria-hidden /> AI-generated — check the cited sources
           </div>
           {insights.status === "partial" ? <div className="mb-2 text-xs text-mute">Fewer than 3 insights passed the checks this time.</div> : null}
-          <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
+          <div className="flex flex-col gap-3">
             {insights.items.map((x) => (
               <InsightCard key={x.insight_id} ins={x} selected={hl === x.insight_id} onSelect={() => setHl(hl === x.insight_id ? null : x.insight_id)} />
             ))}
@@ -304,105 +304,99 @@ function WindowLine({ w }: { w: BriefInsights["window"] }) {
   );
 }
 
+/** One insight per row. Always visible: type, top importance, story count, title, summary, why it matters.
+ * The claims with their quotes and sources sit behind "Show evidence" (D50: each cited item keeps its score and link). */
 function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: boolean; onSelect: () => void }) {
   const top = SCORE_COLOR[ins.max_score ?? 0]?.[0] ?? "#e3e8ef";
+  const [open, setOpen] = useState(false);
   const cited = useMemo(() => {
     const m = new Map<string, CitedItemRow>();
     for (const c of ins.cited_items ?? []) if (!m.has(c.item_id)) m.set(c.item_id, c);
     return m;
   }, [ins.cited_items]);
+  const n = ins.claims.length;
   return (
     <div
       role="button"
       tabIndex={0}
       aria-pressed={selected}
       onClick={onSelect}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect())}
+      onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect())}
       className={`flex cursor-pointer flex-col gap-2 rounded-md border bg-card px-4 py-3 transition-colors hover:border-jgreen ${selected ? "border-jgreen ring-1 ring-jgreen" : "border-line"}`}
-      style={{ borderTop: `4px solid ${top}` }}
+      style={{ borderLeft: `4px solid ${top}` }}
     >
       <div className="flex flex-wrap items-center gap-1.5">
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
         {ins.max_score ? <span className="text-xs text-mute">top importance {ins.max_score}</span> : null}
-        <span className="text-xs text-mute">· {ins.item_ids.length} items, {ins.story_ids.length} stories</span>
+        <span className="text-xs text-mute">· {ins.story_ids.length} {ins.story_ids.length === 1 ? "story" : "stories"}</span>
       </div>
       <h3 className="m-0 text-sm font-semibold">{ins.title}</h3>
       <p className="m-0 text-[#44516a]">{ins.summary}</p>
       {ins.why_it_matters ? <p className="m-0 text-xs text-mute"><b className="font-semibold text-ink">Why it matters: </b>{ins.why_it_matters}</p> : null}
-      <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
-        {ins.claims.map((c, k) => (
-          <li key={k} className="flex flex-col gap-1 text-xs">
-            <div>{c.text}</div>
-            {c.quote ? (
-              <blockquote className="m-0 border-l-2 border-line pl-2 text-mute">
-                <span className="italic">&ldquo;{c.quote}&rdquo;</span>
-                {c.quote_item_id ? <span className="not-italic"> — <CitedItem id={c.quote_item_id} row={cited.get(c.quote_item_id)} /></span> : null}
-              </blockquote>
-            ) : null}
-            {c.jfrog_quote ? (
-              <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-mute">
-                <span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span>
-                <span className="not-italic"> — JFrog capability sheet</span>
-              </blockquote>
-            ) : null}
-            {c.item_ids.length ? (
-              <div className="flex flex-wrap items-center gap-1">
-                <span className="text-[11px] text-mute">Cites</span>
-                {c.item_ids.map((id) => <CitedItem key={id} id={id} row={cited.get(id)} />)}
-              </div>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-      {cited.size ? <CitedList rows={[...cited.values()]} /> : null}
+      {n ? (
+        <div>
+          <button type="button" aria-expanded={open} onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d hover:underline">
+            {open ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}
+            {open ? "Hide evidence" : `Show evidence (${n} ${n === 1 ? "claim" : "claims"})`}
+          </button>
+          {open ? (
+            <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0">
+              {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} />)}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       {ins.baseline_note ? <div className="text-[11px] text-mute">{ins.baseline_note}</div> : null}
     </div>
   );
 }
 
-/** Every item the insight cites, with its score and a way to open it (D50). The generator reads every published item
- * of its window, so some cited items aren't in this Brief's list: scored below its line, or outside its window. */
-function CitedList({ rows }: { rows: CitedItemRow[] }) {
-  const drawer = useItemDrawer();
+/** A claim, its quote, then one source line per item it cites. The quoted item comes first. */
+function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }) {
+  const ids = [...new Set([c.quote_item_id, ...c.item_ids].filter(Boolean))];
   return (
-    <div className="border-t border-line pt-2">
-      <div className="mb-1 text-[11px] font-semibold text-mute">Cited items ({rows.length})</div>
-      <ul className="m-0 flex list-none flex-col gap-1 p-0">
-        {rows.map((r) => (
-          <li key={r.item_id} className="flex items-start gap-1.5 text-xs">
-            <ScoreBadge score={r.score} />
-            <button type="button" onClick={(e) => { e.stopPropagation(); drawer.open(r.item_id); }}
-              className="min-w-0 flex-1 text-left hover:text-jgreen-d hover:underline" title="Open the item">
-              {r.title}
-              {!r.in_brief ? (
-                <Tag className="ml-1.5 align-middle text-[10px]"
-                  title={r.score != null && r.score < 3 ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
-                  not in this Brief
-                </Tag>
-              ) : null}
-            </button>
-            <span onClick={(e) => e.stopPropagation()} className="shrink-0">
-              <ExtLink href={r.url} className="text-mute hover:text-jgreen-d"><ExternalLink className="mt-0.5 size-3" aria-label="Open the source" /></ExtLink>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <li className="flex flex-col gap-1 text-xs">
+      <div>{c.text}</div>
+      {c.quote ? (
+        <blockquote className="m-0 border-l-2 border-line pl-2 italic text-mute">&ldquo;{c.quote}&rdquo;</blockquote>
+      ) : null}
+      {c.jfrog_quote ? (
+        <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-mute">
+          <span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span>
+          <span className="not-italic"> — JFrog capability sheet</span>
+        </blockquote>
+      ) : null}
+      {ids.map((id) => <SourceLine key={id} id={id} row={cited.get(id)} />)}
+    </li>
   );
 }
 
-// A cited item as a chip that opens its drawer. Same SWR key as the drawer, so opening it reuses this fetch.
-function CitedItem({ id, row }: { id: string; row?: CitedItemRow }) {
+/** Score, title (opens the drawer), "not in this Brief" when it applies, link to the source. When the API didn't
+ * serve the row, the item is fetched (same SWR key as the drawer); in_brief is then unknown and no tag is shown. */
+function SourceLine({ id, row }: { id: string; row?: CitedItemRow }) {
   const drawer = useItemDrawer();
-  const meta = useMeta();
   const q = useApi<ItemDetail>(row ? null : `/api/v1/items/${encodeURIComponent(id)}`);
-  const it = row ? { title: row.title, competitor: null } : q.data?.item;
-  const text = it ? (it.competitor ? `${competitorName(meta.data, it.competitor)}: ${it.title}` : it.title) : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`;
+  const it = row ?? q.data?.item;
+  const title = it ? it.title : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`;
   return (
-    <button type="button" onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
-      title={it ? `${it.title} · open the cited item` : "Open the cited item"}
-      className="inline-block max-w-[16rem] truncate rounded-[3px] border border-line bg-white px-1.5 align-bottom text-[11px] text-ink hover:border-jgreen hover:text-jgreen-d">
-      {text}
-    </button>
+    <div className="flex items-start gap-1.5">
+      <ScoreBadge score={it?.score ?? null} />
+      <button type="button" onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
+        className="min-w-0 text-left font-medium hover:text-jgreen-d hover:underline" title="Open the item">
+        {title}
+        {row && !row.in_brief ? (
+          <Tag className="ml-1.5 align-middle text-[10px] font-normal"
+            title={row.score != null && row.score < 3 ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
+            not in this Brief
+          </Tag>
+        ) : null}
+      </button>
+      {it?.url ? (
+        <span onClick={(e) => e.stopPropagation()} className="shrink-0">
+          <ExtLink href={it.url} className="text-mute hover:text-jgreen-d"><ExternalLink className="mt-0.5 size-3" aria-label="Open the source" /></ExtLink>
+        </span>
+      ) : null}
+    </div>
   );
 }
