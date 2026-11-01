@@ -27,7 +27,7 @@ from ci.api import health as health_api
 from ci.api import service as svc
 from ci.api.service import Snapshot
 from ci.classify import CATEGORIES
-from ci.csrf import CSRFMiddleware
+from ci.csrf import CSRFMiddleware, TrustedHostMiddleware
 from ci.pipeline import RUNS_DIR
 from ci.store import STORE_PATH, Store
 from config.settings import DATA_DIR, EVALS_DIR, OUTPUT_DIR
@@ -148,13 +148,15 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                evals_dir: Path = eval_golden.EVALS_OUT_DIR, coverage_dir: Path = coverage.COVERAGE_DIR,
                events_path: Path = coverage.EVENTS_PATH, changes_out_dir: Path = OUTPUT_DIR / "changes",
                labels_path: Path = eval_golden.LABELS_PATH, sheet_path: Path = lens_mod.SHEET_PATH,
-               brief_config_path: Path = svc.BRIEF_CONFIG_PATH, demo: dict | None = None) -> FastAPI:
+               brief_config_path: Path = svc.BRIEF_CONFIG_PATH, demo: dict | None = None,
+               trusted_hosts: frozenset[str] | None = None) -> FastAPI:
     """demo: a snapshot manifest from ci.demo.load(). The API then reads that snapshot read-only, refuses writes,
     calls no model and keeps its clock at the snapshot time (D34, D59)."""
     cfg = cfg or ci_config.load()
     min_score = svc.brief_min_score(brief_config_path)
     app = FastAPI(title="JFrog CI API", version=API_VERSION)
     app.add_middleware(CSRFMiddleware)  # no login, so a cross-site page must not change state
+    app.add_middleware(TrustedHostMiddleware, hosts=trusted_hosts)  # outermost: DNS rebinding (D59)
     read_only = demo is not None
     if demo is not None:
         from ci import demo as demo_mod
