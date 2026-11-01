@@ -17,6 +17,7 @@ export interface ApiMeta {
   mode: "live" | "demo";
   now: string;
   api_version: string;
+  snapshot?: { date: string } | null; // demo mode: the day the snapshot was taken (not served yet)
 }
 
 export interface Page<T> {
@@ -31,6 +32,9 @@ export interface HoldReason {
   detail: string;
   held_at: Level[];
 }
+
+/** Why lens is null: "rejected" (its checks failed) or "failed" (the call failed); null means never analyzed. */
+export type LensStatus = "ok" | "rejected" | "failed";
 
 // Contract §10.5. axis and capability_quote are null for not_related.
 export interface Lens {
@@ -95,6 +99,7 @@ export interface Item {
   fingerprint: string | null;
   event_id: string | null;
   lens?: Lens | null; // D42: only when its quote check passed
+  lens_status?: LensStatus | null; // null: no lens row yet (not served yet)
   text_basis?: TextBasis | null; // contract §10.5
 }
 

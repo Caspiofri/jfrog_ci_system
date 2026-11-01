@@ -2,12 +2,15 @@
 // The JFrog lens on the item card and in the item drawer. Collected and model text renders as React text only (D32).
 import Link from "next/link";
 import { AXIS_LABEL } from "@/lib/format";
-import type { Lens } from "@/lib/types";
+import type { Lens, LensStatus } from "@/lib/types";
 
 /** "Why it matters to JFrog" (D58): the closest JFrog capability only. The relation and the lens sentence are not
  * shown: the 1 Nov check found the relation wrong where it was claimed, while the axis and quote held up. */
-export function LensView({ lens: l }: { lens?: Lens | null }) {
-  if (!l) return <span className="text-mute">Not analyzed yet</span>;
+export function LensView({ lens: l, status }: { lens?: Lens | null; status?: LensStatus | null }) {
+  if (!l) {
+    const unavailable = status === "rejected" || status === "failed";
+    return <span className="text-mute">{unavailable ? "Analysis unavailable" : "Not analyzed yet"}</span>;
+  }
   if (l.relation === "not_related" || !l.capability_quote) {
     return <span className="text-mute">No direct link to a JFrog capability</span>;
   }

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { Activity, BarChart3, CheckCircle2, FileText, List, Map } from "lucide-react";
 import { ItemDrawerProvider } from "@/components/ItemDrawer";
 import { useApi } from "@/lib/api";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDate, fmtDateTime } from "@/lib/format";
 import { runTime, useMeta } from "@/lib/meta";
 import type { Review } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -31,7 +31,9 @@ function RunPill() {
   const t = runTime(data.latest_run_id);
   return (
     <span className="flex items-center gap-2">
-      {data.meta.mode === "demo" ? <span className="rounded bg-[#f59e0b] px-2 py-0.5 text-xs font-semibold text-navy">Demo snapshot</span> : null}
+      {data.meta.mode === "demo" ? <span className="rounded bg-[#f59e0b] px-2 py-0.5 text-xs font-semibold text-navy">
+          {data.meta.snapshot?.date ? `Demo snapshot ${fmtDate(data.meta.snapshot.date, true)}` : "Demo snapshot"}
+        </span> : null}
       <span className="rounded border border-jgreen px-2.5 py-1 text-xs text-jgreen" title={data.latest_run_id ?? undefined}>
         {t ? `Latest run ${fmtDateTime(t)} Israel time` : "No run yet"}
       </span>

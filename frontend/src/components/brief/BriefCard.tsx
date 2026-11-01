@@ -90,7 +90,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         <Row label="What happened">
           {item.excerpt.trim() ? <span className="text-[#44516a]">{item.excerpt}</span> : <span className="text-mute">Only the headline is available.</span>}
         </Row>
-        <Row label="Why it matters to JFrog"><LensView lens={item.lens} /></Row>
+        <Row label="Why it matters to JFrog"><LensView lens={item.lens} status={item.lens_status} /></Row>
         <Row label="Evidence">
           <span className="text-xs text-mute">
             {item.publisher} · {itemDateText(item)} ·{" "}

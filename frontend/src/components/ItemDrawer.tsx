@@ -8,7 +8,7 @@ import { LensView } from "@/components/LensView";
 import { useApi } from "@/lib/api";
 import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
-import type { ItemDetail, Lens } from "@/lib/types";
+import type { ItemDetail, Lens, LensStatus } from "@/lib/types";
 
 const Ctx = createContext<{ open: (id: string) => void }>({ open: () => {} });
 export const useItemDrawer = () => useContext(Ctx);
@@ -39,11 +39,11 @@ function Field({ k, children }: { k: string; children: ReactNode }) {
 }
 
 /** The JFrog lens as the card shows it (D58): the closest capability only, no relation or lens sentence. */
-function LensBlock({ lens }: { lens?: Lens | null }) {
+function LensBlock({ lens, status }: { lens?: Lens | null; status?: LensStatus | null }) {
   return (
     <div className="rounded border-l-4 border-jgreen bg-[#f8fbf8] px-3 py-2">
       <div className="mb-1 text-xs font-semibold text-mute">Why it matters to JFrog</div>
-      <LensView lens={lens} />
+      <LensView lens={lens} status={status} />
     </div>
   );
 }
@@ -70,7 +70,7 @@ function DrawerBody({ id }: { id: string }) {
                   {it.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">Mentions JFrog</Tag> : null}
                   {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
                 </div>
-                <LensBlock lens={it.lens} />
+                <LensBlock lens={it.lens} status={it.lens_status} />
                 {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
                 <ExtLink href={it.url} className="inline-flex items-center gap-1 text-jgreen-d">
                   Open the source <ExternalLink className="size-3" />
