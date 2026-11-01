@@ -124,6 +124,10 @@ function BriefScreen() {
                   title="What was published in this Brief?"
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
                 >
+                  <p className="m-0 -mt-1 mb-2 text-xs text-mute">
+                    The items found in this Brief&apos;s window and rated {b.brief_min_score ?? 3} or higher on importance, published automatically or
+                    approved by an analyst. Items still waiting in the Review queue aren&apos;t listed.
+                  </p>
                   {b.items.items.length ? (
                     b.items.items.map((it) => <BriefCard key={it.item_id} item={it} showLate={!backfill} highlight={highlighted.has(it.item_id)} />)
                   ) : (
@@ -261,7 +265,13 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
   const state = insightState(insights);
   return (
     <Panel
-      title="Experimental: cross-item patterns"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Key insights
+          <Tag className="border border-[#f59e0b]/60 bg-[#fff7e6] text-[10px] font-semibold uppercase tracking-wide text-[#8a5a00]"
+            title="Pattern analysis is experimental: see the check below">Experimental</Tag>
+        </span>
+      }
       cap={cap}
       right={
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={refresh} disabled={busy || !enabled || insights.status === "refreshing"}

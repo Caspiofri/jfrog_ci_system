@@ -22,7 +22,7 @@ export function PageHead({ title, sub, tools }: { title: string; sub?: ReactNode
 
 /** A white card with a question as its title (prototype .card / .ct). */
 export function Panel({ title, cap, children, className, right }: {
-  title?: string; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode;
+  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode;
 }) {
   return (
     <section className={cn("min-w-0 rounded-md border border-line bg-card px-[18px] py-4", className)}>
