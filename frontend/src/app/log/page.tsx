@@ -6,6 +6,7 @@ import { Async, Empty, ExtLink, HBars, Loading, PageHead, Panel, ScoreBadge, Sta
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
+import { ReopenButton } from "@/components/review/actions";
 import { path, useApi } from "@/lib/api";
 import { DISMISS_LABEL, STAGE_LABEL, STATUS_COLOR, STATUS_LABEL, fmtDate, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
@@ -126,7 +127,10 @@ function LogTr({ r, name }: { r: LogRow; name: string }) {
       <td className={td}><ScoreBadge score={r.score} noise={r.stage === "classify" && r.score === null} /></td>
       <td className={td}><StatusDot status={r.status} /></td>
       <td className={`${td} whitespace-nowrap`}>{label(STAGE_LABEL, r.stage)}</td>
-      <td className={`${td} text-mute`}>{r.dismiss_reason ? `Dismissed: ${label(DISMISS_LABEL, r.dismiss_reason)}` : r.reason || "—"}</td>
+      <td className={`${td} text-mute`}>
+        {r.dismiss_reason ? `Dismissed: ${label(DISMISS_LABEL, r.dismiss_reason)}` : r.reason || "—"}
+        {r.status === "dismissed" && r.item_id ? <div className="mt-1"><ReopenButton itemId={r.item_id} title={r.title} /></div> : null}
+      </td>
     </tr>
   );
 }

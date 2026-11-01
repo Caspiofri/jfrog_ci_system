@@ -251,7 +251,23 @@ export interface ItemDetail {
   sightings: { item_id: string; run_id: string; seen_at?: string }[];
   rejections: string[];
   skip: string | null;
-  actions: { action: string; at: string; reason?: string | null; note?: string | null }[];
+  actions: ItemAction[];
+}
+
+/** §13.2: one per field an edit changed. Older edit actions have no changes, only payload.before. */
+export interface FieldChange {
+  field: "competitor" | "category" | "score" | string;
+  old: string | number | null;
+  new: string | number | null;
+  note: string | null;
+}
+
+export interface ItemAction {
+  action: string;
+  at: string;
+  reason?: string | null;
+  note?: string | null;
+  payload?: { changes?: FieldChange[]; status_before_dismiss?: string | null; reopens_action_id?: number | null } | null;
 }
 
 // ---- Review ----

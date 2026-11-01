@@ -2,7 +2,7 @@
 // D16 analyst actions on one item: Approve, Dismiss + reason, Edit, Flag. Each sends the item version (If-Match).
 import { useState } from "react";
 import { useSWRConfig } from "swr";
-import { Check, ChevronDown, Flag, Pencil, X } from "lucide-react";
+import { Check, ChevronDown, Flag, Pencil, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ApiError, send } from "@/lib/api";
+import { ErrorNote } from "@/components/ci";
 import { DISMISS_LABEL, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import type { Item } from "@/lib/types";
@@ -92,11 +93,17 @@ function EditDialog({ item, onClose, onSave }: { item: Item; onClose: () => void
   const [category, setCategory] = useState(item.category ?? "");
   const [score, setScore] = useState(item.score ? String(item.score) : "");
   const [note, setNote] = useState("");
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const body: Record<string, unknown> = {};
   if (competitor && competitor !== item.competitor) body.competitor = competitor;
   if (category && category !== item.category) body.category = category;
   if (score && Number(score) !== item.score) body.score = Number(score);
   const changed = Object.keys(body).length > 0;
+  // §13.2: a note only for a field this edit changes (any other gives 422); a field without one gets the shared note.
+  const fieldNotes = Object.fromEntries(Object.keys(body).filter((f) => notes[f]?.trim()).map((f) => [f, notes[f].trim()]));
+  const noteFor = (f: string) => (
+    <FieldNote field={f} enabled={f in body} value={notes[f] ?? ""} onChange={(v) => setNotes({ ...notes, [f]: v })} />
+  );
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
@@ -109,28 +116,91 @@ function EditDialog({ item, onClose, onSave }: { item: Item; onClose: () => void
             <Label>Competitor</Label>
             <FilterSelect ariaLabel="Competitor" allLabel="(unchanged)" value={competitor} onChange={(v) => setCompetitor(v || item.competitor)}
               options={(meta?.competitors ?? []).map((c) => ({ value: c.key, label: c.name }))} className="h-8 w-full bg-white" />
+            {noteFor("competitor")}
           </div>
           <div className="grid gap-1">
             <Label>Category</Label>
             <FilterSelect ariaLabel="Category" allLabel="(unchanged)" value={category} onChange={(v) => setCategory(v || (item.category ?? ""))}
               options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} className="h-8 w-full bg-white" />
+            {noteFor("category")}
           </div>
           <div className="grid gap-1">
             <Label>Importance</Label>
             <FilterSelect ariaLabel="Importance" allLabel="(unchanged)" value={score} onChange={(v) => setScore(v || (item.score ? String(item.score) : ""))}
               options={[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: String(n) }))} className="h-8 w-full bg-white" />
+            {noteFor("score")}
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="edit-note">Note (optional)</Label>
+            <Label htmlFor="edit-note">Note for the whole edit (optional; used for any field without its own note)</Label>
             <Textarea id="edit-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
           </div>
           <p className="m-0 text-xs text-mute">Saved as a label candidate for the golden set; it is merged by hand, never automatically.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!changed} onClick={() => onSave({ ...body, ...(note ? { note } : {}) })}>Save</Button>
+          <Button disabled={!changed} onClick={() => onSave({ ...body, ...(note.trim() ? { note: note.trim() } : {}), ...(Object.keys(fieldNotes).length ? { notes: fieldNotes } : {}) })}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function FieldNote({ field, enabled, value, onChange }: { field: string; enabled: boolean; value: string; onChange: (v: string) => void }) {
+  return (
+    <input type="text" aria-label={`Note for ${field}`} value={enabled ? value : ""} disabled={!enabled} onChange={(e) => onChange(e.target.value)}
+      placeholder={enabled ? "Why this change? (optional)" : "Change the value to add a note"}
+      className="h-7 rounded border border-line bg-white px-2 text-xs placeholder:text-mute disabled:bg-[#f6f8fa]" />
+  );
+}
+
+/** Re-open a dismissed item (§13.1), after a short confirm. It goes back to the status it had before the dismiss;
+ * the dismiss stays in its history. Version is sent when known (If-Match); the Log has none, which the API allows. */
+export function ReopenButton({ itemId, version, title }: { itemId: string; version?: number; title?: string }) {
+  const refresh = useRefreshAll();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<ApiError | null>(null);
+  const confirm = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await send("POST", `/api/v1/items/${encodeURIComponent(itemId)}/reopen`, note.trim() ? { note: note.trim() } : {}, version);
+      await refresh();
+      setOpen(false);
+    } catch (e) {
+      setErr(e as ApiError);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Button size="sm" variant="outline" className={btn} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+        <RotateCcw className="size-3.5" /> Re-open
+      </Button>
+      {open ? (
+        <Dialog open onOpenChange={(o) => !o && setOpen(false)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Re-open this item?</DialogTitle>
+              <DialogDescription>
+                {title ? <span className="mb-1 block line-clamp-2 font-medium text-ink">{title}</span> : null}
+                It goes back to the status it had before it was dismissed. The dismiss stays in its history.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-1">
+              <Label htmlFor="reopen-note">Note (optional)</Label>
+              <Textarea id="reopen-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
+            </div>
+            {err ? <ErrorNote error={err} /> : null}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button disabled={busy} onClick={confirm}>Re-open</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </>
   );
 }

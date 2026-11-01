@@ -5,10 +5,11 @@ import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Async, CategoryTag, ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { LensView } from "@/components/LensView";
+import { ReopenButton } from "@/components/review/actions";
 import { useApi } from "@/lib/api";
-import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
-import type { ItemDetail, Lens, LensStatus } from "@/lib/types";
+import type { FieldChange, ItemAction, ItemDetail, Lens, LensStatus, Meta } from "@/lib/types";
 
 const Ctx = createContext<{ open: (id: string) => void }>({ open: () => {} });
 export const useItemDrawer = () => useContext(Ctx);
@@ -69,6 +70,7 @@ function DrawerBody({ id }: { id: string }) {
                   <CategoryTag category={it.category} />
                   {it.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">Mentions JFrog</Tag> : null}
                   {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
+                  {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
                 <LensBlock lens={it.lens} status={it.lens_status} />
                 {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
@@ -115,11 +117,7 @@ function DrawerBody({ id }: { id: string }) {
                   {d.sightings.map((s) => (
                     <div key={s.run_id} className="text-xs text-mute">Seen in run {s.run_id}{s.seen_at ? ` · ${fmtDateTime(s.seen_at)}` : ""}</div>
                   ))}
-                  {d.actions.map((a, i) => (
-                    <div key={i} className="text-xs">
-                      {fmtDateTime(a.at)} · <b>{a.action}</b>{a.reason ? ` (${a.reason})` : ""}{a.note ? `: ${a.note}` : ""}
-                    </div>
-                  ))}
+                  {d.actions.map((a, i) => <ActionLine key={i} a={a} meta={meta} />)}
                   {!d.actions.length ? <div className="text-xs text-mute">No analyst actions yet.</div> : null}
                 </div>
               </div>
@@ -128,5 +126,34 @@ function DrawerBody({ id }: { id: string }) {
         </Async>
       </div>
     </>
+  );
+}
+
+const FIELD_LABEL: Record<string, string> = { competitor: "Competitor", category: "Category", score: "Importance" };
+
+function fieldValue(meta: Meta | undefined, c: FieldChange, v: FieldChange["old"]) {
+  if (v === null || v === undefined || v === "") return "—";
+  return c.field === "competitor" ? competitorName(meta, String(v)) : String(v);
+}
+
+/** One analyst action in the drawer's history. An edit lists old -> new per field with its note (§13.2);
+ * a re-open names the status it returned to (§13.1). */
+function ActionLine({ a, meta }: { a: ItemAction; meta: Meta | undefined }) {
+  const changes = a.payload?.changes ?? [];
+  const back = a.action === "reopen" && a.payload?.status_before_dismiss ? ` → back to ${label(STATUS_LABEL, a.payload.status_before_dismiss)}` : "";
+  return (
+    <div className="text-xs">
+      {fmtDateTime(a.at)} · <b>{a.action}</b>{a.reason ? ` (${a.reason})` : ""}{back}{a.note && !changes.length ? `: ${a.note}` : ""}
+      {changes.length ? (
+        <ul className="m-0 mt-0.5 list-none pl-3">
+          {changes.map((c) => (
+            <li key={c.field}>
+              {FIELD_LABEL[c.field] ?? c.field}: {fieldValue(meta, c, c.old)} → <b className="font-semibold">{fieldValue(meta, c, c.new)}</b>
+              {c.note ? <span className="text-mute"> · {c.note}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
