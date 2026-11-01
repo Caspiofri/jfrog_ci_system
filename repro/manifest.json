@@ -1,0 +1,25 @@
+{
+ "labels": 107,
+ "split_counts": {
+  "test": 29,
+  "train": 78
+ },
+ "eval_reports": [
+  "20261031T161759Z.json",
+  "20261031T163731Z.json",
+  "20261031T172144Z.json"
+ ],
+ "coverage_reports": [
+  "20261030T0836Z-5d06a9.json",
+  "20261030T1312Z-389e71.json"
+ ],
+ "files": {
+  "labels.jsonl": "5f1eaa805fa3237bb56829d15ce39115ecc2b496cff8192c7f8c37a2f51d6e81",
+  "reports/coverage/20261030T0836Z-5d06a9.json": "9651564f8f04adb3f4fba885f988d24d006381da696d442fd4c9a53cb1fc13ff",
+  "reports/coverage/20261030T1312Z-389e71.json": "cdca0c224e4b0d0a8253fac01b00bbc628f43b5d84dc89f2dfa3df8d55421c8a",
+  "reports/evals/20261031T161759Z.json": "c5bfc9ae49d6da64eff22224ba482e3fbd506a60fdb3e2fbfe8beae70186aba3",
+  "reports/evals/20261031T163731Z.json": "bcfa780054e00d5581a02e6ae7865dae55be32058a72067ecbf8bba76d14d3d3",
+  "reports/evals/20261031T172144Z.json": "1a1c0c5cef3101a60fda8c40dcd958c91688ea6940a3ffcc7ab17008178dd53e",
+  "split_assignments.json": "b04653dd28596cc5558f797bc0a382eb60cd1374c9b0182d61c5178c183b4716"
+ }
+}

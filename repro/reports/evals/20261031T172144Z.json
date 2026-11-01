@@ -1,0 +1,3103 @@
+{
+ "created_at": "2026-10-31T17:17:50.577659+00:00",
+ "split": "train",
+ "live": true,
+ "prefilter_mode": "shadow",
+ "fingerprint": "181f1d70c09b",
+ "mention_side_files": {
+  "20261030T0836Z-5d06a9": "b1810d41810b"
+ },
+ "model": "gemini-3.6-flash",
+ "labels_total": 107,
+ "split_counts": {
+  "test": 29,
+  "train": 78
+ },
+ "split_conflicts": [],
+ "stories": 104,
+ "n": 78,
+ "full_page_mentions": 78,
+ "snapshot_text_used": 0,
+ "metrics": {
+  "n": 78,
+  "by_basis": {
+   "full": {
+    "n": 20,
+    "competitor": {
+     "n": 15,
+     "errors": 4,
+     "error_rate": 0.26666666666666666
+    },
+    "category": {
+     "n": 15,
+     "errors": 4,
+     "error_rate": 0.26666666666666666
+    },
+    "noise": {
+     "n": 20,
+     "errors": 4,
+     "error_rate": 0.2
+    },
+    "score": {
+     "n": 13,
+     "errors": 6,
+     "error_rate": 0.46153846153846156,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": 0.0,
+     "missing": 0
+    }
+   },
+   "partial": {
+    "n": 58,
+    "competitor": {
+     "n": 44,
+     "errors": 4,
+     "error_rate": 0.09090909090909091
+    },
+    "category": {
+     "n": 44,
+     "errors": 16,
+     "error_rate": 0.36363636363636365
+    },
+    "noise": {
+     "n": 58,
+     "errors": 3,
+     "error_rate": 0.05172413793103448
+    },
+    "score": {
+     "n": 44,
+     "errors": 10,
+     "error_rate": 0.22727272727272727,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": 0.0,
+     "missing": 0
+    }
+   },
+   "unknown": {
+    "n": 0,
+    "competitor": {
+     "n": 0,
+     "errors": 0,
+     "error_rate": null
+    },
+    "category": {
+     "n": 0,
+     "errors": 0,
+     "error_rate": null
+    },
+    "noise": {
+     "n": 0,
+     "errors": 0,
+     "error_rate": null
+    },
+    "score": {
+     "n": 0,
+     "errors": 0,
+     "error_rate": null,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": null,
+     "missing": 0
+    }
+   }
+  },
+  "by_bad_extraction": {
+   "true": {
+    "n": 21,
+    "competitor": {
+     "n": 14,
+     "errors": 4,
+     "error_rate": 0.2857142857142857
+    },
+    "category": {
+     "n": 14,
+     "errors": 4,
+     "error_rate": 0.2857142857142857
+    },
+    "noise": {
+     "n": 21,
+     "errors": 4,
+     "error_rate": 0.19047619047619047
+    },
+    "score": {
+     "n": 12,
+     "errors": 5,
+     "error_rate": 0.4166666666666667,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": 0.0,
+     "missing": 0
+    }
+   },
+   "false": {
+    "n": 57,
+    "competitor": {
+     "n": 45,
+     "errors": 4,
+     "error_rate": 0.08888888888888889
+    },
+    "category": {
+     "n": 45,
+     "errors": 16,
+     "error_rate": 0.35555555555555557
+    },
+    "noise": {
+     "n": 57,
+     "errors": 3,
+     "error_rate": 0.05263157894736842
+    },
+    "score": {
+     "n": 45,
+     "errors": 11,
+     "error_rate": 0.24444444444444444,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": 0.0,
+     "missing": 0
+    }
+   },
+   "unknown": {
+    "n": 0,
+    "competitor": {
+     "n": 0,
+     "errors": 0,
+     "error_rate": null
+    },
+    "category": {
+     "n": 0,
+     "errors": 0,
+     "error_rate": null
+    },
+    "noise": {
+     "n": 0,
+     "errors": 0,
+     "error_rate": null
+    },
+    "score": {
+     "n": 0,
+     "errors": 0,
+     "error_rate": null,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": null,
+     "missing": 0
+    }
+   }
+  },
+  "competitor": {
+   "correct": 51,
+   "n": 59,
+   "accuracy": 0.864406779661017,
+   "per_competitor": {
+    "aws": {
+     "n": 3,
+     "correct": 3,
+     "accuracy": 1.0
+    },
+    "cloudsmith": {
+     "n": 8,
+     "correct": 8,
+     "accuracy": 1.0
+    },
+    "github": {
+     "n": 11,
+     "correct": 11,
+     "accuracy": 1.0
+    },
+    "gitlab": {
+     "n": 5,
+     "correct": 4,
+     "accuracy": 0.8
+    },
+    "industry": {
+     "n": 19,
+     "correct": 13,
+     "accuracy": 0.6842105263157895
+    },
+    "snyk": {
+     "n": 9,
+     "correct": 9,
+     "accuracy": 1.0
+    },
+    "sonatype": {
+     "n": 4,
+     "correct": 3,
+     "accuracy": 0.75
+    }
+   },
+   "on_noise": {
+    "n": 19,
+    "correct": 15,
+    "accuracy": 0.7894736842105263
+   }
+  },
+  "category": {
+   "correct": 39,
+   "n": 59,
+   "accuracy": 0.6610169491525424
+  },
+  "noise": {
+   "tp": 14,
+   "fp": 2,
+   "fn": 5,
+   "precision": 0.875,
+   "precision_n": 16,
+   "recall": 0.7368421052631579,
+   "recall_n": 19,
+   "tn": 57
+  },
+  "mentions_jfrog": {
+   "tp": 1,
+   "fp": 0,
+   "fn": 0,
+   "precision": 1.0,
+   "precision_n": 1,
+   "recall": 1.0,
+   "recall_n": 1
+  },
+  "score": {
+   "n": 57,
+   "exact": 0.7192982456140351,
+   "within_1": 1.0,
+   "missing": 0,
+   "excluded_noise": 21,
+   "excluded_noise_n": 78
+  },
+  "important": {
+   "min": 4,
+   "n": 78,
+   "missing": 0,
+   "tp": 1,
+   "fp": 3,
+   "fn": 1,
+   "precision": 0.25,
+   "precision_n": 4,
+   "recall": 0.5,
+   "recall_n": 2
+  },
+  "by_method": {
+   "rules": {
+    "n": 18,
+    "competitor": {
+     "n": 15,
+     "correct": 14,
+     "accuracy": 0.9333333333333333
+    },
+    "category": {
+     "n": 15,
+     "correct": 8,
+     "accuracy": 0.5333333333333333
+    },
+    "noise": {
+     "n": 18,
+     "correct": 15,
+     "accuracy": 0.8333333333333334
+    }
+   },
+   "llm": {
+    "n": 60,
+    "competitor": {
+     "n": 44,
+     "correct": 37,
+     "accuracy": 0.8409090909090909
+    },
+    "category": {
+     "n": 44,
+     "correct": 31,
+     "accuracy": 0.7045454545454546
+    },
+    "noise": {
+     "n": 60,
+     "correct": 56,
+     "accuracy": 0.9333333333333333
+    }
+   },
+   "fallback": {
+    "n": 0,
+    "competitor": {
+     "n": 0,
+     "correct": 0,
+     "accuracy": null
+    },
+    "category": {
+     "n": 0,
+     "correct": 0,
+     "accuracy": null
+    },
+    "noise": {
+     "n": 0,
+     "correct": 0,
+     "accuracy": null
+    }
+   },
+   "prefilter": {
+    "n": 0,
+    "competitor": {
+     "n": 0,
+     "correct": 0,
+     "accuracy": null
+    },
+    "category": {
+     "n": 0,
+     "correct": 0,
+     "accuracy": null
+    },
+    "noise": {
+     "n": 0,
+     "correct": 0,
+     "accuracy": null
+    }
+   }
+  },
+  "prefilter": {
+   "flagged": 5,
+   "noise_caught": 5,
+   "labeled_noise": 19,
+   "precision": 1.0,
+   "precision_n": 5,
+   "recall": 0.2631578947368421,
+   "recall_n": 19,
+   "relevant_flagged": []
+  },
+  "confusion": {
+   "competitor": [
+    {
+     "label": "industry",
+     "pred": "github",
+     "n": 3
+    },
+    {
+     "label": "industry",
+     "pred": "none",
+     "n": 2
+    },
+    {
+     "label": "sonatype",
+     "pred": "industry",
+     "n": 1
+    },
+    {
+     "label": "industry",
+     "pred": "snyk",
+     "n": 1
+    },
+    {
+     "label": "gitlab",
+     "pred": "industry",
+     "n": 1
+    }
+   ],
+   "category": [
+    {
+     "label": "AI & Agents",
+     "pred": "Customers & Market",
+     "n": 4
+    },
+    {
+     "label": "Security",
+     "pred": "Product & Features",
+     "n": 4
+    },
+    {
+     "label": "Security",
+     "pred": "AI & Agents",
+     "n": 4
+    },
+    {
+     "label": "AI & Agents",
+     "pred": "Security",
+     "n": 2
+    },
+    {
+     "label": "Security",
+     "pred": "Customers & Market",
+     "n": 2
+    },
+    {
+     "label": "Product & Features",
+     "pred": "Security",
+     "n": 2
+    },
+    {
+     "label": "Customers & Market",
+     "pred": "Security",
+     "n": 1
+    },
+    {
+     "label": "Product & Features",
+     "pred": "AI & Agents",
+     "n": 1
+    }
+   ],
+   "noise": {
+    "tp": 14,
+    "fp": 2,
+    "fn": 5,
+    "tn": 57
+   }
+  },
+  "extraction_detector": {
+   "n": 78,
+   "tn": 56,
+   "tp": 11,
+   "fp": 1,
+   "fn": 10,
+   "precision": 0.9166666666666666,
+   "precision_n": 12,
+   "recall": 0.5238095238095238,
+   "recall_n": 21,
+   "misses": [
+    {
+     "id": "5747d5a92dd76ad4",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "9d008fae7d650ce3",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "8feed655a3174cb1",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "184ac547493830bb",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "1bc82968d4eeac72",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "83ebb7bb852769f6",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "9a7683686d892444",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "1554a565d8a309c6",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "77d6f879f6928b62",
+     "labeled_bad": false,
+     "detected_junk": true
+    },
+    {
+     "id": "5c28e62b056fd824",
+     "labeled_bad": true,
+     "detected_junk": false
+    },
+    {
+     "id": "9bfd52cd55931440",
+     "labeled_bad": true,
+     "detected_junk": false
+    }
+   ]
+  }
+ },
+ "items": [
+  {
+   "id": "830ef2aa63e802c1",
+   "story": "830ef2aa63e802c1",
+   "title": "A Protected Browser Doesn't Mean Your Enterprise Is Remediated",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "sonatype",
+    "category": "Customers & Market",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "sonatype",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.92,
+    "method": "llm",
+    "reason": "Vendor security commentary and open-source audit script related to the eMudhra incident.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Shows Sonatype providing open-source utility scripts to build developer trust around CA certificate remediation.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "a1e1e73ca8d4ceae",
+   "story": "a1e1e73ca8d4ceae",
+   "title": "OpenAI Severs Frontier AI From Live Internet After 700-Agent Hugging Face Breach",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "sonatype",
+    "category": "Security",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Major AI ecosystem breach involving zero-day exploitation of a Nexus package registry proxy.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 4,
+    "score": 4,
+    "why_it_matters": "Highlights vulnerability risks in artifact proxies and registries exploited by autonomous AI agents.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "f0f0f754ac054abf",
+   "story": "f0f0f754ac054abf",
+   "title": "Hyphenate Raises $45M Led by Nexus to Run the CFO Office on AI",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "none",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "none",
+    "category": "Funding/M&A/Partnerships",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.98,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "d00350bd35234498",
+   "story": "d00350bd35234498",
+   "title": "Untrained AI users cost more and deliver less. Education fixes both",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "none",
+    "category": "AI & Agents",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "3994949d9e50c212",
+   "story": "3994949d9e50c212",
+   "title": "npm installs are now faster, with fewer requests and lookups",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "cloudsmith",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "cloudsmith",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.98,
+    "method": "llm",
+    "reason": "Sub-feature performance optimization for npm metadata lookups and CLI OIDC support.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Incremental performance gains for Cloudsmith npm repos and CI authentication pipelines.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "b7f34ce370cc5b62",
+   "story": "b7f34ce370cc5b62",
+   "title": "Secure the packages AI agents install on their own",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "cloudsmith",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "cloudsmith",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Marketing commentary and best-practices guide on securing AI agent package dependencies.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Positions Cloudsmith's existing artifact repository and quarantine features for AI agent security.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "fe3c64c6092315b5",
+   "story": "fe3c64c6092315b5",
+   "title": "cloudsmith-cli Release v1.30.1",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "cloudsmith",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 1,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "cloudsmith",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Routine patch release containing minor bug fixes and dependency updates.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Maintenance release for Cloudsmith CLI with no material product or competitive impact.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "217418e77309be5b",
+   "story": "217418e77309be5b",
+   "title": "13 KubeCon North America 2026 sessions not to miss",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "cloudsmith",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "cloudsmith",
+    "category": "Customers & Market",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.88,
+    "method": "llm",
+    "reason": "Marketing listicle promoting conference sessions and vendor booth presence.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Reveals Cloudsmith's marketing focus on Kubernetes, OCI artifacts, and AI agent workloads.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "dd6648c84b09e4f8",
+   "story": "dd6648c84b09e4f8",
+   "title": "Shadow AI Across Government: It's Three Problems, Not One",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "sonatype",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "sonatype",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.92,
+    "method": "llm",
+    "reason": "Marketing thought-leadership commentary on governance risks of Shadow AI.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Highlights Sonatype's messaging on governing AI models and code dependencies in enterprise environments.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "e22aacd87f30ac72",
+   "story": "e22aacd87f30ac72",
+   "title": "The Limits of Fingerprint Blocklists: A Reproducible Java Certificate Bypass",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "sonatype",
+    "category": "Security",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "sonatype",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Security research commentary explaining limitations of certificate blocklists.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Demonstrates Sonatype Research Labs' thought leadership in software supply chain security.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "4d6c6f4f5a1df433",
+   "story": "1d4e78b6d168bccd",
+   "title": "GitHub Agentic Workflows generally available",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.98,
+    "method": "llm",
+    "reason": "GA release of an existing preview feature for agentic workflow automation in GitHub Actions.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Expands GitHub's native CI/CD platform capabilities with built-in AI agent execution and safeguards.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "c9f248786f3c5f5c",
+   "story": "344482fd6d727bf9",
+   "title": "GPT-6.1 Terra in GitHub Copilot",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.98,
+    "method": "llm",
+    "reason": "Addition of a new AI model choice to an existing product feature set.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Enhances GitHub Copilot's model selection for terminal and coding tasks.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "d92b47c2edfaa891",
+   "story": "747b76bde702bc0b",
+   "title": "GitHub Copilot supports server-to-server authentication",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "GitHub Copilot added server-to-server authentication for GitHub Apps in public preview.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Expands GitHub Copilot's enterprise agent integration capabilities, enhancing its developer ecosystem against JFrog AI/MCP integrations.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "5b2fd288b6785734",
+   "story": "5b2fd288b6785734",
+   "title": "DeepSeek Harness CVE-2026-82533: one-command sandbox escape",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "News report detailing CVE-2026-82533, a critical sandbox escape vulnerability in DeepSeek Harness AI agent framework.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Highlights security risks in open-source AI agent runtimes, reinforcing the need for AI security and curation tools like Xray.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "d3c57ef87ce59b6a",
+   "story": "3e6d60bb950c637b",
+   "title": "Prioritize Dependabot alerts with reachability analysis",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "Security",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "GitHub introduced reachability analysis for Dependabot in public preview, directly targeting SCA vulnerability prioritization.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 4,
+    "score": 4,
+    "why_it_matters": "Threatens JFrog Xray's contextual analysis differentiation by offering free reachability analysis in GitHub Enterprise.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "5747d5a92dd76ad4",
+   "story": "5747d5a92dd76ad4",
+   "title": "GitLab vs SonarQube - 2026 Comparison",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "review site softwareadvice.com",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "57831cdf5a4026e7",
+   "story": "57831cdf5a4026e7",
+   "title": "PHP2Shell: Prepare for the Next Vulnerability",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Snyk thought leadership blog post offering analysis and commentary on the PHP2Shell vulnerability.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Demonstrates Snyk's content marketing strategy around runtime vulnerability inventory to position its AppSec platform.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "66af31cee26bd085",
+   "story": "66af31cee26bd085",
+   "title": "Snyk vs Mend vs Socket: 3 SCA Tools, 1 Winner [2026]",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Customers & Market",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Third-party comparison article evaluating Snyk, Mend, Socket, and Dependabot SCA tools.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Provides competitive market intelligence on how buyers compare Snyk and other SCA vendors against native platform tools.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "d8d6226995f01774",
+   "story": "d8d6226995f01774",
+   "title": "Agentic development finally killed traditional AppSec",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Customers & Market",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Opinion piece by Snyk CTO discussing how agentic AI development impacts traditional application security.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Reveals Snyk's executive positioning and messaging around AI agents replacing legacy AppSec paradigms.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "642fa46dff1220e0",
+   "story": "642fa46dff1220e0",
+   "title": "Snyk UNFILTERED: Inside Our First-Ever Customer Summit",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Customers & Market",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Marketing recap of Snyk's customer summit highlighting key discussion themes around AI security and remediation.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Insight into Snyk customer concerns and marketing strategy leading into their AI product launches.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "b9628c450b89ef2a",
+   "story": "b9628c450b89ef2a",
+   "title": "Announcing Snyk CLI v1.1308.3",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "Security",
+    "noise": false,
+    "score": 1,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Routine patch release for Snyk CLI addressing intermediate CA trust revocation and dependency updates.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Standard operational maintenance update for Snyk CLI with no material competitive impact on JFrog.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "94f15dcd679b86d0",
+   "story": "2e8aca35aaece4e4",
+   "title": "cli v1.1309.0-preview.3b249157831f1aab103e1ec71b6d731b92e3c34c",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "Security",
+    "noise": false,
+    "score": 1,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Pre-release changelog for Snyk CLI containing routine bug fixes and dependency updates.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Operational minor CLI pre-release with no strategic or competitive significance for JFrog.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "86f425d0c90706bb",
+   "story": "86f425d0c90706bb",
+   "title": "StepSecurity Now Inventories AI Agent Plugins in Your GitHub Repositories and on Developer Machines",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "StepSecurity launched a feature to inventory AI agent plugins and MCP servers on dev machines and GitHub repos.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Expands AI supply chain security monitoring, a growing area relevant to JFrog's AI model and MCP security strategy.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "7107a87a06d984fc",
+   "story": "2a80e167e01b4a47",
+   "title": "JFrog and Industry Judges Recognize Global Brands Bringing Trust to the Software Supply Chain in the AI Era",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Customers & Market",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": true
+   },
+   "pred": {
+    "competitor": "none",
+    "category": "Customers & Market",
+    "noise": false,
+    "mentions_jfrog": true,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "JFrog marketing awards press release highlighting customer adoption, lacking new product capability announcements.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 3,
+    "why_it_matters": "Highlights customer success and enterprise adoption across key verticals for JFrog platform governance.",
+    "adjustments": [
+     "+1 Mentions JFrog"
+    ],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "ea7361692a6c7fdf",
+   "story": "ea7361692a6c7fdf",
+   "title": "RufRoot: unauthenticated Ruflo MCP bridge RCE, CVSS 10.0",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Security vulnerability report covering a CVSS 10.0 flaw in the Ruflo MCP bridge framework.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Validates growing market demand for securing MCP bridges and AI agent architectures with JFrog Xray.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "890a0ebcb5251ae7",
+   "story": "890a0ebcb5251ae7",
+   "title": "Adversa AI Launches Coding Agent Security Platform to Block Cyberattacks on AI Agents in Real Time",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Product launch by Adversa AI introducing an agentic supply chain security and MCP gateway platform.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Increases competitive pressure in AI agent runtime protection and MCP supply chain security.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "b17b1eda59b37dd6",
+   "story": "063d1b9bd5e89cb1",
+   "title": "GitLab plans first India office in Bengaluru, looks to expand workforce",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": "Leadership & Org",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Leadership & Org",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Routine operational move regarding GitLab planning a physical office expansion in India.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Reflects GitLab geographic talent sourcing without altering core DevSecOps product capabilities.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "03073e5dc6fcb118",
+   "story": "03073e5dc6fcb118",
+   "title": "GitLab Serverless augments developers’ multi-cloud toolbox",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "GitLab product feature announcement for serverless deployments via TriggerMesh integration.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Expands GitLab platform deployment capabilities into multi-cloud serverless workflows.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "b7028c8b37c366c3",
+   "story": "b7028c8b37c366c3",
+   "title": "CVE Remediation: What to Do When a Critical CVE Drops",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Educational vendor commentary and guide explaining CVE remediation lifecycles and VEX standard practices.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Demonstrates OX Security positioning around contextual reachability and SBOM management.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "9d008fae7d650ce3",
+   "story": "10c6954ff9cc889d",
+   "title": "GitLab Inc. (GTLB) Stock Price, News, Quote & History",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "8feed655a3174cb1",
+   "story": "8feed655a3174cb1",
+   "title": "Best AI Tools for Code Security Audits, Compared",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "llm",
+    "reason": "Comparison listicle evaluating AI tools for code security audits without new event data.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Reflects competitive framing and buyer guide criteria for AI security auditing tools.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "184ac547493830bb",
+   "story": "184ac547493830bb",
+   "title": "Is It Too Late to Buy GitLab Inc (GTLB) After 3.2% Rally? GF Val",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "9695217242dfce82",
+   "story": "9695217242dfce82",
+   "title": "Anthropic updates Claude Security to continuously monitor code repositories",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Anthropic updating Claude Security to continuously scan code repositories directly touches core scanning capabilities.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 4,
+    "score": 4,
+    "why_it_matters": "Puts Anthropic directly into AI-driven code vulnerability scanning, competing with JFrog Xray.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "1bc82968d4eeac72",
+   "story": "1bc82968d4eeac72",
+   "title": "AI Supercast: Managing Cost / Economics of AI",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "none",
+    "category": "AI & Agents",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "83ebb7bb852769f6",
+   "story": "83ebb7bb852769f6",
+   "title": "Mend SCA now supports Bun, with reachability built in",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "none",
+    "category": "Product & Features",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "0bc2708c1e191f41",
+   "story": "09e962eff2259da9",
+   "title": "GitLab Reaches $56.28, a Fresh 52-Week High",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "stock chatter: 52-week high/low",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "9a7683686d892444",
+   "story": "9a7683686d892444",
+   "title": "Is It Time To Consider Buying GitLab Inc. (NASDAQ:GTLB)?",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "1554a565d8a309c6",
+   "story": "1554a565d8a309c6",
+   "title": "EMBRACE vulnerability leaves Codex and VS Code unpatched",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "llm",
+    "reason": "News report covering the EMBRACE vulnerability affecting Codex and VS Code.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Highlights security vulnerabilities within AI developer tools and IDE ecosystem integrations.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "1a47a5dbcb816a0e",
+   "story": "1a47a5dbcb816a0e",
+   "title": "LiteLLM supply chain attack started with an exposed master key",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 4,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Industry news coverage of a supply chain attack targeting LiteLLM.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Underscores supply chain attack risks targeting AI middleware and infrastructure.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "9323c2d158b4880e",
+   "story": "09e962eff2259da9",
+   "title": "BofA Securities Adjusts Gitlab Price Target to $64 From $54",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "stock chatter: price target",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "fb62102dd9764090",
+   "story": "fb62102dd9764090",
+   "title": "Verify software supply chain security using AWS Nitro cryptographic verification",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "aws",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "aws",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Technical blog post and guidance on AWS Nitro verification without a product release event.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Highlights AWS's posture on software supply chain trust at the compute layer, framing cloud infrastructure security against artifact-level tools.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "8549621cbe5cb6c5",
+   "story": "8549621cbe5cb6c5",
+   "title": "Tahaluf drives trust and 900%+ Copilot ROI in 13 months",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "none",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "fc44d1a802af31be",
+   "story": "09e962eff2259da9",
+   "title": "GitLab (NASDAQ:GTLB) Sets New 1-Year High - Time to Buy?",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "1a3097096fc0a3a8",
+   "story": "1a3097096fc0a3a8",
+   "title": "26,983 GitLab Inc. $GTLB Shares Sold by Taylor Frigon Capital Management LLC",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "stock chatter: fund share trade",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "8c47e219e9b88653",
+   "story": "09e962eff2259da9",
+   "title": "GitLab Inc. Stock 12‑Month Price Target Raised to $56.12, Implies 3% Upside",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "stock chatter: price target",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "1328dc7acdf83768",
+   "story": "1328dc7acdf83768",
+   "title": "CVE-2026-75130: Context7 MCP prompt injection, explained",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Explainer of an existing MCP prompt injection vulnerability without a new event.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Provides context on MCP security threats, relevant to JFrog's AI/MCP security tooling strategy.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "1bff53baf689cdcf",
+   "story": "1bff53baf689cdcf",
+   "title": "codeql-action v4",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "Security",
+    "noise": false,
+    "score": 1,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Routine version release update for GitHub CodeQL action.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Standard version bump for GitHub actions, posing no direct competitive shift against JFrog.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "2d0873122fc26b1b",
+   "story": "2d0873122fc26b1b",
+   "title": "GitHub Supply Chain Attack: Command Injection and CI/CD Data Exfiltration",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": "Security",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Report on a supply chain attack involving GitHub CI/CD command injection and data exfiltration.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Reinforces demand for software supply chain protection and CI/CD security scanning tools offered by JFrog Xray.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "3f436113ffe40ae3",
+   "story": "3f436113ffe40ae3",
+   "title": "GhostSplice: MCP attack lifts compliance from 42% to 82%",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Analysis and commentary on an MCP attack technique affecting compliance.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Informs JFrog's AI/MCP tooling security research regarding prompt injection and agent compliance bypasses.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "54eb4f85e3f787ab",
+   "story": "54eb4f85e3f787ab",
+   "title": "CVE-2026-18953: AWS's Transform MCP Server Had No Write Boundary",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "aws",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "aws",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Vulnerability report regarding CVE-2026-18953 in AWS's Transform MCP Server.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Highlights security vulnerabilities in AI/MCP integrations, supporting JFrog's value proposition in securing AI supply chains.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "67d9c3c8ce4c1f1d",
+   "story": "67d9c3c8ce4c1f1d",
+   "title": "github-mcp-server latest-release",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Routine minor release (v1.12.0) for GitHub MCP server.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Incremental maintenance update with no material competitive impact on JFrog AI/MCP capabilities.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "77d6f879f6928b62",
+   "story": "77d6f879f6928b62",
+   "title": "Blazing a Belfast trail: “We had to write our own playbook”",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "cloudsmith",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "cloudsmith",
+    "category": "Customers & Market",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "llm",
+    "reason": "Profile article and interview on Cloudsmith's growth and strategy without product news.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Offers qualitative intelligence on competitor positioning and background in artifact management.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "c9670a74f842a3d0",
+   "story": "c9670a74f842a3d0",
+   "title": "Amazon EMR on EKS reduces EMR charge by 30 percent",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "aws",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "aws",
+    "category": "Pricing & Packaging",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "437706c5d2611e2b",
+   "story": "437706c5d2611e2b",
+   "title": "Amazon ECR now supports replication backfill for existing container images",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "aws",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "aws",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "AWS added replication backfill for existing ECR images, enhancing an existing registry capability.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Improves ECR multi-region management, closing a minor usability gap against Artifactory container replication.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "b7f254e385868fda",
+   "story": "b7f254e385868fda",
+   "title": "Amazon MSK Connect now supports updating connector plugins and worker configurations",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "aws",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "aws",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Maintenance feature update for AWS MSK Connect, an unrelated Kafka service.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Routine operational update for AWS streaming infrastructure, no impact on JFrog core offerings.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "c3198b00712a52e7",
+   "story": "c3198b00712a52e7",
+   "title": "Announcing Snyk CLI v1.1308.2",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "Security",
+    "noise": false,
+    "score": 1,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Routine Snyk CLI patch release containing minor bug fixes and dependency updates.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Routine maintenance update for Snyk CLI with no material competitive impact on JFrog.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "1926dc432afc78c0",
+   "story": "1926dc432afc78c0",
+   "title": "Snyk API & Web’s security checks now cover Extra Hosts",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Snyk enhanced its API and Web security scanning to cover extra hosts.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Expands Snyk's web security scanner coverage, incrementally improving their AST product capabilities.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "5c28e62b056fd824",
+   "story": "5c28e62b056fd824",
+   "title": "Introducing Snyk for Serverless",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Snyk introduced serverless scanning capabilities expanding its application security footprint.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Extends Snyk's security scanning into serverless workloads, competing with broad AST and supply chain platforms.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "0888710f43bc728c",
+   "story": "0888710f43bc728c",
+   "title": "Amazon MSK Connect now supports pausing and resuming connectors",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "aws",
+    "category": null,
+    "noise": true,
+    "score": null,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "aws",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "AWS MSK Connect added pause/resume functionality for Kafka connectors.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Routine infrastructure feature for AWS Kafka connector management with no impact on JFrog core domain.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "9266d98738489a49",
+   "story": "9266d98738489a49",
+   "title": "Snowflake's Jira Token: A Flaw Copilot Co-Signed, and the Human GitHub Says Wrote It",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "News analysis of a security flaw and credential exposure co-signed by GitHub Copilot.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Highlights AI code generator security risks, relevant to JFrog's AI/MCP security positioning.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "f686687fa50fc360",
+   "story": "f686687fa50fc360",
+   "title": "Roku developer repositories moved from GitHub to GitLab",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Customers & Market",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Roku moved its public/developer repositories from GitHub to GitLab.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Notable customer migration between key DevOps platform competitors GitLab and GitHub.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "ba83f4f37f68467e",
+   "story": "ba83f4f37f68467e",
+   "title": "CISA KEV: LiteLLM MCP bypass, one-char bearer token",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "CISA added a LiteLLM MCP authentication bypass vulnerability to its KEV catalog.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Highlights security risks in AI model context protocol (MCP) integrations relevant to JFrog AI security tools.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "bca36ea4e6105991",
+   "story": "bca36ea4e6105991",
+   "title": "How the PaperCut AI Agent Swarm Began: Days After the Patch",
+   "text_status": "junk",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "AI & Agents",
+    "noise": true,
+    "mentions_jfrog": false,
+    "confidence": 0.8,
+    "method": "llm",
+    "reason": "classified as noise",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": null,
+    "score": null,
+    "why_it_matters": "Not relevant to JFrog's competitive picture.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "6e1a6251c7dd75a6",
+   "story": "6e1a6251c7dd75a6",
+   "title": "SAST vs DAST: 7 Tools, $0 to $30 per Seat [2026]",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "Customers & Market",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "llm",
+    "reason": "Buyer's guide and tool comparison article covering SAST vs DAST solutions.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Offers market positioning and pricing context on competing security vendors without a new event.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "9bfd52cd55931440",
+   "story": "9bfd52cd55931440",
+   "title": "Gitlab.com's free tier has become almost unusable due to the new rate limits",
+   "text_status": "snippet",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": "Pricing & Packaging",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Pricing & Packaging",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Community discussion and commentary on restrictive GitLab free tier rate limits.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Reveals developer friction with GitLab pricing/tier changes, potentially driving platform migrations.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "92704c09ce84143d",
+   "story": "92704c09ce84143d",
+   "title": "Added Secrets in Inventory and centrally manage Secrets scan frequency",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Snyk added scan frequency controls and inventory views for secrets detection.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Improves management UX for Snyk secrets scanning, competing with Xray's secret detection features.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "0c85ec4e8428ce5b",
+   "story": "0c85ec4e8428ce5b",
+   "title": "GitLab Orbit: Find vulnerability blast radius without the manual hunt",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "gitlab",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "gitlab",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "GitLab announces the general availability of GitLab Orbit for vulnerability blast radius analysis.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Enhances GitLab's security analytics against JFrog Xray by offering automated vulnerability ownership and blast radius mapping.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "0d4fac5e3f00eb93",
+   "story": "0d4fac5e3f00eb93",
+   "title": "GitHub package firewall in public preview",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "Security",
+    "noise": false,
+    "score": 5,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "GitHub launches a package firewall in public preview to inspect and block malicious upstream package downloads.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 5,
+    "score": 5,
+    "why_it_matters": "Competes directly with JFrog Curation at scale by introducing upstream package filtering for GitHub Enterprise users.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "da758eab5f5e6a73",
+   "story": "da758eab5f5e6a73",
+   "title": "Mumbai is now a supported storage region",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "cloudsmith",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "cloudsmith",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Cloudsmith adds Mumbai, India as a supported storage region for customer repositories.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Expands Cloudsmith's global storage footprint to improve artifact download performance in India against Artifactory.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "b4bc00e0441d09d0",
+   "story": "b4bc00e0441d09d0",
+   "title": "CLI v1.30.0: Error reporting, TLS-intercepting proxy support, and a username and password login deprecation",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "cloudsmith",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 1,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "cloudsmith",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Cloudsmith CLI v1.30.0 update adds error telemetry, TLS proxy options, and deprecates password logins.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Minor CLI operational update with telemetry and authentication changes for Cloudsmith users.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "9c431e4d2ea0fa55",
+   "story": "9c431e4d2ea0fa55",
+   "title": "Python 3.15 support is now available",
+   "text_status": "partial",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "snyk",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 1,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "snyk",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Snyk adds scanning support for Python 3.15 in CLI and SCM integrations.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 1,
+    "score": 1,
+    "why_it_matters": "Routine language version support update ensuring parity with the latest Python release.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "d56452a8e34a0f0b",
+   "story": "d56452a8e34a0f0b",
+   "title": "20 October 2026: eMudhra intermediate CA certificates",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "cloudsmith",
+    "category": "Security",
+    "noise": false,
+    "score": 1,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "cloudsmith",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "Cloudsmith provides customer guidance and analysis on the third-party eMudhra CA certificate compromise.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Informational security advisory from Cloudsmith helping users remediate external CA trust store risks.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "393d97d2e4478dbd",
+   "story": "393d97d2e4478dbd",
+   "title": "GitHub Enterprise now includes access to GitHub Copilot",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "Pricing & Packaging",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "Pricing & Packaging",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "GitHub updates enterprise packaging to include GitHub Copilot access for all licensed GitHub Enterprise users.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Highlights GitHub's platform-bundling strategy to drive developer AI adoption against competing platforms.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "27773abf7345d425",
+   "story": "27773abf7345d425",
+   "title": "Create and manage Copilot Automations in Visual Studio Code",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "GitHub adds cloud execution support for Copilot Automations directly within Visual Studio Code.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Enhances GitHub's developer AI workflow automation capabilities inside the IDE.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "7b02d478c08bc9ed",
+   "story": "7b02d478c08bc9ed",
+   "title": "Dependabot alerts REST API now includes dependency versions",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "Product & Features",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.9,
+    "method": "llm",
+    "reason": "GitHub adds dependency version details to the Dependabot alerts REST API responses and webhooks.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Simplifies integration with third-party security tools by exposing vulnerable dependency versions in Dependabot API.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "a160240cb43c4919",
+   "story": "a160240cb43c4919",
+   "title": "10 ways attackers abuse AI services to hack your business",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "score": 2,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "industry",
+    "category": "Security",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.95,
+    "method": "llm",
+    "reason": "Industry commentary detailing threat vectors and security risks associated with enterprise AI and MCP server usage.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 2,
+    "score": 2,
+    "why_it_matters": "Highlights growing security threats around AI tools and MCP servers, supporting JFrog's AI security positioning.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "a95154e9877fb178",
+   "story": "00e038da581063cd",
+   "title": "Work from anywhere with a new, connected Copilot cloud experience",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "GA release connecting Copilot across cloud sandboxes and Actions compute pool improves existing AI agent execution capabilities.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Strengthens GitHub's developer platform and AI agent infrastructure, increasing developer stickiness within the GitHub ecosystem.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  },
+  {
+   "id": "c655f75f90af58e9",
+   "story": "c655f75f90af58e9",
+   "title": "Industry comparisons in the Copilot impact dashboard",
+   "text_status": "full",
+   "snapshot_text": false,
+   "label": {
+    "competitor": "github",
+    "category": "Product & Features",
+    "noise": false,
+    "score": 3,
+    "mentions_jfrog": false
+   },
+   "pred": {
+    "competitor": "github",
+    "category": "AI & Agents",
+    "noise": false,
+    "mentions_jfrog": false,
+    "confidence": 0.85,
+    "method": "rules",
+    "reason": "Adding industry peer benchmarks to the Copilot impact dashboard is a sub-feature enhancement to enterprise analytics.",
+    "degraded": false,
+    "competitor_confirmed": true,
+    "needs_review": false,
+    "review_reason": "",
+    "shadow_prefilter": "",
+    "raw_score": 3,
+    "score": 3,
+    "why_it_matters": "Improves GitHub's enterprise management tools for AI adoption without directly impacting JFrog's core security or repository offerings.",
+    "adjustments": [],
+    "review_reasons": []
+   }
+  }
+ ],
+ "path": null,
+ "fallbacks": {
+  "classify": 0,
+  "rank": 0
+ },
+ "aborted": false,
+ "label_audit": {
+  "total": 107,
+  "needs_attention": 0,
+  "complete": 107,
+  "per_issue": {
+   "not_reviewed_v2": 0,
+   "bad_extraction_unanswered": 0,
+   "no_basis": 0,
+   "no_note": 0,
+   "score1_pre_v2": 0,
+   "noise_fields": 0,
+   "missing_score_or_category": 0
+  }
+ },
+ "seconds": 234.3
+}
