@@ -315,9 +315,14 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             # rejection reasons stay in the stored generation (Health), the Brief carries only their count
             state = insights_state(enabled, stored, (stored or {}).get("insights") or [], refreshing(store, date))
             if stored:
-                generated = [cite(s, x, set(listed)) for x in stored.pop("insights", [])]
+                todays = stored.pop("insights", [])
+                prev_stored = store.latest_insights(w["prev_date"]) if w["prev_date"] else None
+                cont, previous = svc.insight_continuity(todays, (prev_stored or {}).get("insights") or [],
+                                                        w["prev_date"])
+                previous["status"] = (prev_stored or {}).get("status") if w["prev_date"] else None
+                generated = [{**cite(s, x, set(listed)), "continuity": cont[x["insight_id"]]} for x in todays]
                 ins = {**stored, "generator_status": stored.get("status"), "status": state, "items": generated,
-                       "enabled": enabled, "rejected": len(stored.get("rejected") or [])}
+                       "enabled": enabled, "rejected": len(stored.get("rejected") or []), "previous": previous}
             else:
                 ins = {"status": state, "generator_status": None, "items": [], "enabled": enabled, "rejected": 0}
             body = {"date": date, "status": "ok", "brief_min_score": min_score, "summary": summary,
