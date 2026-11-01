@@ -25,6 +25,7 @@ from pathlib import Path
 import yaml
 
 from ci import config as ci_config
+from ci import sources
 from ci.api import service as svc
 from ci.store import STORE_PATH, Store
 from config.settings import OUTPUT_DIR
@@ -162,6 +163,161 @@ def score(path: Path) -> dict:
                                               for x in rows if x.get("supported") == "no"]}
     path.with_suffix(".results.json").write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     return out
+
+
+# ---- the review page (ci.labeling /reliability): every field of a review file's items, marked right or wrong ------
+
+# (key, label) of every field Ofri marks. The labels are the ones of the first HTML sheet, so marks it autosaved in
+# the browser (keyed "<item id>|<label>") can be imported by label.
+SHEET_FIELDS = (
+    ("id", "ID"), ("title", "Title"), ("url", "URL"), ("source", "Source"), ("vetted", "Vetted state"),
+    ("source_date", "Source date"), ("competitor", "Competitor"), ("category", "Category"), ("score", "Score"),
+    ("noise", "Noise flag"), ("classifier", "Classifier"), ("rank_reason", "Ranker reason"),
+    ("rank_why", "Ranker why-it-matters"), ("routing", "Routing (level, published / held, why)"),
+    ("lens_status", "Lens status"), ("lens_axis", "Lens axis"), ("lens_quote", "Lens capability quote"),
+    ("lens_relation", "Lens relation to JFrog"), ("lens_why", "Lens why-it-matters"),
+    ("text", "Article text the model saw"),
+)
+FIELD_KEYS = tuple(k for k, _ in SHEET_FIELDS)
+MARKS = ("right", "wrong")
+NOTE_MAX_CHARS = 2000
+
+
+def review_path(run_id: str, out_dir: Path = REVIEW_DIR) -> Path:
+    return out_dir / f"reliability_{run_id}.yaml"
+
+
+def marks_path(path: Path) -> Path:
+    return path.with_suffix(".marks.json")
+
+
+def review_runs(out_dir: Path = REVIEW_DIR) -> list[str]:
+    """Run ids that have a review file, newest file first."""
+    files = sorted(out_dir.glob("reliability_*.yaml"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return [p.stem.removeprefix("reliability_") for p in files]
+
+
+def _vetted_text(s: svc.Snapshot, url: str) -> str:
+    host = sources.host(url)
+    if s.yaml_vetted(url):
+        how = "on config/vetted_sources.yaml"
+    elif trusted := s.trusted_match(url):
+        how = f"trusted host {trusted} (D34, trusted_sources table)"
+    else:
+        how = "not on config/vetted_sources.yaml and not a trusted host"
+    return f"{'vetted' if s.vetted(url) else 'not vetted'}: host {host}; {how}"
+
+
+def _routing_text(s: svc.Snapshot, item_id: str, status: str) -> str:
+    reasons = s.reasons(item_id)
+    here = [h for h in reasons if s.level in h.held_at]
+    lines = ([f"held (status {status}) at level {s.level}; hold reasons at {s.level}:"]
+             + [f"  {h.code}: {h.detail}" for h in here]) if here else \
+        [f"published (status {status}) at level {s.level}: no hold reason applies at {s.level}"]
+    other = [h for h in reasons if s.level not in h.held_at]
+    if other:
+        lines += ["reasons that hold it only at other levels:"] + [f"  {h.code} ({', '.join(h.held_at)}): {h.detail}"
+                                                                    for h in other]
+    return "\n".join(lines)
+
+
+def sheet(run_id: str, out_dir: Path = REVIEW_DIR, store_path: Path = STORE_PATH) -> dict:
+    """The review file's items (its selection and seed) with every field to mark, read from the store now."""
+    from ci.classify import LLM_TEXT_CHARS as CLASSIFY_CHARS
+    from ci.classify import content_text
+    from ci.lens import TEXT_CHARS as LENS_CHARS
+    from ci.rank import LLM_TEXT_CHARS as RANK_CHARS
+
+    data = yaml.safe_load(review_path(run_id, out_dir).read_text(encoding="utf-8"))
+    shared_cap = max(CLASSIFY_CHARS, LENS_CHARS)
+    with Store(store_path) as store:
+        s = svc.Snapshot.read(store, ci_config.load())
+        lens_rows = {r["item_id"]: r for r in store.lens_rows(run_id)}
+    items = []
+    for x in data["items"]:
+        i = x["id"]
+        if i not in s.items or i not in s.outputs:
+            items.append({"id": i, "group": x["group"], "title": x.get("title"), "url": x.get("url"), "missing": True,
+                          "fields": []})
+            continue
+        it = s.item(i)
+        raw = s.items[i]["raw"]
+        r = s.outputs[i]["ranking"]
+        lr = lens_rows.get(i) or {}
+        text = content_text(raw)
+        tb = it["text_basis"]
+        lens_status = lr.get("status") or "no lens row for this run"
+        lens_status += f": {lr['reason']}" if lr.get("reason") else ""
+        if lr and lr.get("status") != "ok":
+            lens_status += " (the app shows no lens for a non-ok row; the fields below are as stored)"
+        values = {
+            "id": i, "title": it["title"], "url": it["url"],
+            "source": f"{it['source']}; publisher {it['publisher']}",
+            "vetted": _vetted_text(s, it["url"]),
+            "source_date": f"source published_at {it['published_at']} (precision {it['date_precision']})\n"
+                           f"published_at_source {it['published_at_source']}\ndiscovered {it['discovered_at']}",
+            "competitor": it["competitor"], "category": it["category"],
+            "score": f"{it['score']} (raw {r.get('raw_score')})", "noise": "yes" if it["noise"] else "no",
+            "classifier": f"method {s.outputs[i]['classification'].get('method')}; confidence {it['confidence']}; "
+                          f"mentions_jfrog {'yes' if it['mentions_jfrog'] else 'no'}",
+            "rank_reason": it["reason"], "rank_why": it["why_it_matters"],
+            "routing": _routing_text(s, i, it["status"]), "lens_status": lens_status,
+            "lens_axis": lr.get("axis"), "lens_quote": lr.get("capability_quote"),
+            "lens_relation": lr.get("relation"), "lens_why": lr.get("why"),
+            "text": f"text status {tb['status']}, from {tb['source']}"
+                    + (f"; reason {tb['reason']}" if tb.get("reason") else "")
+                    + (f"; {'; '.join(tb['reason_detail'])}" if tb.get("reason_detail") else "")
+                    + f". {len(text)} characters sent to the models"
+                    + ("; the text field was empty, so each model received the title only." if not text else "."),
+        }
+        items.append({"id": i, "group": x["group"], "title": it["title"], "url": it["url"], "missing": False,
+                      "fields": [{"key": k, "label": label, "value": values[k]} for k, label in SHEET_FIELDS],
+                      "text": {"shared": text[:shared_cap], "rank_only": text[shared_cap:RANK_CHARS],
+                               "chars": len(text)}})
+    return {"run_id": data["run_id"], "level": data["level"], "seed": data["seed"],
+            "auto_published_total": data["auto_published_total"],
+            "held": sum(x["group"] == "held" for x in data["items"]),
+            "auto": sum(x["group"] == "auto" for x in data["items"]),
+            "caps": {"classify": CLASSIFY_CHARS, "lens": LENS_CHARS, "rank": RANK_CHARS, "shared": shared_cap},
+            "items": items}
+
+
+def load_marks(path: Path) -> dict:
+    """{item id: {field key: {"mark", "note", "at"}}} from the review file's marks file (empty if none yet)."""
+    p = marks_path(path)
+    return json.loads(p.read_text(encoding="utf-8")).get("marks", {}) if p.exists() else {}
+
+
+def _write_atomically(path: Path, text: str) -> None:
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
+def save_mark(path: Path, item_id: str, field_name: str, mark: str | None, note: str) -> dict:
+    """Store one field's mark and note. Competitor, category and score marks are also written to the review file's
+    answer, so `score` counts them. Raises ValueError on an unknown item, field or mark."""
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    entry = next((x for x in data["items"] if x["id"] == item_id), None)
+    if entry is None:
+        raise ValueError(f"item {item_id} is not in {path.name}")
+    if field_name not in FIELD_KEYS:
+        raise ValueError(f"field must be one of {FIELD_KEYS}")
+    if mark is not None and mark not in MARKS:
+        raise ValueError(f"mark must be right, wrong or null, got {mark!r}")
+    note = (note or "").strip()[:NOTE_MAX_CHARS]
+    marks = load_marks(path)
+    saved = {"mark": mark, "note": note, "at": datetime.now(UTC).isoformat()}
+    marks.setdefault(item_id, {})[field_name] = saved
+    _write_atomically(marks_path(path), json.dumps({"run_id": data["run_id"], "marks": marks}, indent=1,
+                                                   ensure_ascii=False))
+    if field_name in FIELDS and entry["answer"].get(field_name) != mark:
+        entry["answer"][field_name] = mark
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines(keepends=True)
+        header = "".join(lines[:next((n for n, line in enumerate(lines) if not line.startswith("#")), len(lines))])
+        _write_atomically(path, header + yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=120))
+    return saved
 
 
 def main(argv: list[str] | None = None) -> int:

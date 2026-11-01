@@ -12,10 +12,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, model_validator
 
-from ci import config
+from ci import config, reliability
 from ci import rank as rank_mod
-from ci.labeling import audit, relabel, stratified
+from ci.labeling import audit, relabel, reliability_page, stratified
 from ci.packet import NON_COMPETITOR
+from ci.store import STORE_PATH
 from config.settings import EVALS_DIR, OUTPUT_DIR
 from modules.reader import FULL_TEXT_MIN_CHARS
 
@@ -202,7 +203,8 @@ def snapshot(item: dict) -> dict:
 def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
                competitors: list[str] | None = None, default_run: str | None = None,
                cfg: config.CIConfig | None = None, relabel_dir: Path = relabel.RELABEL_DIR,
-               changes_db: Path = relabel.CHANGES_DB) -> FastAPI:
+               changes_db: Path = relabel.CHANGES_DB, reviews_dir: Path | None = None,
+               store_path: Path | None = None) -> FastAPI:
     if cfg is None:  # tests may pass only competitor keys; the queue's name rules then use the keys as names
         cfg = config.load() if competitors is None else config.CIConfig(competitors=[
             config.Competitor(key=k, name=k.replace("_", " ").title()) for k in competitors])
@@ -210,6 +212,7 @@ def create_app(runs_dir: Path = RUNS_DIR, labels_path: Path = LABELS_PATH,
         competitors = [c.key for c in cfg.competitors]
     competitors = [*competitors, NON_COMPETITOR]  # always offered, so an off-target story can be relabeled
     app = FastAPI(title="JFrog CI labeling")
+    reliability_page.add_routes(app, reviews_dir or reliability.REVIEW_DIR, store_path or STORE_PATH)
     write_lock = threading.Lock()  # one write at a time (FastAPI runs sync handlers in a thread pool)
     queue_lock = threading.Lock()  # one queue build per run, even when two tabs open it at once
 

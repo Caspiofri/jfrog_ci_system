@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JFrog CI · reliability review</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --ink: #1d2330; --muted: #667085; --line: #e3e6eb;
+    --accent: #2f6fdf; --accent-soft: #e8f0fd; --gray-soft: #eef0f3; --code: #f1f2f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16181d; --card: #1f2229; --ink: #e6e8ec; --muted: #9aa1ad; --line: #343843;
+            --accent: #7aa7f5; --accent-soft: #24324a; --gray-soft: #2a2e37; --code: #272a33; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 20px; }
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 16px; margin: 0; font-weight: 650; } h1 span { color: var(--muted); font-weight: 500; }
+  a { color: var(--accent); }
+  select, input[type=text], textarea { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); }
+  button { font: inherit; padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); cursor: pointer; }
+  button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .chip { background: var(--gray-soft); border-radius: 999px; padding: 2px 9px; white-space: nowrap; font-size: 12.5px; }
+  .muted { color: var(--muted); }
+  .intro { max-width: 1280px; margin: 6px auto 0; font-size: 12.5px; color: var(--muted); }
+  .banner { max-width: 1280px; margin: 8px auto 0; padding: 8px 12px; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 6px; }
+  .banner[hidden] { display: none; }
+  main { max-width: 1280px; margin: 14px auto 60px; padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .card h2 { font-size: 15px; margin: 0 0 2px; font-weight: 620; }
+  .card .sub { font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  col.f { width: 17%; } col.v { width: 49%; } col.m { width: 14%; } col.n { width: 20%; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; text-align: left; overflow-wrap: anywhere; }
+  thead th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  tbody th { font-weight: 600; font-size: 13px; }
+  .val { white-space: pre-wrap; }
+  .none { color: var(--muted); font-style: italic; }
+  .marks { display: flex; gap: 4px; flex-wrap: wrap; }
+  td.note textarea { width: 100%; min-height: 2.2em; resize: vertical; }
+  .saved { font-size: 11px; color: var(--muted); display: block; margin-top: 3px; min-height: 1em; }
+  .tlabel { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  pre { white-space: pre-wrap; word-break: break-word; background: var(--code); padding: 8px; border-radius: 4px;
+        font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 340px; overflow: auto; margin: 4px 0; }
+  @media (max-width: 800px) {
+    table, tbody, tr, th, td { display: block; width: 100%; } thead, colgroup { display: none; }
+    tbody tr { border-bottom: 2px solid var(--line); padding: 4px 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>JFrog CI <span>· reliability review</span></h1>
+    <label>Run <select id="run"></select></label>
+    <span class="chip" id="progress"></span>
+    <span class="chip" id="status">loading…</span>
+    <a href="/api/reliability" id="export" download>Export marks (JSON)</a>
+    <a href="/">Labeling page</a>
+  </div>
+  <div class="intro" id="intro"></div>
+  <div class="banner" id="legacy" hidden></div>
+</header>
+<main id="items"></main>
+<script>
+(function () {
+  "use strict";
+  var state = {run: null, data: null, marks: {}};
+  var $ = function (id) { return document.getElementById(id); };
+
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === "text") e.textContent = attrs[k]; else if (k === "cls") e.className = attrs[k]; else e.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c) e.appendChild(c); });
+    return e;
+  }
+  function valueNode(v) {
+    if (v === null || v === undefined || v === "") return el("span", {cls: "none", text: "(none)"});
+    return document.createTextNode(String(v));
+  }
+  function getJSON(url) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error(url + ": HTTP " + r.status); return r.json(); });
+  }
+  function markOf(id, key) { return ((state.marks[id] || {})[key]) || {mark: null, note: ""}; }
+
+  function progress() {
+    var total = 0, done = 0;
+    state.data.items.forEach(function (it) {
+      it.fields.forEach(function (f) { total++; if (markOf(it.id, f.key).mark) done++; });
+    });
+    $("progress").textContent = done + " of " + total + " fields marked";
+  }
+
+  // Every mark goes into this browser's pending list first and leaves it only when the server confirms the save,
+  // so a dropped connection loses nothing: pending marks are retried every few seconds and after a reload.
+  var savedEls = {}, retryTimer = null, flushing = false;
+  function pendingKey() { return "reliability_pending_" + state.run; }
+  function readPending() {
+    try { return JSON.parse(localStorage.getItem(pendingKey()) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function writePending(p) {
+    try { localStorage.setItem(pendingKey(), JSON.stringify(p)); } catch (e) { /* storage blocked: the server copy is all there is */ }
+  }
+  function showPending(err) {
+    var n = Object.keys(readPending()).length;
+    if (!n) { $("status").textContent = "all changes saved on the server"; return; }
+    $("status").textContent = n + " change" + (n === 1 ? "" : "s") + " NOT on the server yet (kept in this browser, retrying)" +
+      (err ? ": " + err : "");
+  }
+  function scheduleRetry() { if (!retryTimer) retryTimer = setTimeout(function () { retryTimer = null; flushPending(); }, 5000); }
+
+  function flushPending() {
+    if (flushing) return;
+    var p = readPending(), keys = Object.keys(p);
+    if (!keys.length) { showPending(); return; }
+    flushing = true;
+    var chain = Promise.resolve(), run = state.run;
+    keys.forEach(function (k) {
+      chain = chain.then(function () {
+        var v = p[k], parts = k.split("|"), id = parts[0], key = parts[1];
+        return fetch("/api/reliability/" + encodeURIComponent(run) + "/marks", {
+          method: "PUT", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({item_id: id, field: key, mark: v.mark, note: v.note})
+        }).then(function (r) {
+          if (!r.ok) return r.text().then(function (t) { throw new Error("HTTP " + r.status + " " + t); });
+          return r.json();
+        }).then(function (saved) {
+          var now = readPending();  // drop it only if it was not changed again while in flight
+          if (now[k] && now[k].mark === v.mark && now[k].note === v.note) { delete now[k]; writePending(now); }
+          (state.marks[id] = state.marks[id] || {})[key] = saved;
+          var se = savedEls[k];
+          if (se) se.textContent = "saved " + new Date(saved.at).toLocaleTimeString();
+        });
+      });
+    });
+    chain.then(function () { flushing = false; progress(); if (Object.keys(readPending()).length) flushPending(); else showPending(); })
+         .catch(function (e) {
+           flushing = false;
+           keys.forEach(function (k) { if (readPending()[k] && savedEls[k]) savedEls[k].textContent = "not saved yet, retrying"; });
+           showPending(e.message); scheduleRetry();
+         });
+  }
+
+  function save(id, key, mark, note, savedEl) {
+    var k = id + "|" + key, p = readPending();
+    p[k] = {mark: mark, note: note};
+    writePending(p);
+    savedEls[k] = savedEl;
+    (state.marks[id] = state.marks[id] || {})[key] = {mark: mark, note: note};
+    savedEl.textContent = "saving…";
+    progress();
+    flushPending();
+  }
+  window.addEventListener("beforeunload", function (e) {
+    if (state.run && Object.keys(readPending()).length) { e.preventDefault(); e.returnValue = ""; }
+  });
+  window.addEventListener("online", function () { flushPending(); });
+
+  function markCell(it, f) {
+    var cur = markOf(it.id, f.key);
+    var pk = it.id + "|" + f.key, isPending = !!readPending()[pk];
+    var saved = el("span", {cls: "saved", text: isPending ? "not saved yet, retrying" :
+      cur.at ? "saved " + new Date(cur.at).toLocaleTimeString() : ""});
+    savedEls[pk] = saved;
+    var td = el("td", {cls: "mark"});
+    var box = el("div", {cls: "marks"});
+    ["right", "wrong"].forEach(function (m) {
+      var b = el("button", {type: "button", text: m === "right" ? "Right" : "Wrong", "aria-pressed": String(cur.mark === m)});
+      if (cur.mark === m) b.classList.add("on");
+      b.addEventListener("click", function () {
+        var now = markOf(it.id, f.key);
+        var next = now.mark === m ? null : m;  // a second click clears the mark
+        box.querySelectorAll("button").forEach(function (x) { x.classList.remove("on"); x.setAttribute("aria-pressed", "false"); });
+        if (next) { b.classList.add("on"); b.setAttribute("aria-pressed", "true"); }
+        save(it.id, f.key, next, noteBox.value, saved);
+      });
+      box.appendChild(b);
+    });
+    var noteBox = el("textarea", {rows: "1", "aria-label": "Note for " + f.label});
+    noteBox.value = cur.note || "";
+    var timer = null;
+    function flush() {
+      clearTimeout(timer); timer = null;
+      if (noteBox.value.trim() !== (markOf(it.id, f.key).note || "")) save(it.id, f.key, markOf(it.id, f.key).mark, noteBox.value, saved);
+    }
+    noteBox.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(flush, 800); });
+    noteBox.addEventListener("blur", flush);
+    td.appendChild(box); td.appendChild(saved);
+    return [td, el("td", {cls: "note"}, [noteBox])];
+  }
+
+  function valueCell(it, f) {
+    var td = el("td", {cls: "val"});
+    if (f.key === "url" && f.value) {
+      td.appendChild(el("a", {href: f.value, target: "_blank", rel: "noopener noreferrer", text: f.value}));
+    } else {
+      td.appendChild(valueNode(f.value));
+    }
+    if (f.key === "text" && it.text && it.text.chars) {
+      var caps = state.data.caps;
+      td.appendChild(el("div", {cls: "tlabel", text: "Characters 1–" + Math.min(it.text.chars, caps.shared) +
+        ": seen by the classifier (cap " + caps.classify + "), the lens (cap " + caps.lens + ") and the ranker"}));
+      td.appendChild(el("pre", {text: it.text.shared}));
+      if (it.text.rank_only) {
+        td.appendChild(el("div", {cls: "tlabel", text: "Characters " + (caps.shared + 1) + "–" + Math.min(it.text.chars, caps.rank) +
+          ": seen by the ranker only (cap " + caps.rank + ")"}));
+        td.appendChild(el("pre", {text: it.text.rank_only}));
+      }
+    }
+    return td;
+  }
+
+  function render() {
+    var d = state.data, main = $("items");
+    main.textContent = "";
+    $("intro").textContent = "Run " + d.run_id + " · level " + d.level + " · every held item (" + d.held +
+      ") and a seeded sample of auto-published items: seed " + d.seed + ", n = " + d.auto + " of " +
+      d.auto_published_total + " auto-published. Values are read from the store when the page loads. " +
+      "Each click or note is saved on the server; a second click on a mark clears it.";
+    $("export").href = "/api/reliability/" + encodeURIComponent(d.run_id) + "/export";
+    $("export").setAttribute("download", "reliability_marks_" + d.run_id + ".json");
+    d.items.forEach(function (it, n) {
+      var card = el("section", {cls: "card", id: "item-" + it.id});
+      card.appendChild(el("h2", {text: (n + 1) + ". " + (it.title || it.id)}));
+      card.appendChild(el("div", {cls: "sub", text: (it.group === "held" ? "Held" : "Auto-published (sample)") + " · " + it.id}));
+      if (it.missing) {
+        card.appendChild(el("div", {cls: "none", text: "This item is not in the store any more."}));
+        main.appendChild(card); return;
+      }
+      var tbody = el("tbody");
+      it.fields.forEach(function (f) {
+        var cells = markCell(it, f);
+        tbody.appendChild(el("tr", {"data-field": f.key}, [el("th", {text: f.label}), valueCell(it, f), cells[0], cells[1]]));
+      });
+      card.appendChild(el("table", {}, [
+        el("colgroup", {}, [el("col", {cls: "f"}), el("col", {cls: "v"}), el("col", {cls: "m"}), el("col", {cls: "n"})]),
+        el("thead", {}, [el("tr", {}, [el("th", {text: "Field"}), el("th", {text: "Value"}), el("th", {text: "Right / wrong"}), el("th", {text: "Note"})])]),
+        tbody]));
+      main.appendChild(card);
+    });
+    progress();
+    $("status").textContent = "loaded; marks are saved on the server";
+    offerLegacy();
+  }
+
+  // Marks the first HTML sheet autosaved in this browser ("<item id>|<field label>" -> {mark, note}), same origin only.
+  function offerLegacy() {
+    var old = null;
+    try { old = JSON.parse(localStorage.getItem("reliability_marks_" + state.run) || "null"); } catch (e) { old = null; }
+    var banner = $("legacy");
+    banner.hidden = true; banner.textContent = "";
+    if (!old || typeof old !== "object") return;
+    var byLabel = {};
+    state.data.items.forEach(function (it) { it.fields.forEach(function (f) { byLabel[it.id + "|" + f.label] = [it.id, f.key]; }); });
+    var todo = [];
+    Object.keys(old).forEach(function (k) {
+      var target = byLabel[k], v = old[k] || {};
+      if (!target) return;
+      var cur = markOf(target[0], target[1]);
+      if (cur.mark || cur.note) return;  // never overwrite a mark already on the server
+      var text = String(v.mark || "").trim(), low = text.toLowerCase();
+      var mark = (low === "right" || low === "wrong") ? low : null;
+      var note = String(v.note || "").trim();
+      if (text && !mark) note = ("[earlier sheet mark: " + text + "] " + note).trim();
+      if (mark || note) todo.push({id: target[0], key: target[1], mark: mark, note: note});
+    });
+    if (!todo.length) return;
+    banner.appendChild(document.createTextNode("This browser still holds " + todo.length +
+      " fields you marked in the earlier HTML sheet. Marks typed as exactly \"right\" or \"wrong\" become marks; anything else goes into the note. "));
+    var b = el("button", {type: "button", text: "Import them to the server"});
+    b.addEventListener("click", function () {
+      b.disabled = true;
+      var chain = Promise.resolve();
+      todo.forEach(function (t) {
+        chain = chain.then(function () {
+          return fetch("/api/reliability/" + encodeURIComponent(state.run) + "/marks", {
+            method: "PUT", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({item_id: t.id, field: t.key, mark: t.mark, note: t.note})
+          }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); });
+        });
+      });
+      chain.then(function () { banner.textContent = "Imported " + todo.length + " fields."; load(state.run); })
+           .catch(function (e) { banner.textContent = "Import stopped: " + e.message + ". Reload to retry the rest."; });
+    });
+    banner.appendChild(b);
+    banner.hidden = false;
+  }
+
+  function load(run) {
+    state.run = run;
+    $("status").textContent = "loading…";
+    getJSON("/api/reliability/" + encodeURIComponent(run)).then(function (d) {
+      state.data = d; state.marks = d.marks || {};
+      var p = readPending();  // marks this browser still holds that never reached the server
+      Object.keys(p).forEach(function (k) {
+        var parts = k.split("|");
+        (state.marks[parts[0]] = state.marks[parts[0]] || {})[parts[1]] = {mark: p[k].mark, note: p[k].note};
+      });
+      render();
+      flushPending();
+    }).catch(function (e) { $("status").textContent = "could not load: " + e.message; });
+  }
+
+  getJSON("/api/reliability").then(function (m) {
+    var sel = $("run");
+    m.runs.forEach(function (r) { sel.appendChild(el("option", {value: r, text: r})); });
+    sel.addEventListener("change", function () { load(sel.value); });
+    if (m.runs.length) load(m.runs[0]); else $("status").textContent = "no review file in output/reviews";
+  }).catch(function (e) { $("status").textContent = "could not load: " + e.message; });
+})();
+</script>
+</body>
+</html>
