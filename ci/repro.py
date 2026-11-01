@@ -44,6 +44,10 @@ HEADLINE = (("competitor_accuracy", "competitor", "accuracy", "n"), ("category_a
             ("important_precision", "important", "precision", "precision_n"),
             ("important_recall", "important", "recall", "recall_n"),
             ("score_exact", "score", "exact", "n"), ("score_within_1", "score", "within_1", "n"))
+# label fields an eval report's items don't carry; the breakdowns by_basis and by_bad_extraction need them
+JOINED_LABEL_FIELDS = ("basis", "bad_extraction")
+# needs each item's article text (ci.extraction_quality runs on it), which the pack never holds
+NOT_RECOMPUTABLE = {"extraction_detector": "runs ci.extraction_quality on the article text, not in the pack"}
 
 
 def _sha(data: bytes) -> str:
@@ -135,12 +139,14 @@ def check(pack: Path) -> list[str]:
     return problems
 
 
-def recompute_eval(report: dict) -> dict:
-    """The eval's own metrics on the labels and predictions the report holds."""
+def recompute_eval(report: dict, pack_labels: dict | None = None) -> dict:
+    """The eval's own metrics on the labels and predictions the report holds; basis and bad_extraction, which the
+    report's items don't carry, come from the pack's labels.jsonl (pack_labels: id -> label)."""
     labels, cls, ranked = [], [], []
     for it in report["items"]:
         lab, pred = it["label"], it["pred"]
-        labels.append({"id": it["id"], **lab})
+        extra = {k: (pack_labels or {}).get(it["id"], {}).get(k) for k in JOINED_LABEL_FIELDS if k not in lab}
+        labels.append({"id": it["id"], **extra, **lab})
         cls.append(Classification(id=it["id"], **{k: pred[k] for k in Classification.model_fields if k in pred
                                                   and k != "id"}))
         ranked.append(Ranked(id=it["id"], **{k: pred[k] for k in Ranked.model_fields if k in pred and k != "id"}))
@@ -179,14 +185,22 @@ def reported_coverage(report: dict) -> dict:
 
 
 def recompute(pack: Path) -> dict:
-    """{report: {metric: {value, n, reported, reported_n, same}}} for every eval and coverage report in the pack."""
+    """{report: {metric: {value, n, reported, reported_n, same}}} for every eval and coverage report in the pack.
+    An eval report also gets sections: each metrics section compared whole (same: true/false), and not_recomputed:
+    the sections that need article text."""
     out = {}
+    pack_labels = {row["id"]: row["label"] for row in (json.loads(x) for x in
+                                                       (pack / "labels.jsonl").read_text(encoding="utf-8").splitlines()
+                                                       if x.strip())}
     for p in sorted((pack / "reports" / "evals").glob("*.json")):
         r = json.loads(p.read_text(encoding="utf-8"))
-        got, rep = headline(recompute_eval(r)), headline(r["metrics"])
+        full = recompute_eval(r, pack_labels)
+        got, rep = headline(full), headline(r["metrics"])
         out[f"evals/{p.name}"] = {"split": r["split"], "fingerprint": r["fingerprint"], "n": r["n"], "metrics": {
             k: {**got[k], "reported": rep[k]["value"], "reported_n": rep[k]["n"], "same": got[k] == rep[k]}
-            for k in got}}
+            for k in got},
+            "sections": {k: full.get(k) == v for k, v in r["metrics"].items() if k not in NOT_RECOMPUTABLE},
+            "not_recomputed": {k: why for k, why in NOT_RECOMPUTABLE.items() if k in r["metrics"]}}
     for p in sorted((pack / "reports" / "coverage").glob("*.json")):
         r = json.loads(p.read_text(encoding="utf-8"))
         got, rep = recompute_coverage(r), reported_coverage(r)
@@ -227,7 +241,16 @@ def main(argv: list[str] | None = None) -> int:
             differ += not v["same"]
             print(f"  {k:<28} {_fmt(val):>6}  n={_fmt(v['n']):<4} reported {_fmt(v['reported']):>6} "
                   f"n={_fmt(v['reported_n']):<4} {'same' if v['same'] else 'DIFFERENT'}")
-    print(f"\n{sum(len(r['metrics']) for r in res.values())} numbers recomputed, {differ} different")
+        if "sections" in r:
+            bad = [k for k, same in r["sections"].items() if not same]
+            differ += len(bad)
+            print(f"  whole sections: {len(r['sections']) - len(bad)} of {len(r['sections'])} the same"
+                  + (f"; DIFFERENT: {', '.join(bad)}" if bad else ""))
+            for k, why in r["not_recomputed"].items():
+                print(f"  not recomputed: {k} ({why})")
+    sections = sum(len(r.get("sections", {})) for r in res.values())
+    print(f"\n{sum(len(r['metrics']) for r in res.values())} numbers and {sections} whole sections recomputed, "
+          f"{differ} different")
     return 1 if differ else 0
 
 

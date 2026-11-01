@@ -52,6 +52,8 @@ def test_recompute_gives_every_reported_number_back(pack):
     [ev] = [v for k, v in res.items() if k.startswith("evals/")]
     assert ev["split"] == "train" and all(m["same"] for m in ev["metrics"].values())
     assert set(ev["metrics"]) == {name for name, *_ in repro.HEADLINE}
+    assert ev["sections"] and all(ev["sections"].values())  # every metrics section, by_basis included
+    assert {"by_basis", "by_bad_extraction"} <= set(ev["sections"]) and "extraction_detector" not in ev["sections"]
     cov = res["coverage/r.json"]["metrics"]
     assert cov["overall"] == {"captured": 1, "n": 2, "reported": 1, "reported_n": 2, "same": True}
     assert cov["high_importance"]["same"] and cov["competitor.github"]["same"] and cov["source_kind.feed"]["same"]
@@ -94,3 +96,15 @@ def test_the_pack_drops_local_paths_and_check_flags_any_left(pack):
     assert repro.check(p) == ["reports/coverage/r.json.note: a local file path"]
     for ok in ("https://www.businesswire.com/news/home/2026/en/GitLab", "see evals/coverage_events.yaml"):
         assert not repro.LOCAL_PATH_RE.search(ok)
+
+
+def test_the_breakdowns_take_basis_and_bad_extraction_from_the_pack_labels(pack):
+    p, _ = pack
+    path = next((p / "reports" / "evals").glob("*.json"))
+    r = json.loads(path.read_text())
+    assert not set(repro.JOINED_LABEL_FIELDS) & set(r["items"][0]["label"])  # the report doesn't carry them
+    rows = [json.loads(x) for x in (p / "labels.jsonl").read_text().splitlines()]
+    rows[0]["label"]["basis"] = "partial" if rows[0]["label"]["basis"] == "full" else "full"
+    (p / "labels.jsonl").write_text("".join(json.dumps(x) + "\n" for x in rows))
+    [ev] = [v for k, v in repro.recompute(p).items() if k.startswith("evals/")]
+    assert ev["sections"]["by_basis"] is False and ev["sections"]["competitor"] is True
