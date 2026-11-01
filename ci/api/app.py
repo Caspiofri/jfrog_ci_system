@@ -602,7 +602,10 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     # ---- Log ---------------------------------------------------------------------------------------------------
 
-    def log_rows(s: Snapshot) -> list[dict]:
+    def log_rows(s: Snapshot, actions: list[dict] = ()) -> list[dict]:
+        """actions: the analyst actions, oldest first; a dismissed item's row carries its latest dismiss reason."""
+        dismissed_for = {a["target_id"]: a["reason"] for a in actions
+                         if a["target_kind"] == "item" and a["action"] == "dismiss"}
         rows = []
         for sg in s.sightings:
             i = sg["item_id"]
@@ -628,6 +631,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                          "category": it["category"], "score": it["score"], "published_at": it["published_at"],
                          "collected_at": sg["seen_at"], "discovered_at": it["discovered_at"], "status": it["status"],
                          "stage": stage, "reason": why, "duplicate_of": None,
+                         "dismiss_reason": dismissed_for.get(i) if it["status"] == "dismissed" else None,
                          "text_status": s.items[i]["raw"].get("text_status")})
         for d in svc.dropped_rows(runs_dir, [r["run_id"] for r in s.runs]):
             rows.append({"item_id": d.get("id"), "run_id": d.get("run_id"), "title": d.get("title") or "",
@@ -637,7 +641,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                          "published_at": d.get("published_at"), "collected_at": d.get("collected_at"),
                          "discovered_at": None, "status": "dropped", "stage": d.get("drop_stage"),
                          "reason": d.get("drop_reason") or "", "duplicate_of": d.get("duplicate_of"),
-                         "text_status": d.get("text_status")})
+                         "dismiss_reason": None, "text_status": d.get("text_status")})
         return rows
 
     @app.get("/api/v1/log")
@@ -648,7 +652,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 limit: int = 50, offset: int = 0):
         store, s = snap()
         with store:
-            rows = log_rows(s)
+            rows = log_rows(s, store.actions())
 
         def day(r: dict) -> str:
             ts = svc.parse_ts(r["collected_at"])

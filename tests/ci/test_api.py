@@ -250,6 +250,21 @@ def test_log_has_every_sighting_and_every_drop_with_its_stage(env):
     assert c.get("/api/v1/log", params={"limit": 0}).status_code == 400
 
 
+def test_a_dismissed_items_log_row_carries_the_dismiss_reason(env):
+    c, _, _ = env
+    rows = {r["item_id"]: r for r in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}
+    assert all("dismiss_reason" in r and r["dismiss_reason"] is None for r in rows.values())  # every row has the key
+    assert c.post("/api/v1/items/uv/dismiss", json={"reason": "wrong_competitor"}).status_code == 200
+    rows = {r["item_id"]: r for r in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}
+    assert (rows["uv"]["status"], rows["uv"]["stage"], rows["uv"]["dismiss_reason"]) == \
+        ("dismissed", "analyst", "wrong_competitor")
+    assert rows["uv"]["reason"] == "dismissed"  # the existing field is unchanged
+    assert rows["pub1"]["dismiss_reason"] is None and rows["dup1"]["dismiss_reason"] is None
+    c.patch("/api/v1/items/uv", json={"competitor": "industry"})  # an edit after the dismiss keeps the reason
+    assert {r["item_id"]: r for r in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}["uv"][
+        "dismiss_reason"] == "wrong_competitor"
+
+
 def test_refresh_insights_is_off_until_enabled(env):
     c, store_path, _ = env
     r = c.post("/api/v1/brief/2026-10-30/insights/refresh")

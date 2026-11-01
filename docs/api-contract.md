@@ -259,6 +259,7 @@ The response to `POST`:
 
 `GET /api/v1/log?run_id=&date_from=&date_to=&competitor=&category=&status=&stage=&source=&q=&sort=&limit=&offset=`
 - **Rows:** one row per sighting (item × run), with `status`, `stage` and `stage_reason`.
+- **`dismiss_reason`** (added 1 Nov): on every row. For a dismissed item, the reason of its latest dismiss action (`wrong_competitor`, `wrong_category`, `not_relevant` or `duplicate`); `null` on every other row, dropped rows included. `reason` is unchanged (`dismissed` for an analyst-stage dismissed row).
 - **Counts:** by status and by stage.
 - **Layout:** as the prototype; Ofri liked it as is.
 - **Gaps today:**
