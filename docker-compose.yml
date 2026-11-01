@@ -1,11 +1,16 @@
-# JFrog CI tool. Build and run commands: docs/docker.md.
+# Jessi (JFrog CI tool). Build and run commands: docs/docker.md.
+#   docker compose up                                demo: the API on a frozen snapshot + the web UI, no API key:
+#                                                    http://127.0.0.1:3000 (UI) and http://127.0.0.1:8011/api/v1 (API)
 #   docker compose run --rm ci                       one CI run (collect -> dedupe -> full text -> output/runs/<run_id>.jsonl)
 #   docker compose run --rm eval --split train       golden-set eval -> output/evals/<timestamp>.json
 #   docker compose up -d labeling                    labeling page on http://127.0.0.1:8000/ only
 #   with -f docker-compose.yml -f docker-compose.tailscale.yml it is also on the Tailscale IP (docs/docker.md)
-# All state is on the host: ./data, ./output and ./evals are bind mounts, so runs, eval reports, test_runs.log,
-# split_assignments.json and caches outlive the container. Before the first start:
+# The demo (api, ui) needs nothing on the host. The pipeline services (ci, eval, labeling) keep all state on the host:
+# ./data, ./output and ./evals are bind mounts, so runs, eval reports, test_runs.log, split_assignments.json and
+# caches outlive the container. Before their first start:
 #   mkdir -p output data && touch evals/golden_set.jsonl
+#   export APP_UID=$(id -u)    (or APP_UID=... in .env): the container user must own what it writes to the mounts;
+#                              without it the image user is uid 1000, which is fine for the demo, which writes nothing
 
 x-app: &app
   image: jfrog-ci:latest
@@ -14,7 +19,7 @@ x-app: &app
     target: runtime
     args:
       # your uid, so the app can write to the bind-mounted ./data, ./output and ./evals; required, no silent default
-      APP_UID: ${APP_UID:?set APP_UID=$$(id -u) in the shell or in .env}
+      APP_UID: ${APP_UID:-1000}
   env_file:
     - path: .env
       required: false
@@ -43,9 +48,48 @@ x-app: &app
         create_host_path: false
 
 services:
+  # ---- demo (the default `docker compose up`): read-only, no LLM, no key, no host state
+  api:
+    image: jfrog-ci:latest
+    build:
+      context: .
+      target: runtime
+      args:
+        APP_UID: ${APP_UID:-1000}
+    entrypoint: ["python", "-m", "ci.api", "--port", "8011"]
+    environment:
+      CI_DEMO_DIR: /app/demo/snapshot  # in the image (demo/snapshot, committed); read-only
+      CI_API_HOST: 0.0.0.0  # inside the container only; the host sees it on 127.0.0.1 (ports below)
+      CI_TRUSTED_HOSTS: api  # the ui container calls http://api:8011; localhost and 127.0.0.1 are always allowed
+    ports:
+      - "127.0.0.1:${API_PORT:-8011}:8011"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8011/api/v1/meta', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+
+  ui:
+    image: jfrog-ci-ui:latest
+    build:
+      context: ./frontend
+      dockerfile: ../docker/ui.Dockerfile
+      args:
+        CI_API_URL: http://api:8011
+        CI_MODE: demo
+    ports:
+      - "127.0.0.1:${UI_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ---- the pipeline (only when named: docker compose run --rm ci / up -d labeling)
   ci:
     <<: *app
     entrypoint: ["python", "-m", "ci.run"]
+    profiles: ["pipeline"]
 
   eval:
     <<: *app
@@ -58,6 +102,7 @@ services:
     # expected here). What the host exposes is decided by the ports below, never all interfaces: Docker's
     # published ports bypass ufw. The Tailscale address is added by docker-compose.tailscale.yml.
     entrypoint: ["python", "-m", "ci.labeling", "--host", "0.0.0.0"]
+    profiles: ["pipeline"]
     ports:
       - "127.0.0.1:${LABELING_PORT:-8000}:8000"  # host port; set LABELING_PORT if 8000 is taken
     restart: unless-stopped

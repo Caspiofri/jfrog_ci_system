@@ -12,7 +12,9 @@ def test_the_served_app_gets_an_insights_model_and_embeddings(monkeypatch):
 
 def test_the_api_listens_on_loopback_only(monkeypatch):
     seen = {}
-    monkeypatch.setattr(api_main, "build_app", lambda: "app")
+    monkeypatch.delenv("CI_API_HOST", raising=False)
+    monkeypatch.delenv("CI_DEMO_DIR", raising=False)
+    monkeypatch.setattr(api_main, "build_app", lambda demo=None: "app")
     monkeypatch.setattr(api_main.uvicorn, "run", lambda app, **kw: seen.update(kw))
     monkeypatch.setattr(api_main, "log_config", lambda: "cfg")
     api_main.main(["--port", "8011"])
@@ -47,3 +49,8 @@ def test_the_api_log_is_appended_to_a_file(tmp_path):
             logging.getLogger(name).handlers.clear()
     text = path.read_text()
     assert "hello from the app" in text and "hello from uvicorn" in text
+
+
+def test_only_the_container_may_listen_elsewhere():
+    assert api_main.listen_host({}) == "127.0.0.1"
+    assert api_main.listen_host({"CI_API_HOST": "0.0.0.0"}) == "0.0.0.0"  # set in the Dockerfile only

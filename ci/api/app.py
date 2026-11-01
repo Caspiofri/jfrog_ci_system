@@ -148,20 +148,34 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                evals_dir: Path = eval_golden.EVALS_OUT_DIR, coverage_dir: Path = coverage.COVERAGE_DIR,
                events_path: Path = coverage.EVENTS_PATH, changes_out_dir: Path = OUTPUT_DIR / "changes",
                labels_path: Path = eval_golden.LABELS_PATH, sheet_path: Path = lens_mod.SHEET_PATH,
-               brief_config_path: Path = svc.BRIEF_CONFIG_PATH) -> FastAPI:
+               brief_config_path: Path = svc.BRIEF_CONFIG_PATH, demo: dict | None = None) -> FastAPI:
+    """demo: a snapshot manifest from ci.demo.load(). The API then reads that snapshot read-only, refuses writes,
+    calls no model and keeps its clock at the snapshot time (D34, D59)."""
     cfg = cfg or ci_config.load()
     min_score = svc.brief_min_score(brief_config_path)
     app = FastAPI(title="JFrog CI API", version=API_VERSION)
     app.add_middleware(CSRFMiddleware)  # no login, so a cross-site page must not change state
+    read_only = demo is not None
+    if demo is not None:
+        from ci import demo as demo_mod
+
+        store_path, changes_path = demo["store_path"], demo["changes_path"]
+        now, insights_llm, embed_fn = demo_mod.clock(demo), None, None
+        app.add_middleware(demo_mod.ReadOnlyMiddleware, date=demo.get("date"))
+    snapshot = None if demo is None else {k: demo.get(k) for k in ("date", "as_of", "label", "built_at", "commit")}
 
     def meta() -> dict:
-        return {"mode": "live", "now": svc.iso(now()), "api_version": API_VERSION}
+        out = {"mode": "demo" if read_only else "live", "now": svc.iso(now()), "api_version": API_VERSION}
+        return out | ({"snapshot": snapshot} if snapshot else {})
+
+    def open_store() -> Store:
+        return Store(store_path, read_only=read_only)
 
     def ok(body: dict) -> dict:
         return {**body, "meta": meta()}
 
     def snap() -> tuple[Store, Snapshot]:
-        store = Store(store_path)
+        store = open_store()
         return store, Snapshot.read(store, cfg, now())
 
     def item_out(s: Snapshot, item_id: str, level: str | None = None, badge: str | None = None) -> dict:
@@ -217,7 +231,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     # ---- Brief -------------------------------------------------------------------------------------------------
 
     def insights_enabled() -> bool:
-        with Store(store_path) as store:
+        with open_store() as store:
             return store.setting("insights_enabled", "false") == "true"
 
     def brief_counts(s: Snapshot, w: dict) -> dict:
@@ -378,7 +392,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 for lv in route.LEVELS]
 
     def change_rows(competitor: list[str] | None) -> list[dict]:
-        rows = competitors_api.awaiting_change_rows(changes_path)
+        rows = competitors_api.awaiting_change_rows(changes_path, read_only=read_only)
         return [r for r in rows if not competitor or r["competitor"] in competitor]
 
     @app.get("/api/v1/review")
@@ -431,7 +445,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     @app.put("/api/v1/settings/autonomy-level")
     def put_level(body: LevelBody):
-        with Store(store_path) as store:
+        with open_store() as store:
             store.set_autonomy_level(body.level)
         return get_level()
 
@@ -550,7 +564,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     @app.delete("/api/v1/sources/trust/{host}")
     def untrust(host: str):
         h = clean_host(host)
-        with Store(store_path) as store:
+        with open_store() as store:
             if sources.is_vetted(f"https://{h}/") and h not in store.trusted_hosts():
                 raise ApiError(409, "conflict", f"{h} is on the reviewed list in config/vetted_sources.yaml")
             if h not in store.trusted_hosts():
@@ -651,8 +665,9 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     deps = SimpleNamespace(ok=ok, snap=snap, item_out=item_out, page=page, ApiError=ApiError, cfg=cfg, now=now,
                            changes_path=changes_path, store_path=store_path, runs_dir=runs_dir,
-                           store=lambda: Store(store_path), evals_dir=evals_dir, coverage_dir=coverage_dir,
-                           events_path=events_path, changes_out_dir=changes_out_dir, labels_path=labels_path)
+                           store=open_store, evals_dir=evals_dir, coverage_dir=coverage_dir,
+                           events_path=events_path, changes_out_dir=changes_out_dir, labels_path=labels_path,
+                           read_only=read_only)
     competitors_api.register(app, deps)
     health_api.register(app, deps)
     return app

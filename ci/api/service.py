@@ -58,7 +58,8 @@ def text_basis(raw: dict) -> dict:
         reason, detail = (fetch if fetch and fetch != "ok" else "not_recorded"), None
     return {"status": status, "source": raw.get("text_source") or "teaser",
             "label": TEXT_BASIS_LABELS.get(status, status), "reason": reason, "reason_detail": detail,
-            "chars_used_for_scoring": len(content_text(raw)[:RANKER_TEXT_CHARS])}
+            "chars_used_for_scoring": raw.get("chars_used_for_scoring",  # a demo snapshot keeps only the count
+                                              len(content_text(raw)[:RANKER_TEXT_CHARS]))}
 
 
 def parse_ts(value) -> datetime | None:
