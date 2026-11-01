@@ -37,7 +37,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ci import config as ci_config
-from ci import eval_golden, insights, lens, run_metrics, validate
+from ci import eval_golden, insights, lens, run_meta, run_metrics, validate
 from ci.classify import Classifier
 from ci.dedupe import EmbeddingDeduper, SeenUrls
 from ci.llm import GeminiLLM, JsonLLM
@@ -194,12 +194,13 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
         if result.failed:  # recorded in the store too, so a missed day is visible there and not only in the log
             reason = report.get("status_reason") or "collection failed"
             steps.fail("collect", reason)
-            out = {"run_id": run_id, "kind": kind, "status": "failed", "error": reason, "collection": report}
+            out = {"run_id": run_id, "kind": kind, "status": "failed", "error": reason, "collection": report,
+                   "metadata": run_meta.safe_collect(fingerprints=fps, model=counting.model, cfg=cfg)}
             with Store(store_path) as store:
                 store.start_run(run_id, kind, report["started_at"], "", "")
                 save_metrics(store, lambda: run_metrics.build(
                     run_id=run_id, kind=kind, status="failed", started_at=report["started_at"], fingerprints=fps,
-                    model=None, llm_calls=0, steps=steps, error=reason), out)
+                    model=None, llm_calls=0, steps=steps, error=reason, metadata=out["metadata"]), out)
                 store.finish_run(run_id, "failed", out, reason)
             return DailyResult(run_id, "failed", out, [reason])
         rows = [p.model_dump(mode="json") for p in result.kept]
@@ -246,10 +247,12 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
                                           cfg, sheet_path, embed_fn, errors, steps)
         except Exception as e:
             out = {"run_id": run_id, "kind": kind, "status": "failed", "error": f"{type(e).__name__}: {e}",
-                   "traceback": traceback.format_exc()}
+                   "traceback": traceback.format_exc(),
+                   "metadata": run_meta.safe_collect(fingerprints=fps, model=counting.model, cfg=cfg)}
             save_metrics(store, lambda: run_metrics.build(
                 run_id=run_id, kind=kind, status="failed", started_at=started_at, fingerprints=fps,
-                model=counting.model, llm_calls=counting.calls, steps=steps, error=out["error"]), out)
+                model=counting.model, llm_calls=counting.calls, steps=steps, error=out["error"],
+                metadata=out["metadata"]), out)
             store.finish_run(run_id, "failed", out, out["error"])
             return DailyResult(run_id, "failed", out, [out["error"]])
         fell_back = [c.id for c in classifications if c.method == "fallback"]
@@ -270,7 +273,8 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
                         ", ".join(r["id"] for r in recovered))
         out = {"run_id": run_id, "kind": kind, "status": status, "started_at": started_at,
                "finished_at": datetime.now(UTC).isoformat(), "fingerprint": fp, "model": counting.model,
-               "llm_calls": counting.calls, "errors": errors, **extra,
+               "llm_calls": counting.calls, "errors": errors,
+               "metadata": run_meta.safe_collect(fingerprints=fps, model=counting.model, cfg=cfg), **extra,
                "rejections": [vars(r) for r in rejections],
                "recovered": {"items": len(recovered), "item_ids": [r["id"] for r in recovered]},
                # the funnel follows this run's own rows; recovered items are counted above, not per source
@@ -284,7 +288,7 @@ def run_daily(*, from_run: str | None = None, cfg: ci_config.CIConfig | None = N
             extraction=run_metrics.extraction_block(rows),
             lens=run_metrics.lens_block(store.lens_rows(run_id), extra["lens"]["status"]),
             insights=run_metrics.insights_block(extra["insights"]),
-            validation=run_metrics.validation_block(rejections)), out)
+            validation=run_metrics.validation_block(rejections), metadata=out["metadata"]), out)
         store.finish_run(run_id, status, out, "; ".join(errors))
     (runs_dir / f"{run_id}.daily.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     return DailyResult(run_id, status, out, errors)
@@ -366,7 +370,7 @@ def generate_insights(store: Store, run_id: str, llm: JsonLLM, cfg: ci_config.CI
     rows = [insights.item_from_output(s.outputs[i]) for i in s.classified_ids() if s.status(i) in svc.PUBLISHED]
     res = insights.generate(rows, llm, embed_fn or default_embedding_fn(), anchor=anchor, prev_anchor=prev_anchor,
                             level=s.level, trigger=trigger, sheet=sheet)
-    store.save_insights(brief, res.to_json())
+    store.save_insights(brief, {**res.to_json(), "metadata": run_meta.safe_collect(model=getattr(llm, "model", None))})
     return {"status": res.status, "brief_date": brief, "insights": len(res.insights), "rejected": len(res.rejected),
             "rejected_reasons": [{"title": r.get("title"), "reason": r.get("reason")} for r in res.rejected],
             "fingerprint": res.fingerprint, "error": res.error}

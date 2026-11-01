@@ -13,6 +13,7 @@ metrics (the JSON column):
 - insights: status, produced, rejected, the rejection reasons
 - validation (D32): rejected outputs and items, by stage, with the reasons
 - steps: per step, seconds, LLM calls and status (ok | degraded | failed | skipped) with the error and item ids
+- metadata (D53): ci.run_meta's record of what ran: fingerprints, sheet_sha, models, call settings, combined, commit
 """
 import time
 from collections import Counter
@@ -117,9 +118,10 @@ def validation_block(rejections: list) -> dict:
 def build(*, run_id: str, kind: str, status: str, started_at: str, fingerprints: dict, model: str | None,
           llm_calls: int, steps: Steps, items: dict | None = None, extraction: dict | None = None,
           lens: dict | None = None, insights: dict | None = None, validation: dict | None = None,
-          error: str | None = None) -> dict:
+          error: str | None = None, metadata: dict | None = None) -> dict:
     """The metrics row. Blocks a failed run never reached are None."""
     return {"run_id": run_id, "kind": kind, "status": status, "started_at": started_at,
             "finished_at": datetime.now(UTC).isoformat(), "fingerprints": fingerprints, "model": model,
             "llm_calls": llm_calls, "error": error, "items": items, "extraction": extraction, "lens": lens,
-            "insights": insights, "validation": validation, "steps": steps.to_list()}
+            "insights": insights, "validation": validation, "steps": steps.to_list(),
+            "metadata": metadata}  # ci.run_meta: sheet hash, models, call settings, combined fingerprint, commit

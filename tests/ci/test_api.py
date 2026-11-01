@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from fastapi.testclient import TestClient
 
+from ci import insights
 from ci.api.app import create_app
 from ci.classify import Classification
 from ci.config import CIConfig, Competitor
@@ -258,6 +259,9 @@ def test_refresh_insights_is_off_until_enabled(env):
     assert r["status"] in ("partial", "none")
     ins = c.get("/api/v1/brief", params={"date": "2026-10-30"}).json()["insights"]
     assert ins["trigger"] == "refresh" and ins["enabled"] is True and "insights" not in ins
+    with Store(store_path) as s:  # D53: the generation records what it ran with
+        meta = s.latest_insights("2026-10-30")["metadata"]
+    assert meta["fingerprints"]["insights"] == insights.fingerprint() and meta["commit"]["sha"]
 
 
 def test_errors_use_the_envelope(env):

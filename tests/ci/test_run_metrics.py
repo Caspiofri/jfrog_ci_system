@@ -42,6 +42,15 @@ def test_an_import_run_writes_one_metrics_row_with_counts_and_steps(paths):  # n
     assert (s["lens"]["status"], s["insights"]["status"]) == ("skipped", "skipped")
     assert m["llm_calls"] == res.report["llm_calls"]
     json.dumps(m)
+    meta = m["metadata"]  # D53: what the run ran with, the same block in the run report
+    assert meta == res.report["metadata"] and meta["fingerprints"] == m["fingerprints"]
+    assert meta["commit"]["sha"] and meta["sheet_sha"] and meta["combined"]
+
+
+def test_the_metadata_never_fails_the_run(paths, monkeypatch):  # noqa: F811
+    monkeypatch.setattr("ci.run_meta.collect", lambda **kw: 1 / 0)
+    res = run(paths, from_run=OLD_RUN)
+    assert res.status == "ok" and res.report["metadata"] == {"error": "ZeroDivisionError: division by zero"}
 
 
 def test_a_degraded_step_names_its_items(paths):  # noqa: F811
@@ -67,6 +76,7 @@ def test_a_crashed_step_is_recorded_as_where_the_run_stopped(paths, monkeypatch)
     assert res.status == "failed"
     m = metrics_of(paths, OLD_RUN)
     assert m["status"] == "failed" and "ranker exploded" in m["error"] and m["items"] is None
+    assert m["metadata"]["commit"]["sha"] and m["metadata"] == res.report["metadata"]
     s = steps_of(m)
     assert s["classify"]["status"] == "ok" and s["rank"]["status"] == "failed" and "validate" not in s
 
@@ -75,6 +85,7 @@ def test_a_failed_collection_writes_a_failed_row(paths):  # noqa: F811
     run(paths, collect=fake_collect([], failed=True))
     m = metrics_of(paths, "20261101T0400Z-bbbbbb")
     assert m["status"] == "failed" and steps_of(m)["collect"]["status"] == "failed" and m["llm_calls"] == 0
+    assert m["metadata"]["fingerprints"]["lens"] == lens.fingerprint() and m["metadata"]["commit"]["sha"]
 
 
 def test_lens_quote_check_and_relations_with_n(paths, sheet_path, monkeypatch):  # noqa: F811

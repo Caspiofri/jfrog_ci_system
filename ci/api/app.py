@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ci import config as ci_config
-from ci import coverage, eval_golden, insights, route, sources
+from ci import coverage, eval_golden, insights, route, run_meta, sources
 from ci import lens as lens_mod
 from ci.api import competitors as competitors_api
 from ci.api import health as health_api
@@ -337,10 +337,12 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 raise ApiError(409, "refresh_running", f"insights for {date} are already being refreshed")
             store.set_setting(REFRESH_MARK + date, svc.iso(now()))  # the Brief shows insights_status "refreshing"
             try:
-                res = insights.generate(rows, insights_llm(), embed_fn, anchor=w["anchor"],
+                llm_obj = insights_llm()
+                res = insights.generate(rows, llm_obj, embed_fn, anchor=w["anchor"],
                                         prev_anchor=w["prev_anchor"], level=s.level, trigger="refresh", now=now,
                                         sheet=lens_mod.load_sheet(sheet_path))
-                store.save_insights(date, res.to_json())
+                store.save_insights(date, {**res.to_json(), "metadata": run_meta.safe_collect(
+                    model=getattr(llm_obj, "model", None))})
             finally:
                 store.set_setting(REFRESH_MARK + date, "")
         return ok({"date": date, "status": res.status, "insights": len(res.insights), "rejected": len(res.rejected),

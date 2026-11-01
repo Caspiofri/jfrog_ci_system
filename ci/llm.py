@@ -18,6 +18,8 @@ DEFAULT_MODEL = "gemini-3.6-flash"  # build design doc, Oct 30 midday decision; 
 MAX_ATTEMPTS = 3  # one call plus two retries, on 429 and 5xx only
 BACKOFF_S = 2.0  # doubled per retry, plus up to JITTER of itself so parallel callers spread out
 JITTER = 0.5
+TEMPERATURE = 0.0  # every call; recorded in the run metadata (ci.run_meta)
+RESPONSE_MIME_TYPE = "application/json"
 MAX_RETRY_AFTER_S = 60.0  # a server-requested wait longer than this is capped
 RETRYABLE = frozenset({408, 429})  # plus every 5xx
 
@@ -102,7 +104,7 @@ class GeminiLLM:
 
     def complete(self, prompt: str, schema: dict) -> dict:
         client = self._get_client()
-        config = {"response_mime_type": "application/json", "response_json_schema": schema, "temperature": 0.0}
+        config = {"response_mime_type": RESPONSE_MIME_TYPE, "response_json_schema": schema, "temperature": TEMPERATURE}
         for attempt in range(1, self._max_attempts + 1):
             try:
                 response = client.models.generate_content(model=self.model, contents=prompt, config=config)
