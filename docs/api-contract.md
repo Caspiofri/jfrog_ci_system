@@ -429,14 +429,14 @@ The Brief separates what is known (published items scored 3+), what is pending (
   "published_below": 0,    // published, score 1-2 (competitor profile / timeline)
   "held": 11,              // awaiting review at the current level, discovered in this window
   "held_high": 3,          // of those, preliminary score 4-5
-  "held_by_preliminary_score": {"5": 0, "4": 3, "3": 6, "<=2": 2, "noise": 0},
+  "held_by_preliminary_score": {"5": 0, "4": 3, "3": 6, "<=2": 2, "unscored": 0, "noise": 0},
   "level": "strict"
 }
 ```
 
 - **One query.** `summary` comes from the same window query as `items`: classified items with `prev_anchor < discovered_at <= anchor`, each with its status at the current level. So `published == items.total` when no filter is set.
 - **Preliminary score** is the model's score on a held item (no human has confirmed it). Every key of `held_by_preliminary_score` is always present, zeros included.
-  - A held item with no score would count under `"<=2"`. This doesn't happen today: the ranker scores every non-noise item.
+  - `"unscored"`: held items the ranker gave no score (a ranker failure holds them as model_failure). They are not counted as `"<=2"`, so an outage doesn't read as "nothing big pending". They are part of `held` but never of `held_high`.
   - `"noise"` is 0 under the current routing, because noise is never held (D9). The key stays so the shape is fixed.
 - **Not counted:** dismissed items, and held-out test-split items.
 - **The link to Review:** `held` equals `total` of `GET /review?brief=<date>` at the same level (§10.3).

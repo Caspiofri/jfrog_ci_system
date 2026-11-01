@@ -31,7 +31,7 @@ HELD_OUT = "held_out"  # status of a golden-set test-split item: stored, no pred
 SUGGEST_APPROVALS = 3  # D36 Q-C: suggest trusting a host after 3+ approvals and 0 dismissals
 URGENCY = {5: "act_now", 4: "this_week", 3: "monitor", 2: "fyi", 1: "fyi"}
 BRIEF_CONFIG_PATH = CONFIG_DIR / "brief.yaml"
-HELD_SCORE_KEYS = ("5", "4", "3", "<=2", "noise")
+HELD_SCORE_KEYS = ("5", "4", "3", "<=2", "unscored", "noise")  # unscored: the ranker gave no score
 TEXT_BASIS_LABELS = {"full": "Full article", "partial": "Partial article", "snippet": "Headline and teaser only",
                      "junk": "Teaser only (the page text was not the article)"}
 
@@ -237,7 +237,7 @@ class Snapshot:
                     below += 1
             elif status == "awaiting_review":
                 key = "noise" if self.outputs[i]["classification"].get("noise") else (
-                    str(score) if (score or 0) >= 3 else "<=2")
+                    "unscored" if score is None else str(score) if score >= 3 else "<=2")
                 held[key] += 1
         scores = [self.item(i)["score"] or 0 for i in listed]
         return listed, {"brief_min_score": min_score, "published": len(listed),

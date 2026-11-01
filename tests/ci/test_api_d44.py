@@ -76,7 +76,7 @@ def test_brief_lists_published_3_plus_and_counts_the_rest(env):
     assert ids(b["items"]["items"]) == ["s5", "fut", "s3"]  # s2 and s1 are published but below the Brief
     assert b["summary"] == {"brief_min_score": 3, "published": 3, "published_high": 1,
                             "published_below": 2, "held": 2, "held_high": 1,
-                            "held_by_preliminary_score": {"5": 0, "4": 1, "3": 0, "<=2": 1, "noise": 0},
+                            "held_by_preliminary_score": {"5": 0, "4": 1, "3": 0, "<=2": 1, "unscored": 0, "noise": 0},
                             "level": "strict"}
     assert b["summary"]["published"] == b["items"]["total"]
     assert b["counts"]["items"] == 5  # deprecated counts keep their old meaning: every published item
@@ -102,7 +102,8 @@ def test_the_14_day_import_day(env):
     assert ids(b["items"]["items"]) == ["pub1", "late"]
     s = b["summary"]
     assert (s["published"], s["published_high"], s["published_below"]) == (2, 1, 0)
-    assert s["held"] == 3 and s["held_by_preliminary_score"] == {"5": 0, "4": 1, "3": 2, "<=2": 0, "noise": 0}
+    assert s["held"] == 3
+    assert s["held_by_preliminary_score"] == {"5": 0, "4": 1, "3": 2, "<=2": 0, "unscored": 0, "noise": 0}
 
 
 def test_empty_window(env):
@@ -111,7 +112,7 @@ def test_empty_window(env):
     assert b["status"] == "ok" and b["items"]["total"] == 0 and b["items"]["items"] == []
     assert b["summary"] == {"brief_min_score": 3, "published": 0, "published_high": 0,
                             "published_below": 0, "held": 0, "held_high": 0,
-                            "held_by_preliminary_score": {"5": 0, "4": 0, "3": 0, "<=2": 0, "noise": 0},
+                            "held_by_preliminary_score": {"5": 0, "4": 0, "3": 0, "<=2": 0, "unscored": 0, "noise": 0},
                             "level": "strict"}
     assert review(c, brief="2026-11-02")["total"] == 0
 
@@ -121,7 +122,7 @@ def test_all_items_held(env):
     b = brief(c, "2026-11-03")
     assert b["items"]["total"] == 0  # "nothing published" is not "nothing important": the summary says why
     assert b["summary"]["held"] == 2 and b["summary"]["held_high"] == 1
-    assert b["summary"]["held_by_preliminary_score"] == {"5": 1, "4": 0, "3": 1, "<=2": 0, "noise": 0}
+    assert b["summary"]["held_by_preliminary_score"] == {"5": 1, "4": 0, "3": 1, "<=2": 0, "unscored": 0, "noise": 0}
     rows = c.get("/api/v1/briefs").json()["items"]
     assert {r["date"]: (r["published"], r["held"]) for r in rows}["2026-11-03"] == (0, 2)
 
@@ -221,3 +222,19 @@ def test_a_scheduled_item_carries_its_source_date_while_it_is_in_the_future(env,
     assert listed["scheduled_for"] == "2026-11-02T05:00:00Z"
     s5 = early.get("/api/v1/items/s5").json()["item"]
     assert s5["published_at_source"] is None and s5["scheduled_for"] is None
+
+
+def test_held_items_the_ranker_never_scored_are_counted_as_unscored(env, tmp_path):
+    """D49 review: a ranker outage holds items as model_failure with no score; they were counted as '<=2', which
+    says nothing big is pending. They now have their own bucket, and never count as held_high."""
+    c, store_path = env
+    with Store(store_path) as s:
+        s.add_items([raw("u1", f"{VETTED}u1", "Story u1", "2026-11-02T22:00:00Z", RUN5)], RUN5, START5)
+        s.save_outputs(RUN5, "fp", [Classification(id="u1", competitor="github", category="Security", noise=False,
+                                                   mentions_jfrog=False, confidence=0.9, method="llm")],
+                       [Ranked(id="u1", raw_score=None, score=None, degraded=True, noise=False, reason="",
+                               confidence=0.9)])
+    summary = brief(c, "2026-11-03")["summary"]
+    assert summary["held"] == 3 and summary["held_high"] == 1
+    assert summary["held_by_preliminary_score"] == {"5": 1, "4": 0, "3": 1, "<=2": 0, "unscored": 1, "noise": 0}
+    assert review(c, brief="2026-11-03")["total"] == summary["held"]
