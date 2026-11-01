@@ -90,6 +90,7 @@ class ItemOut(BaseModel):
     fingerprint: str | None
     event_id: str | None
     lens: dict | None  # D42: {axis, capability_quote, relation, why_it_matters, why}; None when none passed its check
+    lens_status: Literal["ok", "rejected", "failed"] | None  # the latest lens row's status; None when no lens row
     text_basis: "TextBasisOut"  # D39/D44
 
 

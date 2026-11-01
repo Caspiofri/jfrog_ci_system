@@ -521,6 +521,15 @@ Every `Item` gains `text_basis`, and `lens` gains `why_it_matters`:
   - `axis` is `null` for `not_related`.
   - `capability_quote` is `null` for `not_related`, else the verbatim line from the capability sheet.
   - `why_it_matters` is the lens sentence. `why` is the same text, kept for the current UI and deprecated.
+- **`lens_status`** (added 1 Nov): the status of the item's latest lens row, so the UI can tell why `lens` is `null`.
+
+  | `lens_status` | Meaning | `lens` |
+  |---|---|---|
+  | `ok` | The lens ran and its quote check passed | the object above |
+  | `rejected` | The lens ran but its answer broke a rule (e.g. the capability quote is not on the sheet, or no answer for this item) | `null` |
+  | `failed` | The lens call for its batch failed (model or parse error) | `null` |
+  | `null` | No lens row: the lens was not run on this item | `null` |
+
 - The item's own `why_it_matters` (the ranker's summary) is unchanged.
 - **Not built:**
   - `lens.source_url` / `source_label` (#3d). The sheet's Sources list isn't labelled by axis, and most lines hold several links, so choosing one per axis would be a guess. It needs the sheet to name a source per axis row.

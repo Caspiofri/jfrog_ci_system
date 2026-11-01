@@ -176,6 +176,7 @@ class Snapshot:
             "run_id": out["run_id"] if out else None, "fingerprint": out["fingerprint"] if out else None,
             "event_id": None,  # events are not built (D33)
             "lens": self.lens_out(item_id),
+            "lens_status": (self.lens.get(item_id) or {}).get("status"),
             "text_basis": text_basis(raw),
         }
 

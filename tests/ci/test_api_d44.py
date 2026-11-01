@@ -173,6 +173,24 @@ def test_text_basis_and_lens_fields(env):
     assert c.get("/api/v1/items/s2").json()["item"]["lens"] is None
 
 
+def test_lens_status_says_whether_a_lens_ran_and_how_it_ended(env):
+    c, store_path = env
+    assert c.get("/api/v1/items/s5").json()["item"]["lens_status"] is None  # no lens row
+    with Store(store_path) as s:
+        s.save_lens(RUN3, "lensfp", [
+            {"item_id": "s5", "status": "ok", "axis": "ai_mcp", "capability_quote": "MCP Registry",
+             "relation": "improves_shared", "why": "w", "reason": ""},
+            {"item_id": "s2", "status": "rejected", "axis": None, "capability_quote": "", "relation": None,
+             "why": "", "reason": "capability quote not on the sheet"},
+            {"item_id": "s3", "status": "failed", "axis": None, "capability_quote": "", "relation": None,
+             "why": "", "reason": "model error"}])
+    got = {i: c.get(f"/api/v1/items/{i}").json()["item"] for i in ("s5", "s2", "s3")}
+    assert {i: x["lens_status"] for i, x in got.items()} == {"s5": "ok", "s2": "rejected", "s3": "failed"}
+    assert got["s2"]["lens"] is None and got["s3"]["lens"] is None  # lens stays null unless ok
+    b = c.get("/api/v1/brief?date=2026-11-01").json()
+    assert all("lens_status" in it for it in b["items"]["items"])
+
+
 def stored(status, kept=0, rejected=0):
     return {"generated_at": "2026-11-01T05:00:00+00:00", "trigger": "daily", "level": "strict", "status": status,
             "fingerprint": "f", "model": "m", "insights": [{"insight_id": f"i{n}"} for n in range(kept)],
