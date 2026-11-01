@@ -195,3 +195,37 @@ def test_a_failing_metrics_write_never_fails_the_run(paths, monkeypatch, caplog,
     assert "run metrics not written" in caplog.text
     with Store(paths["store_path"]) as s:
         assert s.run(res.run_id)["status"] == res.status  # the run row is still finished
+
+
+def test_a_run_that_fails_before_the_store_opens_still_gets_a_failed_row(paths, monkeypatch):  # noqa: F811
+    """D48: a held lock, a missing split file or a bad config used to leave no row, so Health showed yesterday."""
+    from datetime import UTC, datetime
+
+    began = datetime.now(UTC)
+    run_id = daily.record_failure("daily", "start", "SplitMissing: split file is missing", began,
+                                  store_path=paths["store_path"])
+    with Store(paths["store_path"]) as s:
+        run = s.run(run_id)
+        [m] = s.run_metrics(run_id)
+    assert run["status"] == "failed" and "SplitMissing" in run["error"]
+    assert m["status"] == "failed" and steps_of(m)["start"]["status"] == "failed" and m["metadata"]["commit"]["sha"]
+
+
+def test_a_row_left_running_by_the_crashed_process_is_closed_not_duplicated(paths):  # noqa: F811
+    from datetime import UTC, datetime, timedelta
+
+    began = datetime.now(UTC) - timedelta(seconds=1)
+    with Store(paths["store_path"]) as s:
+        s.start_run("20261101T0400Z-cccccc", "daily", "2026-11-01T04:00:00+00:00", "fp", "m")
+    assert daily.record_failure("daily", "start", "MemoryError: x", began,
+                                store_path=paths["store_path"]) == "20261101T0400Z-cccccc"
+    with Store(paths["store_path"]) as s:
+        assert [(r["run_id"], r["status"]) for r in s.runs()] == [("20261101T0400Z-cccccc", "failed")]
+
+
+def test_recording_never_raises(tmp_path):
+    from datetime import UTC, datetime
+
+    bad = tmp_path / "not-a-dir" / "x" / "ci.sqlite"
+    (tmp_path / "not-a-dir").write_text("a file where a directory should be")
+    assert daily.record_failure("daily", "lock", "held", datetime.now(UTC), store_path=bad) is None

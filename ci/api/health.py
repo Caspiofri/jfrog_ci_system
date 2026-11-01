@@ -23,6 +23,9 @@ from ci import coverage, eval_golden
 from ci.api import service as svc
 
 WEAK_N = 10
+STALE_AFTER_H = 1.0  # D48: a run still "running" after this long was killed or hung
+OVERDUE_AFTER_H = 26.0  # D48: the daily run is due every 24 h; no daily run for this long means one was missed
+DAILY_KINDS = ("daily",)
 MIN_RUNS_FOR_SILENT = 2
 EVAL_REPORT_NAME = re.compile(r"\d{8}T\d{6}Z\.json")  # ci.eval_golden reports; not insights_*.json beside them
 DEALS_CATEGORY = "Funding/M&A/Partnerships"
@@ -108,6 +111,36 @@ def is_test_eval(report: dict) -> bool:
 
 def newest(paths: list[Path]) -> Path | None:
     return max(paths, key=lambda p: (p.stat().st_mtime, p.name)) if paths else None  # ties: the timestamped name
+
+
+def _hours(now, ts: str | None) -> float | None:
+    t = svc.parse_ts(ts) if ts else None
+    return round((now - t).total_seconds() / 3600, 1) if t else None
+
+
+def marker(run: dict, now) -> str:
+    """ok | degraded | failed | stale: a run still marked running after STALE_AFTER_H is stale (killed or hung)."""
+    if run["status"] == "running":
+        age = _hours(now, run.get("processed_at") or run["started_at"])
+        return "stale" if age is not None and age > STALE_AFTER_H else "running"
+    return run["status"]
+
+
+def liveness(runs: list[dict], now) -> dict:
+    """D48: is the daily run alive? state = none | overdue | stale | failed | degraded | running | ok, worst first:
+    overdue when the latest daily run started more than OVERDUE_AFTER_H ago, otherwise the latest run's marker.
+    A run that never started at all leaves no row; overdue is how it shows."""
+    daily = sorted((r for r in runs if r["kind"] in DAILY_KINDS), key=lambda r: r["started_at"])
+    if not daily:
+        return {"state": "none", "latest_run_id": None, "hours_since_latest": None, "stale_run_ids": [],
+                "stale_after_hours": STALE_AFTER_H, "overdue_after_hours": OVERDUE_AFTER_H}
+    latest = daily[-1]
+    since = _hours(now, latest["started_at"])
+    stale = [r["run_id"] for r in runs if marker(r, now) == "stale"]
+    state = "overdue" if since is not None and since > OVERDUE_AFTER_H else marker(latest, now)
+    return {"state": state, "latest_run_id": latest["run_id"], "latest_status": marker(latest, now),
+            "hours_since_latest": since, "stale_run_ids": stale,
+            "stale_after_hours": STALE_AFTER_H, "overdue_after_hours": OVERDUE_AFTER_H}
 
 
 def register(app, d) -> None:
@@ -255,7 +288,8 @@ def register(app, d) -> None:
                             [s.items[sg["item_id"]]["raw"] for sg in s.sightings if sg["run_id"] == run["run_id"]])},
                         "all": extraction_block([i["raw"] for i in s.items.values()])}}
             metrics = store.run_metrics(run["run_id"])
-        body |= {"run_metrics": metrics[0] if metrics else None, "eval": eval_block(), "test_eval": test_eval_block(),
+        body |= {"liveness": liveness(s.runs, d.now()),
+                 "run_metrics": metrics[0] if metrics else None, "eval": eval_block(), "test_eval": test_eval_block(),
                  "coverage": coverage_block(), "change_detection": change_block()}
         return d.ok(body)
 
@@ -285,6 +319,6 @@ def register(app, d) -> None:
         store, s = d.snap()
         with store:
             rows = [{k: r[k] for k in ("run_id", "kind", "started_at", "finished_at", "status", "fingerprint", "model")}
-                    | {"llm_calls": json.loads(r["report"] or "{}").get("llm_calls")}
+                    | {"llm_calls": json.loads(r["report"] or "{}").get("llm_calls"), "marker": marker(r, d.now())}
                     for r in sorted(s.runs, key=lambda r: r["started_at"], reverse=True)]
         return d.ok(d.page(rows, limit, offset))

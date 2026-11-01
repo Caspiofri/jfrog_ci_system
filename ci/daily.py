@@ -42,7 +42,7 @@ from ci.classify import Classifier
 from ci.dedupe import EmbeddingDeduper, SeenUrls
 from ci.llm import GeminiLLM, JsonLLM
 from ci.packet import Packet
-from ci.pipeline import CI_DATA_DIR, NO_EMBEDDING_DEDUPE, RUNS_DIR, RunResult
+from ci.pipeline import CI_DATA_DIR, NO_EMBEDDING_DEDUPE, RUNS_DIR, RunResult, new_run_id
 from ci.pipeline import run as collect_run
 from ci.rank import Ranker
 from ci.runlock import RunLocked, run_lock
@@ -388,6 +388,32 @@ def generate_insights(store: Store, run_id: str, llm: JsonLLM, cfg: ci_config.CI
             "fingerprint": res.fingerprint, "error": res.error}
 
 
+def record_failure(kind: str, stage: str, reason: str, began: datetime, store_path: Path = STORE_PATH) -> str | None:
+    """D48: a run that failed before it wrote its own row (lock held, split file missing, bad config, a crash
+    before the store opened) still gets a failed row in runs and run_metrics, so Health sees it. A row this
+    process started and left "running" is closed as failed instead of adding a second one. Never raises: the
+    failure is already in the log, and the store may be the thing that failed. Returns the run id, or None."""
+    try:
+        with Store(store_path) as store:
+            mine = [r for r in store.runs() if r["status"] == "running" and r["processed_at"] >= began.isoformat()]
+            run_id = mine[-1]["run_id"] if mine else new_run_id(began)
+            started_at = mine[-1]["started_at"] if mine else began.isoformat()
+            out = {"run_id": run_id, "kind": kind, "status": "failed", "error": reason[:500], "failed_stage": stage,
+                   "metadata": run_meta.safe_collect()}
+            if not mine:
+                store.start_run(run_id, kind, started_at, "", "")
+            steps = run_metrics.Steps()
+            steps.fail(stage, reason)
+            save_metrics(store, lambda: run_metrics.build(
+                run_id=run_id, kind=kind, status="failed", started_at=started_at, fingerprints={}, model=None,
+                llm_calls=0, steps=steps, error=reason[:500], metadata=out["metadata"]), out)
+            store.finish_run(run_id, "failed", out, reason[:500])
+        return run_id
+    except Exception:
+        log.exception("the failed run could not be recorded in the store")
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m ci.daily", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -395,15 +421,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--days", type=int, help="collection window in days (overrides window_days in config)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    kind = "import" if args.from_run else "daily"
+    began = datetime.now(UTC)
     try:
         with run_lock(LOCK_NAME):
             result = run_daily(from_run=args.from_run, days=args.days)
     except RunLocked as e:
         print(f"FAILED: {e}", file=sys.stderr)
+        record_failure(kind, "lock", str(e), began)
         return EXIT_LOCKED
     except Exception as e:  # the split file, the store, a bad run id: visible in the log, non-zero exit
         print(f"FAILED: {type(e).__name__}: {e}", file=sys.stderr)
         traceback.print_exc()
+        record_failure(kind, "start", f"{type(e).__name__}: {e}", began)
         return EXIT_FAILED
     if "funnel" in result.report:
         print(format_funnel(result.report))

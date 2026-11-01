@@ -139,3 +139,36 @@ def test_extraction_success_per_source_and_publisher_with_n(env):
     assert (ex["all"]["extracted"], ex["all"]["n"]) == (8, 9)  # 7 fixture items + the test-split item + blocked
     assert pubs and next(r for r in run["by_publisher"] if r["key"] == "DevOps.com")["fetch"] == {"not_recorded": 1}
     assert ex["all"]["fetch"] == {"not_recorded": 9}  # items stored before fetch_status existed
+
+
+def test_liveness_flags_stale_and_overdue_runs():
+    """D48: a killed run stays "running" and a missed day leaves no row; both looked like yesterday's success."""
+    from datetime import UTC, datetime
+
+    now = datetime(2026, 11, 2, 12, tzinfo=UTC)
+
+    def r(run_id, status, started, processed=None, kind="daily"):
+        return {"run_id": run_id, "kind": kind, "status": status, "started_at": started,
+                "processed_at": processed or started}
+
+    assert health.liveness([], now)["state"] == "none"
+    ok = r("a", "ok", "2026-11-02T04:00:00+00:00")
+    assert health.liveness([ok], now)["state"] == "ok" and health.liveness([ok], now)["hours_since_latest"] == 8.0
+    hung = r("b", "running", "2026-11-02T04:00:00+00:00", "2026-11-02T04:05:00+00:00")
+    assert health.marker(hung, now) == "stale" and health.liveness([hung], now)["stale_run_ids"] == ["b"]
+    fresh = r("c", "running", "2026-11-02T11:30:00+00:00")
+    assert health.liveness([ok, fresh], now)["state"] == "running"
+    old = r("d", "ok", "2026-11-01T04:00:00+00:00")  # 32 h ago: the 2 Nov run never happened
+    assert health.liveness([old], now)["state"] == "overdue"
+    imp = r("e", "ok", "2026-11-02T10:00:00+00:00", kind="import")  # an import is not the daily run
+    assert health.liveness([old, imp], now)["state"] == "overdue"
+    assert health.liveness([old, r("f", "failed", "2026-11-02T04:00:00+00:00")], now)["state"] == "failed"
+
+
+def test_health_and_runs_carry_the_liveness_markers(env):
+    c, _ = env
+    live = c.get("/api/v1/health").json()["liveness"]
+    assert live["latest_run_id"] in (RUN1, RUN2) and live["state"] in ("ok", "overdue")
+    assert (live["stale_after_hours"], live["overdue_after_hours"]) == (1.0, 26.0)
+    assert {r["marker"] for r in c.get("/api/v1/runs").json()["items"]} <= {"ok", "degraded", "failed", "stale",
+                                                                              "running"}

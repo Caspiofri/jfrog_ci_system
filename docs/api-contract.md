@@ -573,13 +573,16 @@ Every daily or import run writes one row to the store's `run_metrics` table when
 
 On a failed run, the blocks the run never reached are null, and the last step present is the one that failed.
 
-Not recorded: a run that stopped before the store opened (another run held the lock, the split file was missing). Those runs exist only in `output/logs/ci_daily.log`.
+A run that stops before it writes its own row (another run held the lock, the split file is missing, a bad config, a crash before the store opens) gets a failed row too (D48): `runs.status` failed, a `run_metrics` row whose only step is `lock` or `start`, and the report's `failed_stage`. A row the crashed process left `running` is closed as failed instead. The exit code and traceback stay in `output/logs/ci_daily.log`. Every row and report also carries `metadata` (D53: fingerprints, `sheet_sha`, models, call settings, `combined`, `commit`).
 
 ### 11.2 Endpoints
 
 - `GET /api/v1/run-metrics?limit=&offset=`: the rows, newest run first, paged like `/runs`.
 - `GET /api/v1/run-metrics/{run_id}`: one row; 404 `not_found` when the run has none.
 - `GET /api/v1/health` adds `run_metrics` for the selected run (`?run_id=`), or null.
+- `GET /api/v1/health` adds `liveness` (D48): `{state, latest_run_id, latest_status, hours_since_latest, stale_run_ids, stale_after_hours: 1, overdue_after_hours: 26}`. `state` is `overdue` when the latest daily run started more than 26 h ago (a run that never started leaves no row, so this is how it shows), otherwise the latest daily run's marker; `none` when no daily run exists.
+- `GET /api/v1/runs` rows add `marker`: `ok | degraded | failed | running | stale`. `stale` is a row still `running` more than 1 h after it started processing (killed or hung).
+- The API's log is also appended to `output/logs/ci_api.log` (no rotation).
 
 ### 11.3 The test-split eval (D23)
 

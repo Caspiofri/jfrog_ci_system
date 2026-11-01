@@ -183,9 +183,12 @@ def test_main_exit_codes(monkeypatch, capsys, outcome, code):
                       daily.FUNNEL_COLUMNS, 0)}}
         return daily.DailyResult("r", outcome, report, ["x"] if outcome != "ok" else [])
 
+    recorded = []
     monkeypatch.setattr(daily, "run_daily", fake)
     monkeypatch.setattr(daily, "run_lock", _no_lock)
+    monkeypatch.setattr(daily, "record_failure", lambda *a, **kw: recorded.append(a))  # never the live store
     assert daily.main([]) == code
+    assert [r[:2] for r in recorded] == ([("daily", "start")] if outcome == "split" else [])
     err = capsys.readouterr().err
     assert {"split": "FAILED", "degraded": "DEGRADED", "ok": ""}[outcome] in err
 
