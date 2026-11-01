@@ -3,7 +3,7 @@ import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Async, Empty, ErrorNote, ExtLink, Loading, PageHead, Panel, ScoreBadge, Tag } from "@/components/ci";
+import { Async, Empty, ErrorNote, ExtLink, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
@@ -118,6 +118,8 @@ function BriefScreen() {
 
                 <SummaryBlock date={b.date} s={b.summary} />
 
+                <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
+
                 <Panel
                   title="What was published in this Brief?"
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
@@ -135,8 +137,6 @@ function BriefScreen() {
                   )}
                   <FeedFooter total={b.items.total} all={all} offset={offset} set={set} />
                 </Panel>
-
-                <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
               </>
             )
           }
@@ -234,7 +234,7 @@ function insightState(ins: BriefInsights): string | null {
 
 /** The analyst's manual check of the insights (1 Nov). Insights stay experimental until summaries stop overstating. */
 const INSIGHTS_CHECK =
-  "Checked on 1 Nov (n = 4 insights, 12 claims): 11 of 12 claims supported, 12 of 12 citations correct; summaries overstated in all 4.";
+  "Checked on 1 Nov: 11 of 12 claims supported and 12 of 12 citations correct, but summaries overstated in all 4 insights (n = 4); 0 of 4 expected patterns fully found.";
 
 function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
   date: string; insights: BriefInsights; hl: string | null; setHl: (id: string | null) => void; onRefreshed: () => void;
@@ -360,49 +360,71 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
   );
 }
 
-/** A claim, its quote, then one source line per item it cites. The quoted item comes first. */
+/** A cited item's row: served in insights.cited_items, or fetched (same SWR key as the drawer) when it wasn't.
+ * A fetched item has no in_brief, so no "not in this Brief" tag is shown for it. */
+function useCitedItem(id: string, row?: CitedItemRow) {
+  const q = useApi<ItemDetail>(row || !id ? null : `/api/v1/items/${encodeURIComponent(id)}`);
+  const it = row ?? q.data?.item;
+  return {
+    title: it ? it.title : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`,
+    score: it?.score ?? null,
+    url: it?.url ?? null,
+    outside: row ? !row.in_brief : false,
+    belowLine: row?.score != null && row.score < 3,
+  };
+}
+
+const SCORE_TIP = "Importance of the cited item";
+
+/** One claim as one block: the quoted item's score down the left side, then the claim, its quote, and its sources.
+ * When a claim cites several items, each extra source line carries its own small score. */
 function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }) {
   const ids = [...new Set([c.quote_item_id, ...c.item_ids].filter(Boolean))];
+  const main = useCitedItem(ids[0] ?? "", ids[0] ? cited.get(ids[0]) : undefined);
+  const [bg, fg] = SCORE_COLOR[main.score ?? 0] ?? SCORE_COLOR[0];
   return (
-    <li className="flex flex-col gap-1 text-xs">
-      <div>{c.text}</div>
-      {c.quote ? (
-        <blockquote className="m-0 border-l-2 border-line pl-2 italic text-mute">&ldquo;{c.quote}&rdquo;</blockquote>
-      ) : null}
-      {c.jfrog_quote ? (
-        <blockquote className="m-0 border-l-2 border-jgreen pl-2 text-mute">
-          <span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span>
-          <span className="not-italic"> — JFrog capability sheet</span>
-        </blockquote>
-      ) : null}
-      {ids.map((id) => <SourceLine key={id} id={id} row={cited.get(id)} />)}
+    <li className="flex gap-2.5 text-xs">
+      <span title={SCORE_TIP} className="flex w-7 shrink-0 items-start justify-center rounded pt-1 text-sm font-semibold tabular-nums"
+        style={{ background: bg, color: fg }}>
+        {main.score ?? "–"}
+      </span>
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="text-[13px] font-semibold text-ink">{c.text}</div>
+        {c.quote ? <div className="italic text-mute">&ldquo;{c.quote}&rdquo;</div> : null}
+        {c.jfrog_quote ? (
+          <div className="text-mute"><span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span> — JFrog capability sheet</div>
+        ) : null}
+        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} />)}
+      </div>
     </li>
   );
 }
 
-/** Score, title (opens the drawer), "not in this Brief" when it applies, link to the source. When the API didn't
- * serve the row, the item is fetched (same SWR key as the drawer); in_brief is then unknown and no tag is shown. */
-function SourceLine({ id, row }: { id: string; row?: CitedItemRow }) {
+/** "Source: <title>" (opens the drawer), "not in this Brief" when it applies, link to the full article. */
+function SourceLine({ id, row, withScore }: { id: string; row?: CitedItemRow; withScore: boolean }) {
   const drawer = useItemDrawer();
-  const q = useApi<ItemDetail>(row ? null : `/api/v1/items/${encodeURIComponent(id)}`);
-  const it = row ?? q.data?.item;
-  const title = it ? it.title : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`;
+  const it = useCitedItem(id, row);
+  const [bg, fg] = SCORE_COLOR[it.score ?? 0] ?? SCORE_COLOR[0];
   return (
-    <div className="flex items-start gap-1.5">
-      <ScoreBadge score={it?.score ?? null} />
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-mute">
+      {withScore ? (
+        <span title={SCORE_TIP} className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums"
+          style={{ background: bg, color: fg }}>{it.score ?? "–"}</span>
+      ) : null}
+      <span>Source:</span>
       <button type="button" onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
-        className="min-w-0 text-left font-medium hover:text-jgreen-d hover:underline" title="Open the item">
-        {title}
-        {row && !row.in_brief ? (
-          <Tag className="ml-1.5 align-middle text-[10px] font-normal"
-            title={row.score != null && row.score < 3 ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
-            not in this Brief
-          </Tag>
-        ) : null}
+        className="min-w-0 text-left hover:text-jgreen-d hover:underline" title="Open the item">
+        {it.title}
       </button>
-      {it?.url ? (
-        <span onClick={(e) => e.stopPropagation()} className="shrink-0">
-          <ExtLink href={it.url} className="text-mute hover:text-jgreen-d"><ExternalLink className="mt-0.5 size-3" aria-label="Open the source" /></ExtLink>
+      {it.outside ? (
+        <Tag className="text-[10px]"
+          title={it.belowLine ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
+          not in this Brief
+        </Tag>
+      ) : null}
+      {it.url ? (
+        <span onClick={(e) => e.stopPropagation()} className="inline-flex">
+          <ExtLink href={it.url} className="text-mute hover:text-jgreen-d"><ExternalLink className="size-3" aria-label="Open the full article" /></ExtLink>
         </span>
       ) : null}
     </div>
