@@ -7,7 +7,7 @@ import { path, useApi } from "@/lib/api";
 import { LEVEL_LABEL, delta, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
-import type { Brief, BriefRow, Health, Kpi, Page, RunInfo } from "@/lib/types";
+import type { Brief, BriefRow, Health, Page, RunInfo } from "@/lib/types";
 
 export default function HealthPage() {
   return (
@@ -51,7 +51,7 @@ function HealthScreen() {
 
             {h.silent_sources ? <SilentAlert s={h.silent_sources} /> : null}
 
-            <BriefCounts served={(h as Health & { brief?: ServedCounts }).brief} />
+            <BriefCounts />
 
             <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
               <Panel title="Where do items drop off?" cap={h.funnel ? `All sources, this run · published and held at ${label(LEVEL_LABEL, h.funnel.level)}` : undefined}>
@@ -89,43 +89,45 @@ function HealthScreen() {
   );
 }
 
-const KPI_LABEL: Record<string, string> = {
-  items: "Published in the Brief",
-  important: "Rated 4 or 5",
-  found_late: "Found late",
-  mentions_jfrog: "Mention JFrog",
-};
+type Tile = { key: string; label: string; value: number; prev: number | null };
 
-type ServedCounts = { date: string; kpis: Kpi[]; prev_anchor_kind?: string | null };
-
-/** Operational counts that left the Brief (D44): from /health `brief` when served (BACKEND_REQUESTS.md 3g),
- * else the latest Brief's `kpis`. Each with the previous Brief, except when that was the initial import: a
- * 14-day backfill isn't a day, so its delta would mislead. The import is known from `anchor_kind`, never the date. */
-function BriefCounts({ served }: { served?: ServedCounts }) {
+/** The latest Brief's counts on Health. "Published" and "rated 4–5" come from the Brief's summary (scored 3+, the
+ * same numbers the Brief shows); the previous Brief's from its /briefs row. Found late and Mentions JFrog are the
+ * operational counts that left the Brief: they still come from `kpis` and count every published score.
+ * No delta when the previous Brief was the initial import: a 14-day backfill isn't comparable with one day. */
+function BriefCounts() {
   const { data: meta } = useMeta();
-  const date = served ? null : meta?.latest_brief_date;
+  const date = meta?.latest_brief_date;
   const q = useApi<Brief>(date ? path("/brief", { date, limit: 1 }) : null);
   const briefs = useApi<Page<BriefRow>>(path("/briefs", { limit: 200 }));
-  const src = served ?? (q.data ? { date: q.data.date, kpis: q.data.kpis } : null);
+  const b = q.data;
   const rows = briefs.data?.items ?? [];
-  const i = src ? rows.findIndex((r) => r.date === src.date) : -1;
+  const i = b ? rows.findIndex((r) => r.date === b.date) : -1;
   const prevRow = i >= 0 ? rows[i + 1] : undefined; // newest first
-  const prevKind = served?.prev_anchor_kind ?? prevRow?.anchor_kind ?? (prevRow?.backfill ? "import" : undefined);
-  const prevIsImport = prevKind === "import";
+  const prevIsImport = (prevRow?.anchor_kind ?? (prevRow?.backfill ? "import" : undefined)) === "import";
+  const kpi = (k: string) => b?.kpis?.find((x) => x.key === k);
+  const tiles: Tile[] = b?.summary ? [
+    { key: "published", label: `Published in the Brief (scored ${b.summary.brief_min_score}+)`, value: b.summary.published, prev: prevRow?.published ?? null },
+    { key: "published_high", label: "Of those, rated 4 or 5", value: b.summary.published_high, prev: prevRow?.published_high ?? null },
+    { key: "found_late", label: "Found late (any published score)", value: kpi("found_late")?.value ?? 0, prev: kpi("found_late")?.prev ?? null },
+    { key: "mentions_jfrog", label: "Mention JFrog (any published score)", value: kpi("mentions_jfrog")?.value ?? 0, prev: kpi("mentions_jfrog")?.prev ?? null },
+  ] : [];
   const error = q.error ?? briefs.error;
   return (
     <Panel title="How did the latest Brief's counts move?"
-      cap={src ? `Brief of ${fmtLongDate(src.date)} · ${prevIsImport ? "the previous Brief was the initial import, so no comparison" : "vs the previous Brief"}` : undefined}>
-      {error ? <ErrorNote error={error} onRetry={() => { q.mutate(); briefs.mutate(); }} /> : !src || (!served && !briefs.data) ? (
+      cap={b ? `Brief of ${fmtLongDate(b.date)} · ${prevIsImport ? "the previous Brief was the initial import, so no comparison" : "vs the previous Brief"}` : undefined}>
+      {error ? <ErrorNote error={error} onRetry={() => { q.mutate(); briefs.mutate(); }} /> : !b || !briefs.data ? (
         meta && !meta.latest_brief_date ? <Empty>No Brief yet.</Empty> : <Loading rows={1} />
+      ) : !tiles.length ? (
+        <Empty>No counts for the Brief of {fmtLongDate(b.date)}.</Empty>
       ) : (
         <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
-          {src.kpis.map((k) => {
+          {tiles.map((k) => {
             const d = delta(k.value, k.prev);
             const sub = prevIsImport
               ? <span className="text-mute" title={`The initial 14-day import had ${k.prev ?? "—"}; a backfill isn't comparable with one day`}>previous Brief was the initial import</span>
               : <span className={d.cls}>{d.text}</span>;
-            return <KpiTile key={k.key} value={k.value} label={KPI_LABEL[k.key] ?? k.key} sub={sub} />;
+            return <KpiTile key={k.key} value={k.value} label={k.label} sub={sub} />;
           })}
         </div>
       )}
