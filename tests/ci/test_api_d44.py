@@ -238,3 +238,19 @@ def test_held_items_the_ranker_never_scored_are_counted_as_unscored(env, tmp_pat
     assert summary["held"] == 3 and summary["held_high"] == 1
     assert summary["held_by_preliminary_score"] == {"5": 1, "4": 0, "3": 1, "<=2": 0, "unscored": 1, "noise": 0}
     assert review(c, brief="2026-11-03")["total"] == summary["held"]
+
+
+def test_an_insight_lists_its_cited_items_with_score_and_link(env):
+    """D50: the generator reads scores 1-2 too, so a cited item may not be in the Brief; the card can still open it."""
+    c, store_path = env
+    gen = {**stored("ok"), "insights": [{"insight_id": "i0", "item_ids": ["s5", "s2", "gone"]}]}
+    with Store(store_path) as s:
+        s.set_setting("insights_enabled", "true")
+        s.save_insights("2026-11-01", gen)
+    [ins] = brief(c, "2026-11-01")["insights"]["items"]
+    assert ins["item_ids"] == ["s5", "s2", "gone"]  # unchanged
+    rows = {r["item_id"]: r for r in ins["cited_items"]}
+    assert list(rows) == ["s5", "s2"]  # an id no longer in the store is left out
+    assert (rows["s5"]["score"], rows["s5"]["in_brief"], rows["s5"]["status"]) == (5, True, "auto_published")
+    assert (rows["s2"]["score"], rows["s2"]["in_brief"]) == (2, False)  # scored 2: not listed, still linked
+    assert rows["s2"]["url"] == f"{VETTED}s2" and rows["s2"]["title"] == "Story s2"

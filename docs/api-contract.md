@@ -477,6 +477,13 @@ The Brief separates what is known (published items scored 3+), what is pending (
 - The reasons stay in the stored generation, for Health (D37).
 - The generator's raw status (`ok | partial | none | failed`) moves to `insights.generator_status`.
 - No internal decision IDs ("D37") appear in any field meant for the UI.
+- **Cited items (D50).** Each insight in `insights.items` gains `cited_items`, one row per cited item in claim order:
+  `{"item_id", "title", "score", "url", "status", "in_brief"}`. The generator reads every published item of its
+  window, scores 1–2 included, so `in_brief: false` marks a cited item that isn't in the Brief's list; the UI opens
+  it by `item_id` (the item drawer). Additive: `item_ids` is unchanged.
+- **Failures and second runs.** A generation that raises is stored as `failed`, so the Brief says `failed`, not
+  `not_run`. A second daily run on the same Israel day doesn't regenerate that Brief's insights (they keep its
+  window). A Refresh whose generation raises answers `502 insights_failed` and keeps the earlier generation.
 
 ### 10.5 Item payload: the text basis (#3c, D39) and the lens (D42)
 

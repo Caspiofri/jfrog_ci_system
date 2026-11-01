@@ -294,7 +294,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             # rejection reasons stay in the stored generation (Health), the Brief carries only their count
             state = insights_state(enabled, stored, (stored or {}).get("insights") or [], refreshing(store, date))
             if stored:
-                generated = stored.pop("insights", [])
+                generated = [cite(s, x, set(listed)) for x in stored.pop("insights", [])]
                 ins = {**stored, "generator_status": stored.get("status"), "status": state, "items": generated,
                        "enabled": enabled, "rejected": len(stored.get("rejected") or [])}
             else:
@@ -307,6 +307,18 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                     "counts": counts, "kpis": kpis, "insights": ins, "intensity": intensity(s, w),
                     "level": s.level, "items": page(rows, limit, offset)}
         return ok(body)
+
+    def cite(s: Snapshot, insight: dict, listed: set[str]) -> dict:
+        """D50: an insight lists the items it cites, each with its score and a link, so a cited item that isn't in
+        the Brief (scored 1-2, or held since) can still be opened."""
+        rows = []
+        for i in insight.get("item_ids") or []:
+            if i not in s.items:
+                continue
+            x = s.item(i)
+            rows.append({"item_id": i, "title": x["title"], "score": x["score"], "url": x["url"],
+                         "status": s.status(i), "in_brief": i in listed})
+        return {**insight, "cited_items": rows}
 
     def intensity(s: Snapshot, w: dict, days: int = 14) -> dict:
         """Per discovery day (Israel date, D36 Q-E): sum of scores and count of published non-noise items."""
