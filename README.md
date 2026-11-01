@@ -292,7 +292,47 @@ metadata (`ci/run_meta.py`).
 - **No classifier for injected text.** Nothing detects or strips injection attempts before the prompt.
 
 Traces: LangSmith tracing is off in every eval run, whatever the environment says, which `ci/tracing.py` enforces
-with a test. The daily run may trace only with `CI_LANGSMITH_TRACING=true`, which is off by default (D48, D51).
+with a test. No Jessi run sends traces in this submission (see *Future*).
+
+## Jessi: known issues (not fixed before the freeze)
+
+Both are left as they are on purpose: the freeze keeps the measured system unchanged, and the second one feeds the
+insights window.
+
+**1. "Mentions JFrog" can come from page text the model never sees.**
+- **What happens:** the mention counter runs over the whole fetched page (`ci/pipeline.py`, `read_full_text`), but
+  only the first 6,000 characters are stored and sent to the model (`TEXT_MAX_CHARS`). A JFrog, Artifactory,
+  Frogbot or SwampUp match further down the page (a listicle entry, a nav or footer link, a related-posts block)
+  sets `mentions_jfrog`. That holds the item for review (`ci/route.py`) and adds +1 to its score (`ci/rank.py`,
+  `JFROG_BONUS`).
+- **Evidence:** 5 of the 351 stored items are flagged. For 1 of them the stored title and text contain no JFrog
+  term: `d776107280a9fb12` (OX Security, "Top 10 Application Security Testing Tools (2026 Edition)", 6,000 stored
+  characters). Its score was raised from 2 to 3 by the bonus; it is one of the 15 items of the 1 Nov reliability
+  check. What the match was isn't known: the full page isn't stored.
+- **Fix later:** take the flag from the stored text only, or store the matched snippet with the flag so a reviewer
+  can see it.
+
+**2. The source date of Google News items is the feed's date, not the publisher's.**
+- **What happens:** `ci/collectors/google_news.py` (`_published`) takes `published_at` from the RSS `<pubDate>`. No
+  code reads the article's own date (`article:published_time`, `datePublished`). For Google News that is when Google
+  dated the story, which can be an index or last-modified date. The date can then look recent for an old article.
+- **Why it isn't changed now:** the date decides the insights window (D37). Changing it changes which items the
+  insights analyze, after they were measured.
+- **Evidence (n = 2, checked against the publisher's page):**
+  - `08a1c43f07150ac3` (eSecurity Planet) is stored as 27 Oct 07:00Z; the page says published 11 Aug 2026.
+  - `d645b44fc2ae971b` (Netguru) is stored as 29 Oct 09:52Z; the page says published 6 Feb 2025, modified 29 Oct
+    2026.
+  - 207 of the 351 stored items come from Google News. How many of them have a wrong date isn't measured.
+- **In the UI:** the date is labelled "Feed date".
+- **Fix later:** read the page's own date during the fetch, keep the feed date beside it, and use the page date when
+  both exist.
+
+## Jessi: future (not in this submission)
+
+- **LangSmith tracing of the daily run (D48) is dropped for this submission.** `ci/tracing.py` is the switch it would
+  use (daily only, off by default, never in an eval). Today no Jessi code sends traces.
+- **Security advisories stay unvetted (D53, D56).** The store holds 0 GitHub or GitLab advisory pages (n = 351), so
+  vetting them would change nothing today. Revisit when advisory pages appear in the data.
 
 ---
 
