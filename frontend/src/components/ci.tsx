@@ -21,14 +21,14 @@ export function PageHead({ title, sub, tools }: { title: string; sub?: ReactNode
 }
 
 /** A white card with a question as its title (prototype .card / .ct). */
-export function Panel({ title, cap, children, className, right }: {
-  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode;
+export function Panel({ title, cap, children, className, right, big }: {
+  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean;
 }) {
   return (
     <section className={cn("min-w-0 rounded-md border border-line bg-card px-[18px] py-4", className)}>
       {title || cap || right ? (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          {title ? <h2 className="m-0 text-sm font-semibold">{title}</h2> : <span />}
+          {title ? <h2 className={cn("m-0 font-semibold", big ? "text-lg" : "text-sm")}>{title}</h2> : <span />}
           <div className="flex items-baseline gap-3">
             {cap ? <span className="text-xs text-mute">{cap}</span> : null}
             {right}

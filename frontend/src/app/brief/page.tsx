@@ -121,6 +121,7 @@ function BriefScreen() {
                 <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
 
                 <Panel
+                  big
                   title="What was published in this Brief?"
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
                 >
@@ -265,6 +266,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
   const state = insightState(insights);
   return (
     <Panel
+      big
       title={
         <span className="inline-flex items-center gap-2">
           Key insights
