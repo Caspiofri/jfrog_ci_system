@@ -349,6 +349,7 @@ export interface LogRow {
   status: Status;
   stage: string | null;
   reason: string;
+  dismiss_reason?: string | null; // §3.5: the latest dismiss action's reason, null on every other row
   duplicate_of: string | null;
   text_status: string | null;
 }
