@@ -1,10 +1,10 @@
 "use client";
 // One item in a list (prototype .row with r5/r4/r3 emphasis). Title opens the drawer; the icon opens the source.
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
 import { CategoryTag, ItemTitle, ScoreBadge, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { NO_TEXT, itemDateText } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
 import type { Item } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +21,6 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
   actions?: ReactNode;
   extra?: ReactNode;
 }) {
-  const { data: meta } = useMeta();
   const drawer = useItemDrawer();
   const s = item.noise ? 0 : (item.score ?? 0);
   return (
@@ -40,7 +39,7 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
           <ItemTitle title={item.title} url={item.url} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-mute">
-          <span className="font-medium text-ink">{competitorName(meta, item.competitor)}</span>
+          <CompetitorLabel k={item.competitor} className="font-medium text-ink" />
           <CategoryTag category={item.category} />
           <span>{item.publisher}</span>
           <span>{itemDateText(item)}</span>

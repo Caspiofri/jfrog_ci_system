@@ -1,12 +1,13 @@
 "use client";
 // A published item in the Brief (D44): score with its rubric label, then three labeled rows.
 // Every collected string renders as React text (D32); links go through safeHref via ExtLink.
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
 import { CategoryTag, ItemTitle, ScoreBadge, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { LensView } from "@/components/LensView";
 import { RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
+import { useMeta } from "@/lib/meta";
 import type { Item, Meta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +59,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function BriefCard({ item, showLate = true, highlight = false }: { item: Item; showLate?: boolean; highlight?: boolean }) {
-  const { data: meta } = useMeta();
   const drawer = useItemDrawer();
   const s = item.score ?? 0;
   const basis = textBasisWords(item.text_basis);
@@ -69,7 +69,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <ScoreLabel score={item.score} competitor={item.competitor} reason={item.reason} />
-        <span className="text-xs font-medium text-ink">· {competitorName(meta, item.competitor)}</span>
+        <span className="text-xs font-medium text-ink">·</span><CompetitorLabel k={item.competitor} className="text-xs font-medium text-ink" />
         <CategoryTag category={item.category} />
         {showLate && item.badge === "late" ? (
           <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after its feed date">Found late</Tag>

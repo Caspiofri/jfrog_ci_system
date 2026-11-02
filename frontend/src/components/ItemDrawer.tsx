@@ -1,5 +1,6 @@
 "use client";
 // The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ArticleLink, Async, CategoryTag, ScoreBadge, StatusDot, Tag } from "@/components/ci";
@@ -77,7 +78,7 @@ function DrawerBody({ id }: { id: string }) {
                 <LensBlock lens={it.lens} status={it.lens_status} />
                 {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
                 <div>
-                  <Field k="Competitor">{competitorName(meta, it.competitor)}{!it.classified ? " (prefilled, not classified)" : ""}</Field>
+                  <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>
                   {it.scheduled_for ? (
                     <Field k="Feed date">{fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)</Field>

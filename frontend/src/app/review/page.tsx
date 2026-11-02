@@ -1,4 +1,5 @@
 "use client";
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -15,7 +16,7 @@ import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
 import { SCORE_OPTIONS, SORT_ORDER_LINE, filterQueue, hasLocalFilters, queueQuery, remainingOffsets, windowOptions } from "@/lib/reviewQueue";
 import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
+import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { HoldReason, Level, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -401,7 +402,6 @@ const CHANGE_DISMISS: Record<string, string> = {
 };
 
 function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean }) {
-  const { data: meta } = useMeta();
   const refresh = useRefreshAll();
   const [err, setErr] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -426,7 +426,7 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
     <div className="flex items-start gap-3 border-t border-line bg-[#fff7e6] px-2.5 py-2.5 first:border-t-0">
       <Tag className="bg-[#f59e0b] text-white">Cell</Tag>
       <div className="min-w-0 flex-1">
-        <div className="font-semibold">{competitorName(meta, row.competitor)} · {row.axis_label ?? row.axis ?? "axis unknown"}: head-to-head cell changed</div>
+        <div className="font-semibold"><CompetitorLabel k={row.competitor} /> · {row.axis_label ?? row.axis ?? "axis unknown"}: head-to-head cell changed</div>
         <div className="mt-1 grid gap-2 text-xs md:grid-cols-2">
           <div><div className="text-mute">Was</div>{row.old_value || "—"}{row.old_evidence ? <div className="mt-0.5 italic text-mute">&ldquo;{row.old_evidence}&rdquo;</div> : null}</div>
           <div><div className="text-mute">Now</div>{row.new_value || "—"}{row.new_evidence ? <div className="mt-0.5 italic text-mute">&ldquo;{row.new_evidence}&rdquo;</div> : null}</div>

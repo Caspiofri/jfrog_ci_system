@@ -1,11 +1,11 @@
 "use client";
 // Pieces shared by the Competitors overview and profile.
+import { CompetitorAvatar, CompetitorLabel } from "@/components/CompetitorAvatar";
 import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { ItemTitle, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { CATEGORY_COLOR, SOURCE_LABEL, fmtDate, label } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
 import type { CompetitorCard, Deal } from "@/lib/types";
 
 export function Trend({ t, prev }: { t: CompetitorCard["trend"]; prev: number }) {
@@ -50,7 +50,7 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
     <Link href={`/competitors/${encodeURIComponent(c.key)}`}
       className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[18px] py-4 transition-colors hover:border-jgreen">
       <div className="flex items-center justify-between text-[15px] font-semibold">
-        <span>{c.name}</span>
+        <span className="inline-flex items-center gap-2"><CompetitorAvatar k={c.key} name={c.name} size="md" />{c.name}</span>
         <span className="flex items-center gap-1.5 text-xs font-normal text-mute">
           threat <ScoreBadge score={c.threat} />
         </span>
@@ -83,7 +83,6 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
 }
 
 export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; showCompetitor?: boolean }) {
-  const { data: meta } = useMeta();
   const drawer = useItemDrawer();
   const td = "border-b border-line px-2.5 py-2 align-top";
   return (
@@ -100,7 +99,7 @@ export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; sh
           {deals.map((d) => (
             <tr key={d.item_id}>
               <td className={`${td} whitespace-nowrap`}>{fmtDate(d.published_at, true)}</td>
-              {showCompetitor ? <td className={`${td} whitespace-nowrap`}>{competitorName(meta, d.competitor)}</td> : null}
+              {showCompetitor ? <td className={`${td} whitespace-nowrap`}><CompetitorLabel k={d.competitor} /></td> : null}
               <td className={td}><ItemTitle title={d.title} url={d.url} onOpen={() => drawer.open(d.item_id)} /></td>
               <td className={`${td} text-mute`}>{d.publisher} · {label(SOURCE_LABEL, d.source)}</td>
               <td className={td}><StatusDot status={d.status} /></td>

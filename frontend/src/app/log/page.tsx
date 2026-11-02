@@ -1,5 +1,6 @@
 "use client";
 // Log: layout and titles kept from the prototype (the user liked it as is). Data from GET /api/v1/log.
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Async, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
@@ -9,7 +10,7 @@ import { useItemDrawer } from "@/components/ItemDrawer";
 import { ReopenButton } from "@/components/review/actions";
 import { path, useApi } from "@/lib/api";
 import { DISMISS_LABEL, STAGE_LABEL, STATUS_COLOR, STATUS_LABEL, fmtDate, label } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
+import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { Log, LogRow } from "@/lib/types";
 
@@ -84,7 +85,7 @@ function LogScreen() {
                         </tr>
                       </thead>
                       <tbody>
-                        {d.items.map((r, i) => <LogTr key={`${r.item_id}-${r.run_id}-${r.stage}-${i}`} r={r} name={competitorName(meta, r.competitor)} />)}
+                        {d.items.map((r, i) => <LogTr key={`${r.item_id}-${r.run_id}-${r.stage}-${i}`} r={r} />)}
                       </tbody>
                     </table>
                   </div>
@@ -105,14 +106,14 @@ function LogScreen() {
   );
 }
 
-function LogTr({ r, name }: { r: LogRow; name: string }) {
+function LogTr({ r }: { r: LogRow }) {
   const drawer = useItemDrawer();
   const dropped = r.status === "dropped";
   const td = "border-b border-line px-2.5 py-[9px] align-top";
   return (
     <tr>
       <td className={`${td} whitespace-nowrap`}>{fmtDate(r.collected_at)}</td>
-      <td className={`${td} whitespace-nowrap`}>{r.competitor ? name : "—"}</td>
+      <td className={`${td} whitespace-nowrap`}>{r.competitor ? <CompetitorLabel k={r.competitor} /> : "—"}</td>
       <td className={td}>
         <ItemTitle title={r.title} url={r.url} onOpen={dropped || !r.item_id ? undefined : () => drawer.open(r.item_id!)} />
         {dropped && r.duplicate_of ? (

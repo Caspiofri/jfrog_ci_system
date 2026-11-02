@@ -1,5 +1,6 @@
 "use client";
 // Health blocks (contract §9). Every eval number carries its n; coverage is counts with n, never a rate.
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -301,7 +302,6 @@ function Count({ l, c }: { l: string; c?: { captured: number; n: number } }) {
 }
 
 export function Coverage({ cv }: { cv: NonNullable<Health["coverage"]> }) {
-  const { data: meta } = useMeta();
   if (cv.status !== "ok") return <Empty>No coverage check has run yet.</Empty>;
   return (
     <div className="flex flex-col gap-3">
@@ -319,7 +319,7 @@ export function Coverage({ cv }: { cv: NonNullable<Health["coverage"]> }) {
           {cv.missed.map((m) => (
             <div key={m.id} className="border-t border-line py-1.5 text-xs first:border-t-0">
               <ItemTitle title={m.title} url={m.official_url} />
-              <span className="text-mute"> · {competitorName(meta, m.competitor)} · expected importance {m.expected_importance}</span>
+              <span className="text-mute"> · <CompetitorLabel k={m.competitor} /> · expected importance {m.expected_importance}</span>
             </div>
           ))}
         </div>
