@@ -49,13 +49,24 @@ test("the Log's legend also names noise (N) and not scored (–)", () => {
   assert.match(ci, /text: "–", label: "not scored"/);
 });
 
-test("Brief: Importance (1–5) once, directly under the title; under the insights only the Category colours", () => {
+test("Brief: Importance (1–5) once, directly under the title; no category legend", () => {
   const brief = read("app/brief/page.tsx");
   assert.equal((brief.match(/<ImportanceLegend\b/g) ?? []).length, 1);
-  assert.equal((brief.match(/<CategoryColours\b/g) ?? []).length, 1);
-  assert.doesNotMatch(brief, /<ColourLegends\b|<ScoreLegend\b|<CategoryLegend\b|<ColorLegend\b/);
+  assert.doesNotMatch(brief, /<CategoryColours\b|<ColourLegends\b|<ScoreLegend\b|<CategoryLegend\b|<ColorLegend\b/);
   assert.match(brief, /<PageHead[\s\S]*?\/>\s*<ImportanceLegend /);
-  assert.match(brief, /<InsightsPanel [^\n]*\/>\s*<CategoryColours /);
   assert.match(ci, /export function ImportanceLegend[\s\S]*?title="Importance \(1–5\)"/);
-  assert.match(ci, /export function CategoryColours[\s\S]*?title="Category"/);
+});
+
+test("Competitors overview: the legends sit under the competitor cards, not above them", () => {
+  const i = overview.indexOf("<ColourLegends />"), cards = overview.indexOf("<CompetitorCardView");
+  assert.ok(i > cards && cards > -1);
+  assert.equal((overview.match(/<ColourLegends \/>/g) ?? []).length, 1);
+});
+
+test("Importance legend names every score, 2 and 1 in the rubric's own words", async () => {
+  const { RUBRIC } = await import("../src/lib/format.ts");
+  assert.deepEqual([5, 4, 3, 2, 1].map((n) => RUBRIC[n].label),
+    ["Strategic move", "Material change", "Relevant development", "Intelligence value, no new event", "Routine operational event"]);
+  assert.match(RUBRIC[2].competitor, /^No new event, but intelligence value/); // rubric v2 row 2, verbatim
+  assert.match(RUBRIC[1].competitor, /^A routine operational event/); // rubric v2 row 1, verbatim
 });
