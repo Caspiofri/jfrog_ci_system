@@ -67,7 +67,10 @@ test("a claim card opens the side panel with its claim, quote and JFrog line (gr
   assert.match(brief, /const open = \(\) => ids\[0\] && drawer\.open\(ids\[0\], ctx\);/);
   assert.match(brief, /drawer\.open\(id, ctx\)/);
   assert.match(drawer, /\{ctx \? <ClaimBlockInDrawer c=\{ctx\} \/> : null\}/);
-  assert.match(drawer, /In this insight/);
+  assert.match(drawer, /This article is cited in the insight/);
+  assert.match(drawer, /the claim is the insight&apos;s own wording, not the article&apos;s/);
+  assert.match(drawer, /Quoted from this article: /);
+  assert.match(drawer, /Article headline · item \{id\}/);
   assert.match(drawer, /c\.capability \? "[^"]*bg-\[#eef7f0\][^"]*text-jgreen-d" : "text-mute"/);
   assert.match(drawer, /JFrog \{c\.capability\}:<\/b> <span className="italic">&ldquo;\{c\.jfrogQuote\}&rdquo;/);
   assert.match(drawer, /&ldquo;\{c\.jfrogQuote\}&rdquo;<\/span> — JFrog capability sheet/);

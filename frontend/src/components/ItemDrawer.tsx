@@ -79,9 +79,12 @@ function MentionWhy({ d }: { d: ItemDetail }) {
 function ClaimBlockInDrawer({ c }: { c: ClaimContext }) {
   return (
     <div className="flex flex-col gap-1 rounded border border-line bg-page px-3 py-2 text-xs" data-drawer-claim>
-      <span className="font-semibold text-mute">In this insight{c.insight ? `: ${c.insight}` : ""}</span>
+      <span className="text-mute">
+        This article is cited in the insight{c.insight ? <> <b className="font-semibold text-ink">&ldquo;{c.insight}&rdquo;</b></> : null} for this claim
+        (the claim is the insight&apos;s own wording, not the article&apos;s):
+      </span>
       <span className="text-[13px] font-semibold text-ink">{c.claim}</span>
-      {c.quote ? <span className="italic text-mute">&ldquo;{c.quote}&rdquo;</span> : null}
+      {c.quote ? <span><span className="text-mute">Quoted from this article: </span><span className="italic text-ink">&ldquo;{c.quote}&rdquo;</span></span> : null}
       {c.jfrogQuote ? (
         <span className={c.capability ? "rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2 py-0.5 text-jgreen-d" : "text-mute"} data-drawer-jfrog>
           {c.capability ? <><b className="font-semibold">JFrog {c.capability}:</b> <span className="italic">&ldquo;{c.jfrogQuote}&rdquo;</span></>
@@ -103,7 +106,7 @@ function DrawerBody({ id, ctx }: { id: string; ctx: ClaimContext | null }) {
           <span>{q.data?.item.title ?? "Item"}</span>
           {q.data ? <ArticleLink href={q.data.item.url} className="mt-1" /> : null}
         </SheetTitle>
-        <SheetDescription className="text-xs">Item {id}</SheetDescription>
+        <SheetDescription className="text-xs">Article headline · item {id}</SheetDescription>
       </SheetHeader>
       <div className="px-5 pb-6">
         <Async {...q} retry={() => q.mutate()} rows={6}>
