@@ -1,4 +1,4 @@
-// npm test: "From the article" on Brief cards and in the drawer: collapsed by default, text as served.
+// npm test: Brief cards keep "What happened" visible; the drawer has the article dropdown, the JFrog mention and tag.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -8,31 +8,28 @@ const ex = read("components/ArticleExcerpt.tsx");
 const card = read("components/brief/BriefCard.tsx");
 const drawer = read("components/ItemDrawer.tsx");
 
-test("labelled 'From the article', collapsed by default behind 'Show excerpt'", () => {
-  assert.match(ex, /EXCERPT_LABEL = "From the article"/);
+test("Brief card: the earlier design: 'What happened' with the excerpt visible, 'Why it matters to JFrog' on every card", () => {
+  assert.match(card, /<Row label="What happened">\s*\{item\.excerpt\.trim\(\) \? <span className="[^"]*">\{item\.excerpt\}<\/span>/);
+  assert.match(card, /<Row label="Why it matters to JFrog"><LensView lens=\{item\.lens\} status=\{item\.lens_status\} \/><\/Row>/);
+  assert.match(card, /<Row label="Evidence">/);
+  assert.doesNotMatch(card, /ArticleExcerpt|Show excerpt|showLensBlock/);
+});
+
+test("drawer: the article dropdown, collapsed by default, holds the excerpt and the Source link", () => {
   assert.match(ex, /const \[open, setOpen\] = useState\(false\)/);
-  assert.match(ex, /\{open \? "Hide excerpt" : "Show excerpt"\}/);
-  assert.match(ex, /\{open \? <span className="[^"]*">\{excerpt\}<\/span> : null\}/);
+  assert.match(ex, /SHOW_LABEL = "Show article excerpt"/);
+  assert.match(ex, /<button type="button" aria-expanded=\{open\}/);
+  assert.match(ex, /\{open \? \([\s\S]*?\{excerpt\}[\s\S]*?<ArticleLink href=\{url\}/);
+  assert.match(drawer, /<ArticleExcerpt excerpt=\{it\.excerpt\} url=\{it\.url\} \/>/);
 });
 
-test("the toggle is a real button with aria-expanded, and doesn't trigger the card behind it", () => {
-  assert.match(ex, /<button type="button" aria-expanded=\{open\} onClick=\{\(e\) => \{ e\.stopPropagation\(\); setOpen\(!open\); \}\}/);
-});
-
-test("the text is shown as served: not stripped, shortened or rewritten", () => {
+test("the excerpt is shown as served: not stripped, shortened or rewritten", () => {
   const body = ex.slice(ex.indexOf("export function ArticleExcerpt"));
   assert.doesNotMatch(body, /\.(replace|slice|substring|split)\(/);
-  assert.match(ex, /NO_EXCERPT = "Only the headline is available\."/);
 });
 
-test("Brief card: 'From the article' replaces 'What happened'; title, Why it matters (when it exists) and Evidence stay visible", () => {
-  assert.doesNotMatch(card + drawer, /What happened/);
-  assert.match(card, /<Row label=\{EXCERPT_LABEL\}><ArticleExcerpt excerpt=\{item\.excerpt\} \/><\/Row>/);
-  assert.match(card, /\{showLensBlock\(item\.lens, item\.lens_status\) \? \(\s*<Row label="Why it matters to JFrog">/);
-  assert.match(card, /<Row label="Evidence">/);
-  assert.match(card, /<ItemTitle title=\{item\.title\}/);
-});
-
-test("drawer: the same collapsed excerpt under 'From the article'", () => {
-  assert.match(drawer, /\{EXCERPT_LABEL\}<\/div>\s*<ArticleExcerpt excerpt=\{it\.excerpt\} \/>/);
+test("drawer: the JFrog sentence shows only when the excerpt holds it; the tag is the Brief's 'Mentions JFrog'", () => {
+  assert.match(drawer, /\{it\.mentions_jfrog && jfrogSentence\(it\.excerpt\) \? \([\s\S]*?JFrog is mentioned:[\s\S]*?\{jfrogSentence\(it\.excerpt\)\}/);
+  assert.match(drawer, /\{it\.mentions_jfrog \? <MentionsJfrog excerpt=\{it\.excerpt\} \/> : null\}/);
+  assert.match(card, /<MentionsJfrog excerpt=\{item\.excerpt\} \/>/);
 });

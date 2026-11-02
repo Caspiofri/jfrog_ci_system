@@ -1,8 +1,8 @@
 "use client";
 // The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
-import { ArticleExcerpt, EXCERPT_LABEL } from "@/components/ArticleExcerpt";
+import { ArticleExcerpt } from "@/components/ArticleExcerpt";
 import { MentionsJfrog } from "@/components/MentionsJfrog";
-import { showLensBlock } from "@/lib/jfrogMention";
+import { jfrogSentence, showLensBlock } from "@/lib/jfrogMention";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -75,15 +75,17 @@ function DrawerBody({ id }: { id: string }) {
                   <ScoreBadge score={it.score} noise={it.noise} />
                   <StatusDot status={it.status} />
                   <CategoryTag category={it.category} />
-                  {it.mentions_jfrog ? <MentionsJfrog excerpt={it.excerpt} strong={false} /> : null}
+                  {it.mentions_jfrog ? <MentionsJfrog excerpt={it.excerpt} /> : null}
                   {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
                   {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
                 {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
-                <div>
-                  <div className="mb-1 text-xs font-semibold text-mute">{EXCERPT_LABEL}</div>
-                  <ArticleExcerpt excerpt={it.excerpt} />
-                </div>
+                {it.mentions_jfrog && jfrogSentence(it.excerpt) ? (
+                  <div className="rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2 py-1 text-xs text-jgreen-d" data-jfrog-mention>
+                    <b className="font-semibold">JFrog is mentioned:</b> <span className="italic">&ldquo;{jfrogSentence(it.excerpt)}&rdquo;</span>
+                  </div>
+                ) : null}
+                <ArticleExcerpt excerpt={it.excerpt} url={it.url} />
                 <div>
                   <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>
