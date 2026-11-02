@@ -72,6 +72,9 @@ function BriefScreen() {
     <>
       <PageHead
         title="Daily Brief"
+        info={brief.data?.window ? (backfill
+          ? "The 14-day import that started the store. Everything in it was published before the first run, so \"Found late\" badges are hidden here."
+          : `Everything discovered from ${fmtDateTime(brief.data.window.prev_anchor)} to ${fmtDateTime(brief.data.window.anchor)} Israel time (${brief.data.window.hours} h).`) : undefined}
         sub={
           <span className="mt-1 flex items-center gap-2">
             <Button variant="outline" size="icon" className="size-7" disabled={!older} onClick={() => go(older)} aria-label="Previous Brief">
@@ -112,12 +115,6 @@ function BriefScreen() {
               <Panel><Empty>No Brief for {fmtLongDate(b.date)}: there was no successful daily run that day.</Empty></Panel>
             ) : (
               <>
-                <div className="-mt-2 text-xs text-mute">
-                  {backfill
-                    ? "The 14-day import that started the store. Everything in it was published before the first run, so \"Found late\" badges are hidden here."
-                    : `Everything discovered from ${fmtDateTime(b.window.prev_anchor)} to ${fmtDateTime(b.window.anchor)} Israel time (${b.window.hours} h).`}
-                </div>
-
                 <SummaryBlock date={b.date} s={b.summary} runId={b.window.anchor_run_id} />
 
                 <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
@@ -126,11 +123,8 @@ function BriefScreen() {
                   big
                   title="What was published in this Brief?"
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
+                  info={`The items found in this Brief's window and rated ${b.brief_min_score ?? 3} or higher on importance, published automatically or approved by an analyst. Items still waiting in the Review queue aren't listed.`}
                 >
-                  <p className="m-0 -mt-1 mb-2 text-xs text-mute">
-                    The items found in this Brief&apos;s window and rated {b.brief_min_score ?? 3} or higher on importance, published automatically or
-                    approved by an analyst. Items still waiting in the Review queue aren&apos;t listed.
-                  </p>
                   {b.items.items.length ? (
                     b.items.items.map((it) => <BriefCard key={it.item_id} item={it} showLate={!backfill} highlight={highlighted.has(it.item_id)} />)
                   ) : (
@@ -270,6 +264,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         </span>
       }
       cap={cap}
+      info={windowText(insights.window)}
       right={
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={refresh} disabled={busy || !enabled || insights.status === "refreshing"}
           title={enabled ? "Run pattern analysis again after analyst approvals; the 06:00 version is kept" : "Pattern analysis is not enabled for this Brief"}>
@@ -288,7 +283,6 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         <Empty>{state}</Empty>
       ) : (
         <>
-          <WindowLine w={insights.window} />
           <div className="mb-3 flex items-center gap-1.5 rounded border border-[#f59e0b]/60 bg-[#fff7e6] px-2.5 py-1.5 text-xs font-semibold text-[#8a5a00]">
             <Sparkles className="size-3.5 shrink-0" aria-hidden /> AI-generated — check the cited sources
           </div>
@@ -305,15 +299,11 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
 }
 
 /** Why insights can cite items outside the Brief: they read a wider window. Every value comes from the API's
- * insights.window (the window the generator actually used); nothing is shown when it isn't served. */
-function WindowLine({ w }: { w: BriefInsights["window"] }) {
-  if (!w?.days) return null;
+ * insights.window (the window the generator actually used); nothing when it isn't served. Shown on hover. */
+function windowText(w: BriefInsights["window"]): string | undefined {
+  if (!w?.days) return undefined;
   const span = w.from && w.to ? ` (${fmtDate(w.from)}–${fmtDate(w.to)}${w.stories != null ? `, ${w.stories} ${w.stories === 1 ? "story" : "stories"}` : ""})` : "";
-  return (
-    <p className="m-0 mb-2 text-xs text-mute">
-      Patterns across items from the last {w.days} days{span}, so they can cite items outside today&apos;s Brief.
-    </p>
-  );
+  return `Patterns across items from the last ${w.days} days${span}, so they can cite items outside today's Brief.`;
 }
 
 /** One insight per row. Always visible: type, top importance, title, summary, why it matters (no story count: the evidence lists them).

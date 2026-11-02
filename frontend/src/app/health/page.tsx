@@ -26,7 +26,7 @@ function HealthScreen() {
     <>
       <PageHead
         title="Health"
-        sub="Does the system run, and is it correct"
+        info="Does the system run, and is it correct?"
         tools={runs.data?.items.length ? (
           <FilterSelect ariaLabel="Run" allLabel="Latest daily run" value={runId} onChange={(v) => set({ run: v })} className="h-8 min-w-[16rem] bg-white text-[13px]"
             options={runs.data.items.map((r) => ({ value: r.run_id, label: `${fmtDateTime(r.started_at)} · ${r.kind} · ${MARKER[r.marker ?? r.status]?.label ?? r.status}` }))} />

@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArticleLink, Async, Empty, ErrorNote, HBars, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, Empty, ErrorNote, HBars, Hint, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ItemRow } from "@/components/ItemRow";
@@ -73,7 +73,7 @@ function ReviewScreen() {
 
   return (
     <>
-      <PageHead title="Review queue" sub="Items held by the routing rules, each with the reason it was held" />
+      <PageHead title="Review queue" info="Items held by the routing rules, each with the reason it was held." />
       {trustMsg ? <TrustToast res={trustMsg} onDone={() => setTrustMsg(null)} /> : null}
 
       <Async {...q} retry={() => q.mutate()} rows={6}>
@@ -179,19 +179,20 @@ function LevelControl({ levels, current, shown, onPreview }: {
   return (
     <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Autonomy level">
       {levels.map((l) => (
-        <button key={l.level} type="button" role="radio" aria-checked={shown === l.level} onClick={() => onPreview(l.level)}
+        <Hint key={l.level} text={LEVEL_HELP[l.level]} asChild>
+        <button type="button" role="radio" aria-checked={shown === l.level} onClick={() => onPreview(l.level)}
           className={cn("flex items-center gap-3 rounded border px-3 py-2 text-left transition-colors hover:border-jgreen",
             shown === l.level ? "border-jgreen bg-accent" : "border-line")}>
-          <span className="flex-1">
+          <span className="flex flex-1 items-center gap-1.5">
             <span className="font-semibold">{label(LEVEL_LABEL, l.level)}</span>
-            {current === l.level ? <Tag className="ml-2 bg-jgreen px-1.5 text-[11px] text-white">current</Tag> : null}
-            <span className="block text-[11px] text-mute">{LEVEL_HELP[l.level]}</span>
+            {current === l.level ? <Tag className="bg-jgreen px-1.5 text-[11px] text-white">current</Tag> : null}
           </span>
           <span className="text-right">
             <b className="text-lg font-semibold tabular-nums">{l.held}</b>
             <span className="block text-[11px] text-mute">held</span>
           </span>
         </button>
+        </Hint>
       ))}
     </div>
   );
@@ -357,7 +358,7 @@ function TrustedSources() {
     }
   };
   return (
-    <Panel title="Which sources have earned trust?" cap="Suggested after 3+ approvals and no dismissals">
+    <Panel title="Which sources have earned trust?" info="A host is suggested after 3 or more approvals and no dismissals.">
       {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
       <div className="grid gap-4 md:grid-cols-2">
         <div>

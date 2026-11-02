@@ -1,7 +1,7 @@
 "use client";
 // Small shared pieces in the prototype's style. All API strings are rendered as React text (D32).
 import type { ReactNode } from "react";
-import { AlertTriangle, ArrowUpRight, Inbox, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Inbox, Info, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -9,11 +9,27 @@ import type { ApiError } from "@/lib/api";
 import { CATEGORY_COLOR, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, label, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export function PageHead({ title, sub, tools }: { title: string; sub?: ReactNode; tools?: ReactNode }) {
+/** A small (i) that explains on hover and keyboard focus: long explanations live here, not on screen. */
+export function InfoHint({ text, label: aria = "What this means" }: { text: ReactNode; label?: string }) {
+  if (!text) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" aria-label={aria} data-info-hint
+          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full align-middle text-mute outline-none hover:text-jgreen-d focus-visible:ring-2 focus-visible:ring-jgreen">
+          <Info className="size-3.5" aria-hidden />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-left font-normal">{text}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function PageHead({ title, sub, tools, info }: { title: string; sub?: ReactNode; tools?: ReactNode; info?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2.5">
       <div>
-        <h1 className="m-0 text-[22px] font-semibold">{title}</h1>
+        <h1 className="m-0 flex items-center gap-1.5 text-[22px] font-semibold">{title}<InfoHint text={info} /></h1>
         {sub ? <div className="mt-0.5 text-mute">{sub}</div> : null}
       </div>
       {tools ? <div className="flex flex-wrap items-center gap-2">{tools}</div> : null}
@@ -22,14 +38,14 @@ export function PageHead({ title, sub, tools }: { title: string; sub?: ReactNode
 }
 
 /** A white card with a question as its title (prototype .card / .ct). */
-export function Panel({ title, cap, children, className, right, big }: {
-  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean;
+export function Panel({ title, cap, children, className, right, big, info }: {
+  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean; info?: ReactNode;
 }) {
   return (
     <section className={cn("min-w-0 rounded-md border border-line bg-card px-[18px] py-4", className)}>
       {title || cap || right ? (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          {title ? <h2 className={cn("m-0 font-semibold", big ? "text-lg" : "text-sm")}>{title}</h2> : <span />}
+          {title ? <h2 className={cn("m-0 flex items-center gap-1.5 font-semibold", big ? "text-lg" : "text-sm")}>{title}<InfoHint text={info} /></h2> : <span />}
           <div className="flex items-baseline gap-3">
             {cap ? <span className="text-xs text-mute">{cap}</span> : null}
             {right}

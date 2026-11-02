@@ -40,7 +40,7 @@ export default function CapabilitiesPage() {
   const { rows, verified } = readSheet();
   return (
     <>
-      <PageHead title="JFrog capability sheet" sub="What JFrog offers on each head-to-head axis: the lines lens quotes are checked against" />
+      <PageHead title="JFrog capability sheet" info="What JFrog offers on each head-to-head axis: the lines the lens quotes are checked against." />
       <Panel title="Capabilities by axis" cap="config/jfrog_capabilities.md · official JFrog pages, as of 30 Oct 2026">
         {verified ? <p className="m-0 mb-3 text-xs text-mute">{verified}</p> : null}
         <div className="overflow-x-auto">

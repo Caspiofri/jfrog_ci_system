@@ -9,7 +9,7 @@ export default function CompetitorsPage() {
   const q = useApi<Competitors>("/api/v1/competitors");
   return (
     <>
-      <PageHead title="Competitors" sub="Threat is the highest importance this week" />
+      <PageHead title="Competitors" info="Threat is the highest importance this week." />
       <Async {...q} retry={() => q.mutate()} rows={6} isEmpty={(d) => !d.items.length} empty="No competitors in the config.">
         {(d) => (
           <>

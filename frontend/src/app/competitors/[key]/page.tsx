@@ -81,7 +81,7 @@ function Profile() {
               </div>
 
               {p.head_to_head ? (
-                <Panel title="How do they compare with JFrog?" cap="Changed cells are highlighted and go to review · not stated = the page says nothing, not a gap">
+                <Panel title="How do they compare with JFrog?" info="Changed cells are highlighted and go to review. Not stated means the page says nothing on that axis, not that there is a gap.">
                   <HeadToHead competitor={p.key} name={p.name} axes={p.head_to_head.axes} />
                 </Panel>
               ) : (

@@ -38,7 +38,7 @@ function LogScreen() {
 
   return (
     <>
-      <PageHead title="Log" sub="Every collected item, including dropped ones" />
+      <PageHead title="Log" info="Every collected item, including dropped ones." />
       <Async {...q} retry={() => q.mutate()} rows={6}>
         {(d) => {
           const byStatus = d.counts.status;
