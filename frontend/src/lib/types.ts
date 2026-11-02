@@ -167,6 +167,23 @@ export interface Insight {
   jfrog_quotes?: string[];
   /** Contract §10.4 (D50): one row per cited item, claim order. in_brief false = not in this Brief's list. */
   cited_items?: CitedItemRow[];
+  /** Contract §14: absent on older data. */
+  continuity?: InsightContinuity | null;
+}
+
+export interface InsightContinuity {
+  status: "new" | "continuing" | "strengthened" | string;
+  since: string | null; // the previous Brief's date
+  new_stories: number | null;
+  matched?: string[];
+}
+
+export interface PreviousInsights {
+  date: string | null;
+  status: string | null;
+  insights: number;
+  unmatched: number;
+  unmatched_ids?: string[];
 }
 
 export interface CitedItemRow {
@@ -190,6 +207,7 @@ export interface BriefInsights {
   window?: { from?: string; to?: string; days?: number; items?: number; stories?: number };
   rejected?: number; // a count (§10.4)
   items: Insight[];
+  previous?: PreviousInsights | null; // contract §14: absent on older data
   mock?: boolean; // dev mock scenarios only
 }
 

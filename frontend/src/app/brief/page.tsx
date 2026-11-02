@@ -15,6 +15,7 @@ import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Claim, Insight, ItemDetail, Page, RunMetrics } from "@/lib/types";
 import { todayTiles } from "@/lib/briefNumbers";
+import { CONTINUITY_TIP, continuityBadge, goneLine } from "@/lib/continuity";
 
 const TOP = 5;
 const PAGE = 50;
@@ -273,6 +274,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
       }
     >
       <p className="m-0 mb-2 text-xs text-[#44516a]">{INSIGHTS_CHECK}</p>
+      {goneLine(insights.previous) ? <p className="m-0 mb-2 text-xs text-ink" data-gone-line>{goneLine(insights.previous)}</p> : null}
       {insights.mock ? <div className="mb-2"><MockTag what="this insights state" /></div> : null}
       {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
       {busy || state === "refreshing" ? (
@@ -329,6 +331,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
     >
       <div className="flex flex-wrap items-center gap-1.5" data-insight-header>
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
+        <ContinuityBadge c={ins.continuity} />
         {ins.max_score ? <span className="text-xs text-mute">top importance {ins.max_score}</span> : null}
       </div>
       <h3 className="m-0 text-sm font-semibold">{ins.title}</h3>
@@ -350,6 +353,23 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
       ) : null}
       {ins.baseline_note ? <div className="text-[11px] text-mute">{ins.baseline_note}</div> : null}
     </div>
+  );
+}
+
+const BADGE_STYLE: Record<string, string> = {
+  new: "border-[#3f5b8f]/40 bg-[#e8eefb] text-[#3f5b8f]",
+  continuing: "border-line bg-page text-ink",
+  strengthened: "border-jgreen/50 bg-[#eef7f0] text-jgreen-d",
+};
+
+/** New / Also in previous Brief (<date>) [· +N new sources], from the API's continuity field; nothing when absent. */
+function ContinuityBadge({ c }: { c: Insight["continuity"] }) {
+  const b = continuityBadge(c, (d) => fmtDate(d));
+  if (!b) return null;
+  return (
+    <Hint text={CONTINUITY_TIP}>
+      <Tag className={cn("border text-[11px] font-semibold", BADGE_STYLE[b.status])}>{b.text}</Tag>
+    </Hint>
   );
 }
 
