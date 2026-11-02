@@ -153,19 +153,37 @@ test("the view: capability list (select on narrow screens), first one open, Expa
   assert.doesNotMatch(comp, /<table|overflow-x-auto|StateIcon/);
 });
 
-test("vendor row: name beside every avatar, value clamped to 2 lines and expandable, Source, as-of date, stale clock, profile link", () => {
-  assert.match(comp, /<CompetitorAvatar k=\{k\} name=\{name\} size="md" \/>\}\s*\{name\}/);
-  assert.match(comp, /aria-expanded=\{open\}[\s\S]*?!open && "line-clamp-2"/);
-  assert.match(comp, /<ArticleLink href=\{c\.source\}/);
+test("vendor row: bold name beside every avatar (JFrog too), value ~70 characters wide and 2 lines, as-of right, Source icon, compare arrow on hover", () => {
+  assert.match(comp, /<CompetitorAvatar k=\{k\} name=\{name\} size="md" \/>\s*\{name\}/);
+  assert.match(comp, /flex w-36 shrink-0 items-center gap-1\.5 font-semibold/);
+  assert.match(comp, /aria-expanded=\{open\}[\s\S]*?max-w-\[70ch\][\s\S]*?font-normal[\s\S]*?!open && "line-clamp-2"/);
+  assert.match(comp, /sm:ml-auto sm:justify-end[\s\S]*?as of \{fmtDate\(c\.asOf, true\)\}/);
+  assert.match(comp, /<ArticleLink href=\{c\.source\} label=\{`Open \$\{name\}'s source page in a new tab`\} iconOnly \/>/);
   assert.match(comp, /<Clock className="size-3" aria-hidden \/> Stale/);
-  assert.match(comp, /as of \{fmtDate\(c\.asOf, true\)\}/);
-  assert.match(comp, /href=\{`\/competitors\/\$\{encodeURIComponent\(k\)\}#head-to-head`\}/);
+  assert.match(comp, /href=\{`\/competitors\/\$\{encodeURIComponent\(k\)\}#head-to-head`\}[\s\S]*?opacity-0[\s\S]*?group-hover:opacity-100 \[@media\(hover:none\)\]:opacity-100/);
   assert.match(readFileSync(new URL("../src/app/competitors/[key]/page.tsx", import.meta.url), "utf8"), /id="head-to-head"/);
   assert.match(comp, /NOT_STATED_LINE = "Their page says nothing:"/);
   assert.match(comp, /NOT_TRACKED_LINE = "Not tracked yet:"/);
+  const ci = readFileSync(new URL("../src/components/ci.tsx", import.meta.url), "utf8");
+  assert.match(ci, /title=\{iconOnly \? "Source" : aria\}/);
+});
+
+test("JFrog row is the anchor: own-colour avatar, green tint and edge, then a 'Competitors' separator", async () => {
+  const { COMPETITOR_COLOR } = await import("../src/lib/competitors.ts");
+  assert.equal(COMPETITOR_COLOR.jfrog, "#1f7a33");
+  assert.match(comp, /jfrog \? "border-l-4 border-jgreen bg-\[#eef7f0\]"/);
+  assert.match(comp, /<VendorRow c=\{v\.jfrog\} k="jfrog" name="JFrog" jfrog \/>\s*<div[^>]*data-separator>\s*Competitors/);
+});
+
+test("capability list: selected is tinted with an accent bar and bold; others muted; one dot per vendor by data state", () => {
+  assert.match(comp, /i === sel \? "border-jgreen border-l-4 bg-\[#eef7f0\] text-ink" : "border-line text-mute"/);
+  assert.match(comp, /i === sel \? "font-bold" : "font-medium"/);
+  assert.match(comp, /\{c\.n\} of \{c\.of\} pages state something<\/span>\s*<VendorDots /);
+  assert.match(comp, /background: on \? competitorColor\(k\) : "#d5dbe4"/);
+  assert.match(comp, /const label = `\$\{n\}: \$\{c \? STATE_INFO\[c\.state\]\.label/);
 });
 
 test("still at the top of the Competitors view, above the cards; JFrog row first with a light tint", () => {
   assert.ok(page.indexOf("<CapabilityMatrix />") < page.indexOf("<Async"));
-  assert.match(comp, /<VendorRow c=\{v\.jfrog\} k="jfrog" name="JFrog" jfrog \/>\s*\{v\.listed\.map/);
+  assert.match(comp, /<VendorRow c=\{v\.jfrog\} k="jfrog" name="JFrog" jfrog \/>[\s\S]*?\{v\.listed\.map/);
 });

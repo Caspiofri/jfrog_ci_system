@@ -4,12 +4,14 @@
 // not tracked yet fold into two muted lines. No comparison, no verdict: colour only marks the data state.
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Clock } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Clock } from "lucide-react";
 import { ArticleLink, ErrorNote, Panel } from "@/components/ci";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
-import { buildMatrix, capabilityCount, capabilityRows, type MatrixCell, type MatrixRow } from "@/lib/matrix";
+import { STATE_INFO, buildMatrix, capabilityCount, capabilityRows, states, type MatrixCell, type MatrixRow } from "@/lib/matrix";
+import { competitorColor } from "@/lib/competitors";
+import { emphasize } from "@/lib/emphasis";
 import { useMeta } from "@/lib/meta";
 import type { CompetitorProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -18,30 +20,56 @@ export const CAPTION = "What was found on public pages, not a verdict.";
 export const NOT_STATED_LINE = "Their page says nothing:";
 export const NOT_TRACKED_LINE = "Not tracked yet:";
 
-/** One vendor's row: avatar and name, the value (2 lines, click to expand), source, as-of date; stale gets a clock. */
+/** Numbers, currency amounts and "+" in bold; the text itself is unchanged and dates stay plain. */
+function Emphasized({ text }: { text: string }) {
+  return <>{emphasize(text).map((p, i) => (p.bold ? <b key={i} className="font-semibold">{p.text}</b> : <span key={i}>{p.text}</span>))}</>;
+}
+
+/** One vendor's row: bold name; regular value (2 lines, ~70 characters wide, click to expand); as-of date right,
+ *  small and muted; Source as an icon; "compare" arrow on row hover (always on touch screens). */
 function VendorRow({ c, k, name, jfrog = false }: { c: MatrixCell; k: string; name: string; jfrog?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={cn("flex flex-col gap-1 border-t border-line px-3 py-2 first:border-t-0 sm:flex-row sm:items-start sm:gap-3", jfrog && "bg-[#f8fbf8]")}
+    <div className={cn("group flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-start sm:gap-3", jfrog ? "border-l-4 border-jgreen bg-[#eef7f0]" : "border-t border-line first-of-type:border-t-0")}
       data-vendor={k} data-state={c.state}>
       <span className="flex w-36 shrink-0 items-center gap-1.5 font-semibold">
-        {jfrog ? null : <CompetitorAvatar k={k} name={name} size="md" />}
+        <CompetitorAvatar k={k} name={name} size="md" />
         {name}
       </span>
-      <span className="min-w-0 flex-1">
-        <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} title={open ? "Show less" : "Show all"}
-          className={cn("text-left text-[13px] text-ink hover:text-jgreen-d", !open && "line-clamp-2")}>{c.full}</button>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-mute">
-          {c.stale ? (
-            <span className="inline-flex items-center gap-1 text-[#8a5a00]" title={c.staleReason ?? undefined}>
-              <Clock className="size-3" aria-hidden /> Stale{c.asOf ? ` · as of ${fmtDate(c.asOf, true)}` : ""}
-            </span>
-          ) : c.asOf ? <span>as of {fmtDate(c.asOf, true)}</span> : null}
-          <ArticleLink href={c.source} label={`Open ${name}'s source page in a new tab`} />
-          {jfrog ? null : <Link href={`/competitors/${encodeURIComponent(k)}#head-to-head`} className="hover:text-jgreen-d hover:underline">Compare on {name}&apos;s profile</Link>}
-        </span>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} title={open ? "Show less" : "Show all"}
+        className={cn("min-w-0 max-w-[70ch] flex-1 text-left text-[13px] font-normal text-ink hover:text-jgreen-d", !open && "line-clamp-2")}>
+        <Emphasized text={c.full ?? ""} />
+      </button>
+      <span className="flex shrink-0 items-center gap-2 text-[11px] text-mute sm:ml-auto sm:justify-end">
+        {c.stale ? (
+          <span className="inline-flex items-center gap-1 text-[#8a5a00]" title={c.staleReason ?? undefined}>
+            <Clock className="size-3" aria-hidden /> Stale{c.asOf ? ` · as of ${fmtDate(c.asOf, true)}` : ""}
+          </span>
+        ) : c.asOf ? <span>as of {fmtDate(c.asOf, true)}</span> : null}
+        <ArticleLink href={c.source} label={`Open ${name}'s source page in a new tab`} iconOnly />
+        {jfrog ? null : (
+          <Link href={`/competitors/${encodeURIComponent(k)}#head-to-head`} aria-label={`Compare on ${name}'s profile`} title={`Compare on ${name}'s profile`}
+            className="inline-flex items-center text-mute opacity-0 transition-opacity hover:text-jgreen-d focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+            <ArrowRight className="size-3.5" aria-hidden />
+          </Link>
+        )}
       </span>
     </div>
+  );
+}
+
+/** One dot per vendor (JFrog + 6): its avatar colour when its page states something, grey otherwise. */
+function VendorDots({ r, order, name }: { r: MatrixRow; order: string[]; name: (k: string) => string }) {
+  const all: [string, string, MatrixCell][] = [["jfrog", "JFrog", r.jfrog], ...order.map((k) => [k, name(k), r.cells[k]] as [string, string, MatrixCell])];
+  return (
+    <span className="mt-1 flex items-center gap-1" data-dots>
+      {all.map(([k, n, c]) => {
+        const label = `${n}: ${c ? STATE_INFO[c.state].label : STATE_INFO.not_tracked.label}`;
+        const on = c && states(c);
+        return <span key={k} title={label} aria-label={label} role="img" className="inline-block size-2 rounded-full"
+          style={{ background: on ? competitorColor(k) : "#d5dbe4" }} data-dot={on ? "on" : "off"} />;
+      })}
+    </span>
   );
 }
 
@@ -52,6 +80,9 @@ function CapabilityBlock({ r, order, name, title = false }: { r: MatrixRow; orde
     <section className="min-w-0 rounded-md border border-line" data-capability={r.axis} aria-label={r.label}>
       {title ? <h3 className="m-0 border-b border-line px-3 py-2 text-sm font-semibold">{r.label} <span className="text-xs font-normal text-mute">{n} of {of} pages state something</span></h3> : null}
       <VendorRow c={v.jfrog} k="jfrog" name="JFrog" jfrog />
+      <div className="flex items-center gap-2 px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-mute" data-separator>
+        Competitors<span className="h-px flex-1 bg-line" aria-hidden />
+      </div>
       {v.listed.map((k) => <VendorRow key={k} c={r.cells[k]} k={k} name={name(k)} />)}
       {v.notStated.length || v.notTracked.length ? (
         <div className="flex flex-col gap-0.5 border-t border-line bg-page px-3 py-2 text-xs text-mute" data-folded>
@@ -103,9 +134,11 @@ export function CapabilityMatrix() {
               const c = capabilityCount(r);
               return (
                 <button key={r.axis} type="button" role="tab" aria-selected={i === sel} onClick={() => setSel(i)}
-                  className={cn("rounded border px-3 py-2 text-left transition-colors hover:border-jgreen", i === sel ? "border-jgreen bg-accent" : "border-line")}>
-                  <span className="block text-[13px] font-semibold">{r.label}</span>
+                  className={cn("rounded border px-3 py-2 text-left transition-colors hover:border-jgreen",
+                    i === sel ? "border-jgreen border-l-4 bg-[#eef7f0] text-ink" : "border-line text-mute")}>
+                  <span className={cn("block text-[13px]", i === sel ? "font-bold" : "font-medium")}>{r.label}</span>
                   <span className="block text-[11px] text-mute">{c.n} of {c.of} pages state something</span>
+                  <VendorDots r={r} order={keys} name={name} />
                 </button>
               );
             })}

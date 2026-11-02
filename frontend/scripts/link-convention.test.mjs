@@ -18,7 +18,7 @@ test("only ArticleLink opens a new tab", () => {
   assert.deepEqual(hits.map((p) => p.replace(SRC, "")), ["components/ci.tsx"]);
   const ci = read(join(SRC, "components/ci.tsx"));
   assert.equal(ci.match(/target="_blank"/g).length, 1, "one external-link element in ci.tsx");
-  assert.match(ci, /export function ArticleLink[\s\S]*?target="_blank"[\s\S]*?Source<ExternalLink/);
+  assert.match(ci, /export function ArticleLink[\s\S]*?target="_blank"[\s\S]*?\{iconOnly \? null : "Source"\}<ExternalLink/);
 });
 
 test("no other link style is left: no text link to an article, no chain-link or arrow icon", () => {

@@ -10,6 +10,7 @@ export const COMPETITOR_COLOR: Record<string, string> = {
   snyk: "#0f766e", // teal
   aws: "#b45309", // amber-brown
   industry: "#6b7280", // grey
+  jfrog: "#1f7a33", // JFrog green: the anchor row of the capability view
 };
 export const OTHER_COLOR = "#9ca3af";
 

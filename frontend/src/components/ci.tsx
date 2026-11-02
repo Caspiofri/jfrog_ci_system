@@ -183,14 +183,16 @@ export const ARTICLE_LINK_LABEL = "Open the original article in a new tab";
 
 /** The one external-link style: "Source" with the external-link icon (box with arrow), opening the original page in
  *  a new tab. Nothing when the URL isn't http(s). */
-export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className }: { href: string | null | undefined; label?: string; className?: string }) {
+export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className, iconOnly = false }: {
+  href: string | null | undefined; label?: string; className?: string; iconOnly?: boolean;
+}) {
   const safe = safeHref(href);
   if (!safe) return null;
   return (
-    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={aria} title={aria}
+    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={aria} title={iconOnly ? "Source" : aria}
       onClick={(e) => e.stopPropagation()}
       className={cn("inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[11px] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
-      Source<ExternalLink className="size-3" aria-hidden="true" />
+      {iconOnly ? null : "Source"}<ExternalLink className={iconOnly ? "size-3.5" : "size-3"} aria-hidden="true" />
     </a>
   );
 }
