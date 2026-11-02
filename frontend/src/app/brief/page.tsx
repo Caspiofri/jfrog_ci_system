@@ -395,9 +395,10 @@ function AiLabel() {
 function JfrogQuote({ c }: { c: Claim }) {
   const cap = claimCapability(c, CAPABILITY_ROWS);
   return (
-    <div className="text-mute" data-jfrog-quote={cap.source}>
+    <div data-jfrog-quote={cap.source}
+      className={cap.key ? "rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2 py-0.5 text-jgreen-d" : "text-mute"}>
       {cap.key ? (
-        <><b className="font-semibold text-ink">JFrog {CAPABILITY_NAME[cap.key]}:</b> <span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span></>
+        <><b className="font-semibold">JFrog {CAPABILITY_NAME[cap.key]}:</b> <span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span></>
       ) : (
         <><span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span> — JFrog capability sheet</>
       )}

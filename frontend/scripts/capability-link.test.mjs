@@ -54,3 +54,8 @@ test("the chip is in the header, visible while collapsed", () => {
   assert.match(collapsed, /<TouchesJfrog claims=\{ins\.claims\} \/>/);
   assert.match(brief, /Touches JFrog: \{caps\.map\(\(k\) => CAPABILITY_NAME\[k\]\)\.join\(" · "\)\}/);
 });
+
+test("a named capability line is green like the Touches JFrog chip; an unnamed quote stays muted", () => {
+  assert.match(brief, /className=\{cap\.key \? "[^"]*bg-\[#eef7f0\][^"]*text-jgreen-d" : "text-mute"\}/);
+  assert.match(brief, /<Tag className="[^"]*bg-\[#eef7f0\][^"]*text-jgreen-d">\s*Touches JFrog/);
+});
