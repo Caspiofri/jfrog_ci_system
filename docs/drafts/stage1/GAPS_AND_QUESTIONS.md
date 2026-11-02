@@ -214,6 +214,13 @@ classifier outputs competitor, category, noise and confidence; the ranker output
 `SNIPPET_SCORE_CAP = 4  # … (Ofri, Oct 30: was 3)`. The value is a design setting, but the PRD should state it if the
 README cites it.
 
+**c25. Routing: D9 and D34 vs `ci/route.py`.** Eleven differences are listed with quotes and code lines in
+`RULES.md` §6.6. The main ones: D9 still describes "one autonomy threshold" while the code has three levels; D9's
+"M&A" is the whole Funding/M&A/Partnerships category in the code; D9's "security claims about JFrog" has no rule of
+its own (only `mentions_jfrog`, in any category); D34's level definitions omit the D36 reasons (`model_failure` and
+`invalid_output` at Relaxed; `low_confidence`, `teaser_high_score` and `junk_extraction` at Balanced); and "Trust this
+source" writes to the store, not to `config/vetted_sources.yaml`.
+
 ---
 
 ## d. Open questions for Ofri
@@ -241,3 +248,4 @@ Ordered by how much they block. Each can be answered in one line.
 16. **"Good, accurate and scalable" (c21):** part of the official brief, or the PRD's paraphrase?
 17. **Rubric text (c22):** is `config/rubric_v2.md` the frozen rubric, with the PRD table to be updated to match?
 18. **Event type and gap_verified (c23):** mark D29's outputs as not built (future), or drop them from D29?
+19. **Routing text (c25):** update the D9 and D34 rows to match `ci/route.py`, or is any code rule meant to change?

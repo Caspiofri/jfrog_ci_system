@@ -1,6 +1,6 @@
-# Jessi rules: classify, category and ranking (DRAFT, 2 Nov 2026)
+# Jessi rules: classify, category, ranking and routing (DRAFT, 2 Nov 2026)
 
-What decides each item's competitor, category, noise flag and score. Text is taken from the PRD (decision IDs given)
+What decides each item's competitor, category, noise flag, score and route (published or held). Text is taken from the PRD (decision IDs given)
 and from the files the pipeline actually reads at `main` ae8fbb5. Where the code holds the exact wording, the code's
 wording is quoted, because that is what runs. Differences between the PRD and the code are listed at the end and in
 `GAPS_AND_QUESTIONS.md` (c20, c22–c24).
@@ -261,7 +261,180 @@ page text the model never saw (D57).
 
 ---
 
-## 6. Where each rule lives
+## 6. Routing rules: what is published and what waits for an analyst
+
+Read from the code at ae8fbb5, not from the PRD, because the code is what runs. The main file is `ci/route.py`. The
+API adds analyst decisions and trusted hosts (`ci/api/service.py`), and the Review screen shows the labels in
+`frontend/src/lib/format.ts`. Line numbers refer to ae8fbb5. Differences from D9 and D34 are listed in §6.6, and no
+side is taken there.
+
+### 6.1 How routing works
+
+| Rule | Source | Plain English |
+| --- | --- | --- |
+| Three levels: Strict, Balanced, Relaxed. The default is Strict | `ci/route.py:29-30` | The autonomy setting has three steps, and a new install starts at Strict. |
+| The level is stored as one setting and changed through `PUT /api/v1/settings/autonomy-level` | `ci/store.py:485-496`, `ci/api/app.py:445-457` | One setting covers the whole system. It is not set per analyst or per competitor. |
+| Status is computed on every read and never stored, so a level change re-routes at once | `ci/route.py:17-18`, `ci/route.py:114-123` | When you change the level, the queue and the Brief change straight away. Nothing needs to be re-run. |
+| An item is held when at least one of its hold reasons applies at the current level | `ci/route.py:108-111` | One reason is enough to send an item to an analyst. |
+| Noise is `dropped`: it gets no hold reasons and never reaches the queue or the Brief | `ci/route.py:74-75`, `ci/route.py:117-118` | Items judged not relevant go only to the Log, never to the review queue. |
+| An analyst decision overrides routing. Order: dismissed, then flagged, then approved | `ci/api/service.py:128-141` | Once an analyst decides on an item, the autonomy setting no longer moves it. |
+| `approved` and `flagged` count as published, alongside `auto_published` | `ci/api/service.py:26` | An item an analyst approves or flags is shown as published. |
+| Review queue order: items with a reason that holds at every level first, then highest score, then oldest | `ci/api/app.py:427-430` | Items that would wait for an analyst at any setting are listed first. |
+| Changed head-to-head cells come from the changes store, not from items, and are held at every level | `ci/route.py:103-105`, `ci/api/competitors.py:249-271` | Every change to a comparison-table cell waits for an analyst. |
+
+### 6.2 Per autonomy level (news items)
+
+In the tables below, "score" means the final score, after the +1 Mentions JFrog bonus and the snippet cap
+(`ci/rank.py:75-81`). Noise is left out because it is dropped at every level.
+
+**Strict** (default)
+
+| Held for an analyst | Published automatically |
+| --- | --- |
+| Any item from an unvetted source, whatever its score (`unvetted_source`) | A non-noise item that meets all of these: |
+| Classifier confidence below 0.8 (`low_confidence`) | • from a vetted or trusted source |
+| Headline or teaser only (`snippet`) and score 4 or more (`teaser_high_score`) | • confidence 0.8 or higher |
+| Page text judged junk and score 4 or more (`junk_extraction`) | • not a teaser-only or junk item scored 4 or more |
+| Category Pricing & Packaging (`pricing`) | • category is not Pricing & Packaging or Funding/M&A/Partnerships |
+| Category Funding/M&A/Partnerships (`m_and_a`) | • does not mention JFrog |
+| Mentions JFrog (`mentions_jfrog`) | • classifier and ranker both answered |
+| Classifier or ranker gave no usable answer (`model_failure`) | • passed output validation |
+| Rejected by output validation, D32 (`invalid_output`) | |
+
+**Balanced**
+
+| Held for an analyst | Published automatically |
+| --- | --- |
+| Unvetted source **and score 4 or more** (`unvetted_source`). An item with no score is not held for this reason but is held as `model_failure` | Everything Strict publishes, plus unvetted-source items scored 1–3 that no other reason holds |
+| Classifier confidence below 0.8 (`low_confidence`) | |
+| Teaser-only and score 4 or more (`teaser_high_score`) | |
+| Junk text and score 4 or more (`junk_extraction`) | |
+| `pricing`, `m_and_a`, `mentions_jfrog`, `model_failure`, `invalid_output` (as at Strict) | |
+
+**Relaxed**
+
+| Held for an analyst | Published automatically |
+| --- | --- |
+| Only the reasons that hold at every level: `pricing`, `m_and_a`, `mentions_jfrog`, `model_failure`, `invalid_output` (and `changed_cell` for comparison-table cells) | Every other non-noise item, including unvetted sources at any score, low confidence, and teaser-only or junk items scored 4 or more |
+
+### 6.3 Hold reasons that apply at every level
+
+| Key | Exact condition in the code | Label the UI shows | Source | Plain English |
+| --- | --- | --- | --- | --- |
+| `pricing` | `x.category == "Pricing & Packaging"` | Pricing | `ci/route.py:34`, `ci/route.py:89-90`; label `frontend/src/lib/format.ts:55` | Pricing and packaging news always goes to an analyst, whatever the autonomy setting. |
+| `m_and_a` | `x.category == "Funding/M&A/Partnerships"`, which covers the whole category, so funding rounds and partnerships are included | M&A / funding | `ci/route.py:34`, `ci/route.py:91-92`; label `format.ts:56` | Funding, acquisition and partnership news always goes to an analyst, whatever the autonomy setting. |
+| `mentions_jfrog` | `x.mentions_jfrog` is true (see §6.5 for how it is set) | Mentions JFrog | `ci/route.py:93-94`; label `format.ts:57` | Items that mention JFrog always go to an analyst, whatever the autonomy setting. |
+| `model_failure` | `x.classifier_degraded or x.ranker_degraded`: the classifier fell back (`ci/classify.py:470-473`) or the ranker gave no usable score (`ci/rank.py:220-222`) | Model failure | `ci/route.py:95-97`; label `format.ts:58` | When the model gave no usable answer, the item always goes to an analyst instead of being shown with a made-up value. |
+| `invalid_output` | The item has at least one D32 validation rejection in the store (`store.rejection_reasons()`) | Invalid model output | `ci/route.py:98-99`, `ci/store.py:329`, `ci/validate.py:138-150`; label `format.ts:59` | When the model's answer broke the output rules (score out of range, an unknown competitor or category, an unknown item ID), the item always goes to an analyst. |
+| `changed_cell` | Every changed head-to-head cell with status `awaiting_review` in the changes store | Changed head-to-head cell | `ci/route.py:103-105`, `ci/api/competitors.py:249-271`; label `format.ts:60` | Every change to a cell of the comparison table always goes to an analyst. |
+
+A key with no entry in the UI label map is shown with its underscores replaced by spaces
+(`frontend/src/lib/format.ts:97-98`). Every key above has an entry.
+
+### 6.4 Hold reasons that depend on the level
+
+| Key | Held at | Exact condition in the code | Label the UI shows | Source | Plain English |
+| --- | --- | --- | --- | --- | --- |
+| `unvetted_source` | Strict; Balanced only when score ≥ 4 | `not vetted(x.url)`; Balanced is added when `x.score is not None and x.score >= 4` | Unvetted source | `ci/route.py:77-80`; label `format.ts:51` | At Strict every item from an unvetted publisher waits for an analyst, at Balanced only those scored 4 or 5, and at Relaxed none do. |
+| `low_confidence` | Strict, Balanced | `x.confidence < 0.8` | Low confidence | `ci/route.py:31`, `ci/route.py:81-83`; label `format.ts:52` | At Strict and Balanced, items the classifier was unsure about wait for an analyst. |
+| `teaser_high_score` | Strict, Balanced | `x.score >= 4` and `text_status == "snippet"` | High score on a teaser | `ci/route.py:84-86`, threshold `ci/rank.py:26`; label `format.ts:53` | At Strict and Balanced, an item scored 4 or 5 from its headline or teaser alone waits for an analyst. |
+| `junk_extraction` | Strict, Balanced | `x.score >= 4` and `text_status == "junk"` | Junk extraction | `ci/route.py:87-88`, threshold `ci/rank.py:26`; label `format.ts:54` | At Strict and Balanced, an item scored 4 or 5 whose page text could not be read cleanly waits for an analyst. |
+
+What "vetted" means in the code:
+
+| Rule | Source | Plain English |
+| --- | --- | --- |
+| A host is vetted when it, or a parent domain, is listed under `first_party` or `trade_press` | `ci/sources.py:84-98`, `config/vetted_sources.yaml` | A source counts as vetted when its site is on the approved list of competitor sites and trade press. |
+| github.com and gitlab.com are vetted only under the tracked orgs, and only for releases, tags, blob/tree and changelog pages | `ci/sources.py:27`, `ci/sources.py:76-81`, `config/vetted_sources.yaml` `github_orgs` / `gitlab_orgs` | On GitHub and GitLab only a competitor's own release, file and changelog pages count as vetted. Issues, discussions and pull requests do not. |
+| gist.github.com is never vetted | `ci/sources.py:26` | Gists are never vetted, because anyone can post one. |
+| A host trusted through "Trust this source" counts as vetted, and so does any subdomain of it | `ci/api/service.py:115-120`, `ci/store.py:443` | Once an analyst trusts a source, its items are routed as vetted. |
+| github.com, gitlab.com, gist.github.com and hosts already on the list cannot be trusted | `ci/api/app.py:602-608` | Trust cannot be used to bypass the per-org GitHub and GitLab rule. |
+| Trust is suggested after 3 or more approvals and 0 dismissals from one host | `ci/api/service.py:31`, `ci/api/service.py:264-269` | After an analyst approves 3 items from a source and dismisses none, the queue suggests trusting it. |
+
+### 6.5 Mentions JFrog: the hold and the +1 bonus
+
+One flag drives two separate rules.
+
+- **The flag** (`ci/classify.py:253-256`). True when the regex `\b(jfrog|artifactory|frogbot|swampup)\b`
+  (`ci/classify.py:58`, case-insensitive) matches the title plus the stored text with URLs removed. It is also true
+  when the full-page mention count, taken before text truncation, found JFrog. The LLM does not set it ("Mentions
+  JFrog is always the regex", `ci/classify.py:8`). A bare "Xray" does not count (`ci/classify.py:53-54`).
+- **The hold** (`ci/route.py:93-94`). It holds the item at every level and does not read the score.
+- **The bonus** (`ci/rank.py:24`, `ci/rank.py:75-77`). It adds +1 to the score when the score is below 5 and records
+  "+1 Mentions JFrog" in the adjustments. The snippet cap runs after it (`ci/rank.py:79-81`), so a teaser-only or junk
+  item that mentions JFrog still ends at 4 at most.
+
+How they relate:
+
+1. Both rules read the same flag, and neither rule reads the other.
+2. Every item with the flag is already held at every level, so the bonus never decides whether routing publishes an
+   item. It changes the score the analyst sees, the item's place in the queue and, after approval, its place in the
+   Brief.
+3. The bonus can add more hold reasons to an item the flag already holds. A teaser-only item with model score 3
+   becomes 4 and is also listed as `teaser_high_score`. An unvetted item with model score 3 becomes 4 and is also held
+   as `unvetted_source` at Balanced. The status stays the same; only the list of reasons gets longer.
+
+Plain English: "Items that mention JFrog always go to an analyst, whatever the autonomy setting, and their score is
+raised by one point (never above 5) so they rank higher once approved."
+
+The flag can come from page text the ranker never saw, and the bonus raised a score Ofri judged too high in 2 cases
+(n = 2, D62; EXPERIMENTAL; see §5).
+
+### 6.6 Differences between the code and D9 / D34
+
+Quotes are from `docs/specs/PRD.md` in the clone (D9 at line 263, D34 at line 238). Neither the code nor the PRD is
+judged right here.
+
+1. **Threshold vs levels.** D9: "Confidence-based routing: each item is auto-published or sent to an analyst review
+   queue by one autonomy threshold". Code: three named levels defined by hold reasons, with no threshold number
+   (`ci/route.py:3`, `ci/route.py:29`). D34 says it "updates D9", but the D9 row has not been changed.
+2. **"M&A" vs the whole category.** D9: "high-stakes categories (pricing, M&A, security claims about JFrog)". Code:
+   `m_and_a` holds the whole "Funding/M&A/Partnerships" category, funding rounds and partnerships included
+   (`ci/route.py:34`, `ci/route.py:91-92`; the docstring at `ci/route.py:11` says "(the whole category)"). The UI label
+   is "M&A / funding" and does not mention partnerships (`frontend/src/lib/format.ts:56`).
+3. **"Security claims about JFrog".** D9 lists it as a forced-review category. The code has no rule for the Security
+   category combined with JFrog. The closest rule is `mentions_jfrog` (`ci/route.py:93-94`), which holds any item that
+   names JFrog through the regex, in any category, and does not match an item that names only a bare "Xray"
+   (`ci/classify.py:53-58`).
+4. **"Forced" low confidence.** D9: "Review is forced for low classifier confidence". Code: held at Strict and
+   Balanced only, so published at Relaxed (`ci/route.py:81-83`). This matches D36: "Low confidence (below 0.8) is
+   held at Strict and Balanced".
+5. **"Forced" for unvetted sources.** D9: "Review is forced for … unvetted sources". Code: held at Strict, at Balanced
+   only when score ≥ 4, and not at Relaxed (`ci/route.py:77-80`). This matches D34's level definitions.
+6. **Relaxed holds more than D34 lists.** D34: "Relaxed = only the always-held reasons (Pricing, M&A, Mentions JFrog,
+   changed head-to-head cells)". Code: Relaxed also holds `model_failure` and `invalid_output` (`ci/route.py:95-99`).
+   Both come from D36 ("model failures and D32 rejections are held at every level") and the PRD's Routing paragraph
+   (line 110).
+7. **Balanced holds more than D34 lists.** D34: "Balanced = unvetted held only at score ≥4". Code: Balanced also holds
+   `low_confidence`, `teaser_high_score` and `junk_extraction` (`ci/route.py:81-88`), from D36.
+8. **Strict holds more than D34 lists.** D34: "Strict = every unvetted source + everything D9 always holds". Code:
+   Strict also holds `teaser_high_score` and `junk_extraction` (`ci/route.py:84-88`, D36). Neither appears in D9.
+9. **Which score the ≥ 4 checks use.** D34 says "score ≥4" without saying whether this is the model's score or the
+   final one. Code: `x.score` is the final score, after the +1 bonus and the snippet cap (`ci/route.py:65-67`,
+   `ci/rank.py:75-81`).
+10. **Where "Trust this source" writes.** D34: "a "Trust this source" action in the review queue that adds a
+    publisher to the vetted list". Code: trusted hosts are stored in the store (`ci/store.py:443`) and combined with
+    `config/vetted_sources.yaml` when the API reads them (`ci/api/service.py:115-120`). The yaml file is not changed.
+    `python -m ci.route` counts with the yaml list only (`ci/route.py:72`, `ci/route.py:152-156`), so its counts do
+    not include trusted hosts.
+11. **D34's counts were not re-measured here.** D34: "Strict 84, Balanced 28 held of 228". This was measured on 31 Oct.
+    Vetting changed after that (github.com per org, D49; gitlab.com, D53; advisories, D56). Whether the counts are the
+    same at ae8fbb5 is unknown, and this draft did not open the store to check.
+
+Notes on the code itself, for the record. These are not differences from the PRD.
+
+- `ci/rank.py:86-91` defines the teaser and junk review rules a second time and stores them as `needs_review` /
+  `review_reasons` on the ranking (`ci/store.py:78`). Routing does not read those fields. It recomputes the rules in
+  `ci/route.py:84-88`. Both use `SNIPPET_REVIEW_MIN = 4` (`ci/rank.py:26`).
+- `ci/insights.py:132-140` (`published()`) calls `route.status` without trusted hosts. It is not called from `ci/` at
+  ae8fbb5. The daily run selects insight inputs through the API's status, which does include trusted hosts
+  (`ci/daily.py:376`).
+- Two constants share the name `LOW_CONFIDENCE`. In `ci/route.py:31` it is the 0.8 hold line. In `ci/classify.py:48`
+  it is the 0.2 confidence given to a failed answer, and such an item is also held as `model_failure`.
+
+---
+
+## 7. Where each rule lives
 
 | Rule | File | Frozen by |
 | --- | --- | --- |
@@ -271,11 +444,15 @@ page text the model never saw (D57).
 | 2-vs-3 line, vulnerability rule, bonus, snippet cap, ordering | `ci/rank.py` | D40, D41 |
 | Noise pre-filter (shadow) | `ci/prefilter.py` | D25, D41 |
 | Capability sheet (3-vs-4 reference, lens, insights) | `config/jfrog_capabilities.md` | sheet_sha e7f13e0b3456 |
+| Hold reasons, levels, status | `ci/route.py` | D9, D34, D36 |
+| Vetted hosts, per-org GitHub/GitLab rule | `config/vetted_sources.yaml`, `ci/sources.py` | D34, D49, D53 |
+| Trusted hosts, analyst decisions, trust suggestion | `ci/api/service.py`, `ci/store.py` | D16, D34, D36 |
+| UI labels of hold reasons | `frontend/src/lib/format.ts` | — |
 | Regression tests for misfires and injections | `tests/ci/` | D24, D51 |
 
-## 7. Differences between the PRD and the code
+## 8. Differences between the PRD and the code
 
-Not resolved here; see `GAPS_AND_QUESTIONS.md` c20 and c22–c24.
+Not resolved here; see `GAPS_AND_QUESTIONS.md` c20 and c22–c24. Routing differences are in §6.6 and c25.
 
 1. The rubric file the ranker reads has lines the PRD's rubric table lacks: "Keywords never raise a score by
    themselves", "an unverifiable gap is not a 4", "GA of an existing preview = 3 by default", extra examples in the

@@ -5,7 +5,7 @@
 > **PROVEN** (measured on data the tuning never saw), **EXPERIMENTAL** (measured, but small n, single labeler, or the
 > tuning data), **PENDING** (planned, not run yet), **FUTURE** (not built). All labels are by one labeler (Ofri).
 > Every sentence that rests on a result not in yet carries a `[PENDING: …]` tag, so one search finds them all.
-> Full list of numbers: `EVIDENCE_TABLE.md`. Full text of the classify, category and ranking rules: `RULES.md`.
+> Full list of numbers: `EVIDENCE_TABLE.md`. Full text of the classify, category, ranking and routing rules: `RULES.md`.
 > Open points: `GAPS_AND_QUESTIONS.md`.
 
 ---
