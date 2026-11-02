@@ -147,18 +147,30 @@ export function CategoryLegend({ categories, title = "Categories:" }: { categori
 
 /** The two colour legends every item view shows, always visible: Importance (score colours) and Category. */
 export function ColourLegends({ unscored = false, className }: { unscored?: boolean; className?: string }) {
+  return (
+    <div className={cn("flex flex-col gap-1 rounded-md border border-line bg-card px-3 py-2", className)} aria-label="Colour legend" data-legends>
+      <ImportanceLegend unscored={unscored} />
+      <CategoryColours />
+    </div>
+  );
+}
+
+/** "Importance (1–5)": the score colours, 5 to 1, with the rubric's names; N and – when the view shows them. */
+export function ImportanceLegend({ unscored = false, className }: { unscored?: boolean; className?: string }) {
   const extra = unscored ? [
     { color: SCORE_COLOR[0][0], fg: SCORE_COLOR[0][1], text: "N", label: "noise" },
     { color: SCORE_COLOR[0][0], fg: SCORE_COLOR[0][1], text: "–", label: "not scored" },
   ] : [];
   return (
-    <div className={cn("flex flex-col gap-1 rounded-md border border-line bg-card px-3 py-2", className)} aria-label="Colour legend" data-legends>
-      <ColorLegend title="Importance (1–5)" items={[5, 4, 3, 2, 1].map((n) => ({
-        color: SCORE_COLOR[n][0], fg: SCORE_COLOR[n][1], text: String(n), label: RUBRIC[n]?.label ?? null,
-      })).concat(extra)} />
-      <CategoryLegend title="Category" categories={Object.keys(CATEGORY_COLOR)} />
-    </div>
+    <ColorLegend className={className} title="Importance (1–5)" items={[5, 4, 3, 2, 1].map((n) => ({
+      color: SCORE_COLOR[n][0], fg: SCORE_COLOR[n][1], text: String(n), label: RUBRIC[n]?.label ?? null,
+    })).concat(extra)} />
   );
+}
+
+/** "Category": all seven category colours, in one fixed order. */
+export function CategoryColours({ className }: { className?: string }) {
+  return <div className={className}><CategoryLegend title="Category" categories={Object.keys(CATEGORY_COLOR)} /></div>;
 }
 
 /** "n=12" next to every eval number and every measured count. */

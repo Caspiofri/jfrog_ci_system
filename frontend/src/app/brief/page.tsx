@@ -3,7 +3,7 @@ import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, Newspaper, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArticleLink, Async, ColourLegends, Empty, ErrorNote, Hint, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, CategoryColours, Empty, ErrorNote, Hint, ImportanceLegend, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { cn } from "@/lib/utils";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
@@ -101,6 +101,8 @@ function BriefScreen() {
         }
       />
 
+      <ImportanceLegend className="-mt-2" />
+
       {MOCK && mock ? (
         <div className="rounded border border-dashed border-[#8b5cf6] bg-[#f5f3ff] px-3 py-2 text-xs text-[#5b21b6]">
           Dev mock mode: values marked <MockTag /> are invented for a state check, not data.
@@ -120,9 +122,9 @@ function BriefScreen() {
             ) : (
               <>
                 <SummaryBlock date={b.date} s={b.summary} runId={b.window.anchor_run_id} />
-                <ColourLegends />
 
                 <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
+                <CategoryColours className="-mt-2" />
 
                 <Panel
                   big

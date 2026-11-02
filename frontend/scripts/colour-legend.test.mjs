@@ -34,7 +34,7 @@ test("the legend names each colour in text, and score legend uses the rubric's o
 });
 
 test("every item view shows both legends, Importance (1–5) and Category, outside any hover", () => {
-  for (const f of ["app/brief/page.tsx", "app/review/page.tsx", "app/log/page.tsx", "app/competitors/page.tsx", "app/competitors/[key]/page.tsx"]) {
+  for (const f of ["app/review/page.tsx", "app/log/page.tsx", "app/competitors/page.tsx", "app/competitors/[key]/page.tsx"]) {
     assert.match(read(f), /<ColourLegends\b[^>]*\/>/, f);
   }
   const fn = ci.slice(ci.indexOf("export function ColourLegends"), ci.indexOf("/** \"n=12\""));
@@ -47,4 +47,15 @@ test("the Log's legend also names noise (N) and not scored (–)", () => {
   assert.match(read("app/log/page.tsx"), /<ColourLegends unscored \/>/);
   assert.match(ci, /text: "N", label: "noise"/);
   assert.match(ci, /text: "–", label: "not scored"/);
+});
+
+test("Brief: Importance (1–5) once, directly under the title; under the insights only the Category colours", () => {
+  const brief = read("app/brief/page.tsx");
+  assert.equal((brief.match(/<ImportanceLegend\b/g) ?? []).length, 1);
+  assert.equal((brief.match(/<CategoryColours\b/g) ?? []).length, 1);
+  assert.doesNotMatch(brief, /<ColourLegends\b|<ScoreLegend\b|<CategoryLegend\b|<ColorLegend\b/);
+  assert.match(brief, /<PageHead[\s\S]*?\/>\s*<ImportanceLegend /);
+  assert.match(brief, /<InsightsPanel [^\n]*\/>\s*<CategoryColours /);
+  assert.match(ci, /export function ImportanceLegend[\s\S]*?title="Importance \(1–5\)"/);
+  assert.match(ci, /export function CategoryColours[\s\S]*?title="Category"/);
 });
