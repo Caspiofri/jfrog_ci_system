@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 export const HEATMAP_CAPTION = "Activity by category, from automatic classification. Last 7 days.";
 /** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
-export const HEATMAP_COUNTS = "Articles counted by publication date.";
+export const HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the last 7 days. Items awaiting review are not in this grid; each card shows them.";
 
 async function getAllRows(url: string): Promise<{ rows: LogRow[]; now: string }> {
   const first = await get<Log>(url);
@@ -55,7 +55,7 @@ export function ActivityHeatmap() {
             {legendSteps(hm.max).map((n) => (
               <span key={n} className="inline-flex items-center gap-1"><i className="inline-block size-3 rounded-sm" style={{ background: heatColor(n, hm.max).bg }} aria-hidden />{n}</span>
             ))}
-            <span>Feed dates {fmtDate(hm.from)}–{fmtDate(hm.to)} · {hm.total} items · not noise, not dismissed</span>
+            <span>Found {fmtDate(hm.from)}–{fmtDate(hm.to)}</span>
           </div>
           <div className="overflow-x-auto" data-heatmap>
             <table className="w-full min-w-[44rem] border-collapse">
@@ -91,9 +91,19 @@ export function ActivityHeatmap() {
                     })}
                   </tr>
                 ))}
+                <tr data-total-row>
+                  <th scope="row" className="sticky left-0 z-10 border-t-2 border-line bg-card px-2 py-1.5 text-left text-xs font-semibold">Total (as on the card)</th>
+                  {keys.map((k) => (
+                    <td key={k} className="border-t-2 border-l border-line px-2 py-1.5 text-center text-sm font-bold tabular-nums" data-col-total={hm.colTotals[k]}>{hm.colTotals[k]}</td>
+                  ))}
+                </tr>
               </tbody>
             </table>
           </div>
+          <p className="m-0 mt-2 flex flex-wrap items-baseline gap-x-3 text-sm" data-heat-totals>
+            <span><b className="font-semibold tabular-nums">{hm.published}</b> published</span>
+            <span className="text-xs text-mute">across the six competitors, the same as the cards below</span>
+          </p>
           {picked && sel ? (
             <div className="mt-3 rounded border border-line px-3 py-2" data-heat-items>
               <div className="mb-1 flex items-center gap-2 text-xs font-semibold">

@@ -1,18 +1,23 @@
-// "Where competitors are active": items per competitor and category, published in the last 7 days by feed date,
-// counted in the browser from Log rows (GET /log, filtered by status, competitor and collection date). Noise and
-// dismissed items are excluded by status. No verdict is computed. No imports besides types, so `npm test` runs it.
+// "Where competitors are active": items per competitor and category, counted exactly as the competitor cards' big
+// number (GET /competitors items_7d): published items, by the date found (discovered_at), in the cards' 7-day window.
+// So a column's total is that card's number. Awaiting-review items stay on the cards' own tag. Counted in the browser from Log
+// rows; noise and dismissed items are excluded by status. No imports besides types, so `npm test` runs it.
 import type { LogRow } from "./types";
 
 export const HEATMAP_DAYS = 7;
-export const KEPT_STATUSES = ["auto_published", "awaiting_review", "approved"]; // not noise (dropped), not dismissed
+// the API's published statuses (ci/api/service.py PUBLISHED): not awaiting review, not noise (dropped), not dismissed
+export const KEPT_STATUSES = ["auto_published", "approved", "flagged"];
 
 export interface HeatCell { count: number; items: LogRow[] }
 export interface Heatmap {
+  colTotals: Record<string, number>; // per competitor: equals the card's number
   competitors: string[];
   categories: string[];
   cells: Record<string, Record<string, HeatCell>>; // [competitor][category]
   max: number; // the highest cell anywhere, for the colour scale
   total: number;
+  published: number; // of total: published (the cards' big numbers)
+  queued: number; // of total: awaiting review (the cards' "awaiting review" tags)
   from: string; // window start (exclusive), ISO
   to: string; // window end (inclusive), ISO: the API's "now"
 }
@@ -25,13 +30,13 @@ export function heatmapQuery(competitors: string[], now: string, days = HEATMAP_
 }
 
 export function buildHeatmap(rows: LogRow[], competitors: string[], categories: string[], now: string, days = HEATMAP_DAYS): Heatmap {
-  const to = Date.parse(now);
-  const from = to - days * 86_400_000;
+  const to = Date.parse(now); // the cards' week.end
+  const from = to - days * 86_400_000; // the cards' week.start
   const seen = new Map<string, LogRow>(); // one row per item: the Log lists an item once per run that saw it
   for (const r of rows) {
-    if (!r.item_id || !r.competitor || !r.category || !r.published_at) continue;
+    if (!r.item_id || !r.competitor || !r.category || !r.discovered_at) continue;
     if (!KEPT_STATUSES.includes(r.status)) continue;
-    const t = Date.parse(r.published_at);
+    const t = Date.parse(r.discovered_at); // the date found, as the cards count
     if (!(t > from && t <= to)) continue;
     if (!seen.has(r.item_id)) seen.set(r.item_id, r);
   }
@@ -46,16 +51,19 @@ export function buildHeatmap(rows: LogRow[], competitors: string[], categories: 
   }
   let max = 0;
   let total = 0;
+  let queued = 0;
   for (const c of competitors) {
     const top = Math.max(0, ...categories.map((k) => cells[c][k].count));
     for (const k of categories) {
       const cell = cells[c][k];
       cell.items.sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
       total += cell.count;
+      queued += cell.items.filter((r) => r.status === "awaiting_review").length;
     }
     max = Math.max(max, top);
   }
-  return { competitors, categories, cells, max, total, from: new Date(from).toISOString(), to: new Date(to).toISOString() };
+  const colTotals = Object.fromEntries(competitors.map((c) => [c, categories.reduce((t, k) => t + cells[c][k].count, 0)]));
+  return { colTotals, competitors, categories, cells, max, total, published: total - queued, queued, from: new Date(from).toISOString(), to: new Date(to).toISOString() };
 }
 
 /** One colour, light to strong by count; 0 is an empty light cell. */

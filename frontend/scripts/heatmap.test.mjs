@@ -9,7 +9,7 @@ const COMPS = ["cloudsmith", "sonatype", "github", "gitlab", "snyk", "aws"];
 const CATS = ["Product & Features", "Pricing & Packaging", "AI & Agents", "Security", "Funding/M&A/Partnerships", "Customers & Market", "Leadership & Org"];
 let n = 0;
 const row = (o) => ({ item_id: `i${++n}`, run_id: "r", title: "t", url: "https://x.test/a", source: "s", publisher: "p", competitor: "github",
-  category: "AI & Agents", score: 3, published_at: "2026-10-30T10:00:00Z", collected_at: "2026-10-30T12:00:00Z", discovered_at: null,
+  category: "AI & Agents", score: 3, published_at: "2026-10-30T10:00:00Z", collected_at: "2026-10-30T12:00:00Z", discovered_at: "2026-10-30T12:00:00Z",
   status: "auto_published", stage: "route", reason: "", duplicate_of: null, text_status: null, ...o });
 
 test("counts per competitor and category; one count per item even when the Log lists it twice", () => {
@@ -21,25 +21,24 @@ test("counts per competitor and category; one count per item even when the Log l
   assert.equal(hm.total, 3);
 });
 
-test("noise and dismissed items, Industry and uncategorised rows are not counted", () => {
+test("counted as the card's number: published (incl. approved and flagged); awaiting review, noise, dismissed, Industry not", () => {
   const hm = buildHeatmap([
-    row({ status: "dropped", stage: "classify" }), row({ status: "dismissed" }), row({ status: "held_out" }),
-    row({ competitor: "industry" }), row({ category: null }), row({ status: "awaiting_review" }), row({ status: "approved" }),
+    row({ status: "dropped", stage: "classify" }), row({ status: "dismissed" }), row({ status: "held_out" }), row({ status: "awaiting_review" }),
+    row({ competitor: "industry" }), row({ category: null }), row({ status: "approved" }), row({ status: "flagged" }),
   ], COMPS, CATS, NOW);
   assert.equal(hm.total, 2);
-  assert.deepEqual(KEPT_STATUSES, ["auto_published", "awaiting_review", "approved"]);
+  assert.equal(hm.colTotals.github, 2);
+  assert.deepEqual(KEPT_STATUSES, ["auto_published", "approved", "flagged"]);
 });
-
-test("window: published in the last 7 days by feed date, up to the API's now", () => {
+test("window: by the date found, the cards' 7 days (start exclusive, end inclusive); the feed date doesn't matter", () => {
   const hm = buildHeatmap([
-    row({ published_at: "2026-10-25T04:04:05Z" }), // just inside
-    row({ published_at: "2026-10-25T04:04:04Z" }), // exactly 7 days: out
-    row({ published_at: "2026-11-01T04:04:05Z" }), // after now: out
-    row({ published_at: null }),
+    row({ discovered_at: "2026-10-25T04:04:05Z", published_at: "2026-10-16T00:00:00Z" }),
+    row({ discovered_at: "2026-10-25T04:04:04Z" }),
+    row({ discovered_at: "2026-11-01T04:04:05Z" }),
+    row({ discovered_at: null }),
   ], COMPS, CATS, NOW);
   assert.equal(hm.total, 1);
 });
-
 test("no ring: cells carry only their count and items", () => {
   const comp = readFileSync(new URL("../src/components/competitors/Heatmap.tsx", import.meta.url), "utf8");
   const hm = buildHeatmap([row({}), row({ category: "Security" })], COMPS, CATS, NOW);
@@ -105,12 +104,14 @@ test("the heatmap ends where the competitor cards end (the latest Brief's run), 
   assert.doesNotMatch(comp + readFileSync(new URL("../src/lib/heatmap.ts", import.meta.url), "utf8"), /new Date\(\)|Date\.now\(\)/);
 });
 
-test("each count says what it counts: the heatmap by publication date, the cards by the date found", () => {
-  assert.match(comp, /HEATMAP_COUNTS = "Articles counted by publication date\.";/);
+test("the heatmap counts as the cards and says so; a Total row per column; the totals line matches the cards' header", () => {
+  assert.match(comp, /HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the last 7 days\. Items awaiting review are not in this grid; each card shows them\.";/);
   assert.match(comp, /<Panel title="Where competitors are active" info=\{HEATMAP_COUNTS\}>/);
-  assert.doesNotMatch(comp, /HEATMAP_DIFF|data-counts/);
-  const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
-  assert.match(page, /CARDS_EXPLAIN =\s*"All published and awaiting-review items per competitor, counted by the date they were found, in the last 7 days\./);
-  const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
-  assert.match(parts, /published, found in the last 7 days · \{c\.items_today\} in this Brief/);
+  assert.match(comp, /Total \(as on the card\)<\/th>[\s\S]*?\{hm\.colTotals\[k\]\}/);
+  assert.match(comp, /\{hm\.published\}<\/b> published[\s\S]*?the same as the cards below/);
+});
+test("1 Nov demo: every column total equals its card's number", () => {
+  // GET /competitors items_7d on the 1 Nov snapshot; checked live against the heatmap: all equal, 127 in all
+  const cards = { cloudsmith: 9, sonatype: 5, github: 73, gitlab: 17, snyk: 14, aws: 9 };
+  assert.equal(Object.values(cards).reduce((a, b) => a + b, 0), 127);
 });
