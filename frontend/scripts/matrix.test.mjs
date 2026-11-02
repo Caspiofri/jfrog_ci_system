@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { NOT_FOUND, SHORT_MAX, anyMark, buildMatrix, matrixCell, shorten } from "../src/lib/matrix.ts";
+import { NOT_FOUND, SHORT_MAX, STATE_INFO, STATE_ORDER, anyMark, buildMatrix, matrixCell, shortWords, shorten } from "../src/lib/matrix.ts";
 
 const AXES = [["deployment", "Deployment"], ["package_coverage", "Package coverage"], ["security_scanning", "Security scanning"],
   ["curation_gating", "Curation/gating"], ["ai_mcp", "AI & MCP"], ["cicd_integration", "CI/CD integration"], ["pricing_model", "Pricing model"]];
@@ -68,9 +68,10 @@ const comp = readFileSync(new URL("../src/components/competitors/Matrix.tsx", im
 const lib = readFileSync(new URL("../src/lib/matrix.ts", import.meta.url), "utf8");
 const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
 
-test("hover and keyboard focus show the full text, source and date", () => {
+test("hover and keyboard focus show the state, full text, source and date", () => {
   assert.match(comp, /<Hint text=\{<CellHint/);
-  assert.match(comp, /c\.full \?\?/);
+  assert.match(comp, /\{STATE_INFO\[c\.state\]\.label\}/);
+  assert.match(comp, /\{c\.full \? <span>\{c\.full\}<\/span>/);
   assert.match(comp, /Source: \{host\(c\.source\)\}/);
   assert.match(comp, /as of \$\{fmtDate\(c\.asOf, true\)\}/);
   assert.match(comp, /<ArticleLink href=\{c\.source\}/);
@@ -83,7 +84,10 @@ test("columns: JFrog first, then the six tracked competitors with avatars, not I
 });
 
 test("title, caption, legend; at the top of the Competitors view, above the cards", () => {
-  assert.match(comp, /title="JFrog vs competitors" cap="Capabilities from public sources, with source and date for every cell\."/);
+  assert.match(comp, /title="JFrog vs competitors"/);
+  assert.match(comp, /export const CAPTION = "Colour shows what we found on each competitor's public pages, not a verdict on their product\.";/);
+  assert.match(comp, /data-caption>\{CAPTION\}/);
+  assert.doesNotMatch(comp, /Capabilities from public sources/);
   assert.match(comp, /data-legend/);
   assert.ok(page.indexOf("<CapabilityMatrix />") > -1 && page.indexOf("<CapabilityMatrix />") < page.indexOf("<CompetitorCardView"));
   assert.ok(page.indexOf("<CapabilityMatrix />") < page.indexOf("<Async"), "above everything else on the page");
@@ -97,4 +101,50 @@ test("narrow screens: the matrix scrolls by itself, first column sticky", () => 
 test("no verdicts: no gap, threat, ahead, behind or lens relation in the matrix", () => {
   const visible = (s) => s.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "").replace(/className=("[^"]*"|\{[^}]*\})/g, "");
   for (const s of [comp, lib]) assert.doesNotMatch(visible(s), /\bgap\b|threat|ahead|behind|relation|closes_gap|opens_gap/i);
+});
+
+test("four data states, each with its own icon, colour and label, from the API's state only", () => {
+  assert.deepEqual(STATE_ORDER, ["value", "stale", "not_stated", "not_tracked"]);
+  assert.deepEqual(STATE_ORDER.map((k) => [STATE_INFO[k].icon, STATE_INFO[k].label]),
+    [["check", "Found"], ["clock", "Stale"], ["question", "Page says nothing"], ["dash", "Not tracked yet"]]);
+  assert.equal(new Set(STATE_ORDER.map((k) => STATE_INFO[k].bg)).size, 4, "four colours");
+  assert.equal(new Set(STATE_ORDER.map((k) => STATE_INFO[k].icon)).size, 4, "four icons");
+  for (const k of STATE_ORDER) assert.ok(STATE_INFO[k].label.split(" ").length <= 3);
+});
+
+test("each state maps to its cell: value and stale keep a few words of the value, the others their label", () => {
+  const long = "Supports npm, Maven, PyPI, RubyGems, and NuGet repositories with upstream proxying";
+  const v = matrixCell(cell({ value: long }));
+  assert.deepEqual([v.state, v.short, v.full], ["value", "Supports npm, Maven, PyPI…", long]);
+  const st = matrixCell(cell({ state: "stale", value: "Supports 34 package formats" }));
+  assert.deepEqual([st.state, st.short], ["stale", "Supports 34 package formats"]);
+  const ns = matrixCell(cell({ state: "not_stated", value: "" }));
+  assert.deepEqual([ns.state, ns.short, ns.full], ["not_stated", "Page says nothing", null]);
+  const nt = matrixCell(cell({ state: "not_tracked", value: null, source_url: undefined }));
+  assert.deepEqual([nt.state, nt.short, nt.source], ["not_tracked", "Not tracked yet", null]);
+  assert.equal(matrixCell(null).state, "not_tracked");
+  assert.ok(shortWords("one two three four five six").split(" ").length <= 4);
+});
+
+test("JFrog's column uses the same cell: the check icon with its own short value", () => {
+  const [r] = buildMatrix([profile("github")]);
+  assert.deepEqual([r.jfrog.state, r.jfrog.short], ["value", "JFrog deployment"]);
+  assert.match(comp, /<MatrixTd c=\{r\.jfrog\} who="JFrog"/);
+});
+
+test("icon and colour always together; the legend lists the four states with both", () => {
+  assert.match(comp, /<td[^>]*style=\{\{ background: st\.bg \}\}[\s\S]*?<StateIcon state=\{c\.state\} \/>/);
+  assert.match(comp, /STATE_ORDER\.map\(\(k\) => \([\s\S]*?<StateIcon state=\{k\} \/>[\s\S]*?\{STATE_INFO\[k\]\.label\}/);
+  assert.match(comp, /role="img" aria-label=\{s\.label\}/);
+});
+
+test("no cell text, label, legend or caption says present, absent, partial, gap, threat, ahead or behind", () => {
+  const banned = /\b(present|absent|partial|gap|threat|ahead|behind)\b/i;
+  for (const k of STATE_ORDER) assert.doesNotMatch(STATE_INFO[k].label, banned);
+  const visible = comp.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "").replace(/className=("[^"]*"|\{[^}]*\})/g, "");
+  assert.doesNotMatch(visible, banned);
+  for (const c of [cell(), cell({ state: "stale" }), cell({ state: "not_stated", value: "" }), null]) {
+    const m = matrixCell(c);
+    assert.doesNotMatch(`${m.short} ${m.why ?? ""}`, banned);
+  }
 });

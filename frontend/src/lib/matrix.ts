@@ -5,8 +5,28 @@ import type { Cell, H2HAxis } from "./types";
 
 export const NOT_FOUND = "Not found yet";
 export const SHORT_MAX = 90;
+export const SHORT_WORDS = 4;
+
+/** The cell's data state, from the API's own `state` field: what we found on the page, never a verdict. */
+export type DataState = "value" | "stale" | "not_stated" | "not_tracked";
+export const STATE_INFO: Record<DataState, { label: string; icon: "check" | "clock" | "question" | "dash"; bg: string; fg: string }> = {
+  value: { label: "Found", icon: "check", bg: "#eef7f0", fg: "#1f7a33" },
+  stale: { label: "Stale", icon: "clock", bg: "#fff4e0", fg: "#8a5a00" },
+  not_stated: { label: "Page says nothing", icon: "question", bg: "#eef0f3", fg: "#5b6576" },
+  not_tracked: { label: "Not tracked yet", icon: "dash", bg: "#f8f9fb", fg: "#9aa5b5" },
+};
+export const STATE_ORDER: DataState[] = ["value", "stale", "not_stated", "not_tracked"];
+
+/** The first few words of a value, for the cell; the hover has the whole text. */
+export function shortWords(s: string, n = SHORT_WORDS): string {
+  const w = s.replace(/\s+/g, " ").trim().split(" ");
+  if (w.length <= n) return w.join(" ");
+  return `${w.slice(0, n).join(" ").replace(/[\s,;:.–-]+$/, "")}…`;
+}
 
 export interface MatrixCell {
+  state: DataState; // the API's state; a missing cell counts as not tracked
+  short: string; // the first words of the value, or the state's label when there is no value
   text: string; // shortened value, or "Not found yet"
   full: string | null; // the whole value, for the hover
   empty: boolean;
@@ -32,7 +52,11 @@ export function shorten(s: string, max = SHORT_MAX): string {
 export function matrixCell(c: Cell | null | undefined): MatrixCell {
   const value = c && (c.state === "value" || c.state === "stale") && c.value?.trim() ? c.value.trim() : null;
   const changedAt = c?.change?.detected_at || null;
+  const raw = c?.state;
+  const state: DataState = raw === "value" || raw === "stale" || raw === "not_stated" || raw === "not_tracked" ? raw : "not_tracked";
   return {
+    state, // as the API serves it; a missing cell counts as not tracked
+    short: value ? shortWords(value) : STATE_INFO[state].label,
     text: value ? shorten(value) : NOT_FOUND,
     full: value,
     empty: !value,
