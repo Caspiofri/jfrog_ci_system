@@ -6,7 +6,7 @@ import type { LogRow } from "./types";
 export const HEATMAP_DAYS = 7;
 export const KEPT_STATUSES = ["auto_published", "awaiting_review", "approved"]; // not noise (dropped), not dismissed
 
-export interface HeatCell { count: number; items: LogRow[]; ring: boolean }
+export interface HeatCell { count: number; items: LogRow[] }
 export interface Heatmap {
   competitors: string[];
   categories: string[];
@@ -38,7 +38,7 @@ export function buildHeatmap(rows: LogRow[], competitors: string[], categories: 
   const cells: Heatmap["cells"] = {};
   for (const c of competitors) {
     cells[c] = {};
-    for (const k of categories) cells[c][k] = { count: 0, items: [], ring: false };
+    for (const k of categories) cells[c][k] = { count: 0, items: [] };
   }
   for (const r of seen.values()) {
     const cell = cells[r.competitor!]?.[r.category!];
@@ -50,7 +50,6 @@ export function buildHeatmap(rows: LogRow[], competitors: string[], categories: 
     const top = Math.max(0, ...categories.map((k) => cells[c][k].count));
     for (const k of categories) {
       const cell = cells[c][k];
-      cell.ring = top > 0 && cell.count === top; // every tied top cell; none in an all-zero column
       cell.items.sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
       total += cell.count;
     }

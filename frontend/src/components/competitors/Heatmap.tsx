@@ -15,7 +15,6 @@ import type { Log, LogRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const HEATMAP_CAPTION = "Activity by category, from automatic classification. Last 7 days.";
-const RING_NOTE = "Ring = this competitor's most active category";
 
 async function getAllRows(url: string): Promise<{ rows: LogRow[]; now: string }> {
   const first = await get<Log>(url);
@@ -51,7 +50,6 @@ export function ActivityHeatmap() {
             {legendSteps(hm.max).map((n) => (
               <span key={n} className="inline-flex items-center gap-1"><i className="inline-block size-3 rounded-sm" style={{ background: heatColor(n, hm.max).bg }} aria-hidden />{n}</span>
             ))}
-            <span className="inline-flex items-center gap-1"><i className="inline-block size-3 rounded-full ring-2 ring-[#f59e0b]" aria-hidden />{RING_NOTE}</span>
             <span>Feed dates {fmtDate(hm.from)}–{fmtDate(hm.to)} · {hm.total} items · not noise, not dismissed</span>
           </div>
           <div className="overflow-x-auto" data-heatmap>
@@ -75,13 +73,13 @@ export function ActivityHeatmap() {
                       const col = heatColor(cell.count, hm.max);
                       const on = sel?.c === k && sel?.k === cat;
                       return (
-                        <td key={k} className="border-b border-l border-line p-1 text-center" data-count={cell.count} data-ring={cell.ring ? "1" : undefined}>
+                        <td key={k} className="border-b border-l border-line p-1 text-center" data-count={cell.count}>
                           <button type="button" disabled={!cell.count} onClick={() => setSel(on ? null : { c: k, k: cat })}
-                            aria-label={`${name(k)}, ${cat}: ${cell.count} items${cell.ring ? ", most active category" : ""}`} aria-pressed={on}
+                            aria-label={`${name(k)}, ${cat}: ${cell.count} items`} aria-pressed={on}
                             className={cn("mx-auto flex h-8 w-full min-w-[3.5rem] items-center justify-center rounded text-sm font-semibold tabular-nums",
                               cell.count ? "cursor-pointer hover:outline hover:outline-2 hover:outline-jgreen" : "cursor-default", on && "outline outline-2 outline-jgreen")}
                             style={{ background: col.bg, color: col.fg }}>
-                            <span className={cn("inline-flex size-7 items-center justify-center rounded-full", cell.ring && "ring-2 ring-[#f59e0b]")}>{cell.count}</span>
+                            {cell.count}
                           </button>
                         </td>
                       );

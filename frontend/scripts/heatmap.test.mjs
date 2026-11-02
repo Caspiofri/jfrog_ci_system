@@ -40,23 +40,18 @@ test("window: published in the last 7 days by feed date, up to the API's now", (
   assert.equal(hm.total, 1);
 });
 
-test("ring: the top cell of each column; every tied top cell; no ring in an all-zero column", () => {
-  const hm = buildHeatmap([
-    row({ category: "AI & Agents" }), row({ category: "AI & Agents" }), row({ category: "Security" }),
-    row({ competitor: "gitlab", category: "Security" }), row({ competitor: "gitlab", category: "Product & Features" }),
-  ], COMPS, CATS, NOW);
-  const rings = (c) => CATS.filter((k) => hm.cells[c][k].ring);
-  assert.deepEqual(rings("github"), ["AI & Agents"]);
-  assert.deepEqual(rings("gitlab"), ["Product & Features", "Security"]);
-  assert.deepEqual(rings("sonatype"), []);
-  assert.equal(hm.max, 2);
+test("no ring: cells carry only their count and items", () => {
+  const comp = readFileSync(new URL("../src/components/competitors/Heatmap.tsx", import.meta.url), "utf8");
+  const hm = buildHeatmap([row({}), row({ category: "Security" })], COMPS, CATS, NOW);
+  assert.deepEqual(Object.keys(hm.cells.github["AI & Agents"]).sort(), ["count", "items"]);
+  assert.equal(hm.max, 1);
+  assert.doesNotMatch(comp, /ring-\[#f59e0b\]|Ring =|most active category|data-ring/);
 });
 
 test("empty state: no items at all", () => {
   const hm = buildHeatmap([], COMPS, CATS, NOW);
   assert.equal(hm.total, 0);
   assert.equal(hm.max, 0);
-  assert.ok(COMPS.every((c) => CATS.every((k) => !hm.cells[c][k].ring)));
   assert.deepEqual(legendSteps(0), []);
 });
 
@@ -80,10 +75,9 @@ test("query: one Log call filtered by kept status, the six competitors and the f
 const comp = readFileSync(new URL("../src/components/competitors/Heatmap.tsx", import.meta.url), "utf8");
 const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
 
-test("title, caption, legend with the scale and the ring; directly under the matrix", () => {
+test("title, caption, legend with the scale; directly under the matrix", () => {
   assert.match(comp, /<Panel title="Where competitors are active">/);
   assert.match(comp, /HEATMAP_CAPTION = "Activity by category, from automatic classification\. Last 7 days\."/);
-  assert.match(comp, /RING_NOTE = "Ring = this competitor's most active category"/);
   assert.match(comp, /legendSteps\(hm\.max\)/);
   assert.match(page, /<CapabilityMatrix \/>\s*<ActivityHeatmap \/>/);
 });
