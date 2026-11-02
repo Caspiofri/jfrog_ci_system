@@ -27,12 +27,13 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
   return (
     <div
       className={cn(
-        "flex items-start gap-3 border-t border-line py-2.5 first:border-t-0",
+        "flex cursor-pointer items-start gap-3 border-t border-line py-2.5 first:border-t-0 hover:bg-page/60",
         EMPHASIS[s],
         s > 0 && s <= 2 && "opacity-80",
         highlight && "ring-2 ring-jgreen ring-inset bg-[#f3fbf4]",
       )}
       data-item={item.item_id}
+      onClick={(e) => openFromRow(e, () => drawer.open(item.item_id))}
     >
       <ScoreBadge score={item.score} noise={item.noise} />
       <div className="min-w-0 flex-1">
@@ -61,4 +62,16 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
       {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div> : null}
     </div>
   );
+}
+
+/** A click anywhere on the row opens the item's drawer, except on its own controls (buttons, links, fields, menus),
+ *  inside a dialog or menu rendered elsewhere (React bubbles portal clicks), or when the user is selecting text.
+ *  Keyboard users open it with the title button. */
+const INTERACTIVE = "button, a, input, textarea, select, label, [role='menuitem'], [role='menu'], [role='dialog'], [role='radio']";
+function openFromRow(e: React.MouseEvent<HTMLElement>, open: () => void) {
+  const t = e.target as HTMLElement;
+  if (!e.currentTarget.contains(t)) return; // a portal (Edit dialog, Dismiss menu)
+  if (t.closest(INTERACTIVE)) return;
+  if (typeof window !== "undefined" && window.getSelection()?.toString()) return;
+  open();
 }
