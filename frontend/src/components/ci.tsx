@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ApiError } from "@/lib/api";
-import { CATEGORY_COLOR, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, label, safeHref } from "@/lib/format";
+import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, label, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** A small (i) that explains on hover and keyboard focus: long explanations live here, not on screen. */
@@ -109,6 +109,43 @@ export function Hint({ text, children, asChild = false, className }: { text: Rea
       <TooltipContent className="max-w-xs text-left">{text}</TooltipContent>
     </Tooltip>
   );
+}
+
+/** A visible colour legend: every colour that carries meaning is named on screen, never only in a hover. */
+export function ColorLegend({ title, items, className }: {
+  title?: ReactNode; items: { color: string; label: ReactNode; fg?: string; text?: string }[]; className?: string;
+}) {
+  if (!items.length) return null;
+  return (
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mute", className)} data-legend>
+      {title ? <span className="font-semibold">{title}</span> : null}
+      {items.map((it, i) => (
+        <span key={i} className="inline-flex items-center gap-1">
+          {it.text ? (
+            <i className="inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-[3px] px-0.5 text-[9px] font-semibold not-italic tabular-nums"
+              style={{ background: it.color, color: it.fg }}>{it.text}</i>
+          ) : (
+            <i className="inline-block size-2.5 rounded-sm ring-1 ring-black/10" style={{ background: it.color }} aria-hidden />
+          )}
+          {it.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The score colours, 5 to 1, with the rubric labels. */
+export function ScoreLegend({ title = "Score colours:" }: { title?: ReactNode }) {
+  return (
+    <ColorLegend title={title} items={[5, 4, 3, 2, 1].map((n) => ({
+      color: SCORE_COLOR[n][0], fg: SCORE_COLOR[n][1], text: String(n), label: RUBRIC[n]?.label ?? null,
+    }))} />
+  );
+}
+
+/** The category colours, for the categories shown (or every category). */
+export function CategoryLegend({ categories, title = "Categories:" }: { categories: string[]; title?: ReactNode }) {
+  return <ColorLegend title={title} items={categories.map((c) => ({ color: CATEGORY_COLOR[c] ?? "#9aa5b5", label: c }))} />;
 }
 
 /** "n=12" next to every eval number and every measured count. */

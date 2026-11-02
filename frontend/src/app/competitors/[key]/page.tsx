@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Async, Empty, HBars, KpiTile, Loading, Panel, ScoreBadge } from "@/components/ci";
+import { Async, Empty, HBars, KpiTile, Loading, Panel, ScoreBadge, ScoreLegend } from "@/components/ci";
 import { ItemRow } from "@/components/ItemRow";
 import { ActivityChart } from "@/components/competitors/ActivityChart";
 import { HeadToHead } from "@/components/competitors/HeadToHead";
@@ -51,6 +51,9 @@ function Profile() {
                 </div>
                 <span className="flex items-center gap-2 text-mute">Threat this week <ScoreBadge score={c.threat} /></span>
               </div>
+              <div className="rounded-md border border-line bg-card px-3 py-2" aria-label="Colour legend">
+                <ScoreLegend title="Score colours:" />
+              </div>
 
               <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
                 <KpiTile value={c.items_7d} label="Published in 7 days" sub={<Trend t={c.trend} prev={c.items_prev_7d} />} />
@@ -72,7 +75,7 @@ function Profile() {
                 <Panel title="What are they focused on?" cap="Published items this week">
                   {c.category_mix.length ? (
                     <>
-                      <MixBar mix={c.category_mix} />
+                      <MixBar mix={c.category_mix} legend />
                       <div className="mt-3">
                         <HBars rows={c.category_mix.map((m) => ({ label: m.category, value: m.count, color: CATEGORY_COLOR[m.category] }))} />
                       </div>

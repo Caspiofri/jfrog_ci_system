@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { History } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArticleLink, Async, Tag } from "@/components/ci";
+import { ArticleLink, Async, ColorLegend, Tag } from "@/components/ci";
 import { path, useApi } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import type { Cell, CellHistoryRow, H2HAxis, Page } from "@/lib/types";
@@ -100,6 +100,9 @@ export function HeadToHead({ competitor, name, axes }: { competitor: string; nam
           ))}
         </tbody>
       </table>
+      {axes.some((a) => a.changed) ? (
+        <ColorLegend className="mt-2" items={[{ color: "#fff7e6", label: "Highlighted row: changed this week, goes to review" }]} />
+      ) : null}
     </div>
   );
 }
