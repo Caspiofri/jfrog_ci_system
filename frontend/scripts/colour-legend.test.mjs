@@ -17,7 +17,7 @@ test("overview: importance colours and the cards' category bar have a visible le
 });
 
 test("profile: score colours, the category bar, the activity chart and the head-to-head highlight have legends", () => {
-  assert.match(profile, /<ColourLegends \/>/);
+  assert.doesNotMatch(profile, /<ColourLegends\b/); // removed from the competitor profile (Ofri, 3 Nov)
   assert.match(profile, /<MixBar mix=\{c\.category_mix\} legend \/>/);
   assert.match(chart, /a day with an item rated 4 or 5/);
   assert.match(h2h, /<ColorLegend[^>]*Highlighted row: changed this week/);
@@ -34,7 +34,7 @@ test("the legend names each colour in text, and score legend uses the rubric's o
 });
 
 test("every item view shows both legends, Importance (1–5) and Category, outside any hover", () => {
-  for (const f of ["app/review/page.tsx", "app/log/page.tsx", "app/competitors/page.tsx", "app/competitors/[key]/page.tsx"]) {
+  for (const f of ["app/review/page.tsx", "app/log/page.tsx", "app/competitors/page.tsx"]) {
     assert.match(read(f), /<ColourLegends\b[^>]*\/>/, f);
   }
   const fn = ci.slice(ci.indexOf("export function ColourLegends"), ci.indexOf("/** \"n=12\""));

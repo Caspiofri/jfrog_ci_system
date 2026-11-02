@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Async, ColourLegends, Empty, HBars, KpiTile, Loading, Panel, ScoreBadge } from "@/components/ci";
+import { Async, Empty, HBars, KpiTile, Loading, Panel, ScoreBadge } from "@/components/ci";
 import { ItemRow } from "@/components/ItemRow";
 import { ActivityChart } from "@/components/competitors/ActivityChart";
 import { HeadToHead } from "@/components/competitors/HeadToHead";
@@ -51,7 +51,6 @@ function Profile() {
                 </div>
                 <span className="flex items-center gap-2 text-mute">Top score this week <ScoreBadge score={c.threat} /></span>
               </div>
-              <ColourLegends />
 
               <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
                 <KpiTile value={c.items_7d} label="Published in 7 days" sub={<Trend t={c.trend} prev={c.items_prev_7d} />} />
