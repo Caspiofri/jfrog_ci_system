@@ -4,8 +4,12 @@ import { CompetitorCardView, DealsTable } from "@/components/competitors/parts";
 import { CapabilityMatrix } from "@/components/competitors/Matrix";
 import { ActivityHeatmap } from "@/components/competitors/Heatmap";
 import { useApi } from "@/lib/api";
+import { cardTotals } from "@/lib/cardTotals";
 import { LEVEL_LABEL, fmtDate, label } from "@/lib/format";
 import type { Competitors } from "@/lib/types";
+
+const CARDS_EXPLAIN =
+  "Each card counts a competitor's relevant articles found in the last 7 days. The big number is what was published to analysts; items still queued for an analyst are not in it and show as \"awaiting review\". Noise and dismissed items are left out. The Industry card holds market news with no tracked competitor.";
 
 export default function CompetitorsPage() {
   const q = useApi<Competitors>("/api/v1/competitors");
@@ -17,10 +21,19 @@ export default function CompetitorsPage() {
       <Async {...q} retry={() => q.mutate()} rows={6} isEmpty={(d) => !d.items.length} empty="No competitors in the config.">
         {(d) => (
           <>
-            <div className="-mt-2 text-xs text-mute">
-              Week {fmtDate(d.week.start)}–{fmtDate(d.week.end)}, counted by discovery time; published items only
-              (held items count as awaiting review at {label(LEVEL_LABEL, d.level)}).
-            </div>
+            <section className="flex flex-col gap-1" aria-label="Published competitor items" data-cards-header>
+              <h2 className="m-0 text-lg font-semibold">
+                Published competitor items <span className="text-sm font-normal text-mute">· found {fmtDate(d.week.start)}–{fmtDate(d.week.end)}</span>
+              </h2>
+              <p className="m-0 flex flex-wrap items-baseline gap-x-3 text-sm">
+                <span><b className="text-xl font-semibold tabular-nums">{cardTotals(d.items).published}</b> published</span>
+                <span><b className="text-xl font-semibold tabular-nums text-[#8a5a00]">{cardTotals(d.items).queued}</b> awaiting review</span>
+                <span className="text-xs text-mute">across the six competitors</span>
+              </p>
+              <p className="m-0 text-xs text-mute" data-cards-explain>
+                {CARDS_EXPLAIN} Queue level: {label(LEVEL_LABEL, d.level)}.
+              </p>
+            </section>
             <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
               {d.items.map((c) => <CompetitorCardView key={c.key} c={c} />)}
             </div>
