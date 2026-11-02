@@ -1,6 +1,7 @@
 "use client";
 import { Async, CategoryLegend, Empty, PageHead, Panel, ScoreLegend } from "@/components/ci";
 import { CompetitorCardView, DealsTable } from "@/components/competitors/parts";
+import { CapabilityMatrix } from "@/components/competitors/Matrix";
 import { useApi } from "@/lib/api";
 import { useMeta } from "@/lib/meta";
 import { LEVEL_LABEL, fmtDate, label } from "@/lib/format";
@@ -19,6 +20,7 @@ export default function CompetitorsPage() {
   return (
     <>
       <PageHead title="Competitors" info="Threat is the highest importance this week." />
+      <CapabilityMatrix />
       <Async {...q} retry={() => q.mutate()} rows={6} isEmpty={(d) => !d.items.length} empty="No competitors in the config.">
         {(d) => (
           <>
