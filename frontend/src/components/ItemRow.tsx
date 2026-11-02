@@ -1,8 +1,7 @@
 "use client";
 // One item in a list (prototype .row with r5/r4/r3 emphasis). Title opens the drawer; the icon opens the source.
 import type { ReactNode } from "react";
-import { ExternalLink } from "lucide-react";
-import { CategoryTag, ExtLink, ScoreBadge, Tag } from "@/components/ci";
+import { CategoryTag, ItemTitle, ScoreBadge, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { NO_TEXT, itemDateText } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
@@ -38,12 +37,7 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
       <ScoreBadge score={item.score} noise={item.noise} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-1.5">
-          <button type="button" onClick={() => drawer.open(item.item_id)} className={cn("text-left font-semibold hover:text-jgreen-d", s >= 4 && "text-sm")}>
-            {item.title}
-          </button>
-          <ExtLink href={item.url} className="mt-0.5 shrink-0 text-mute">
-            <ExternalLink className="size-3.5" aria-label="Open the source" />
-          </ExtLink>
+          <ItemTitle title={item.title} url={item.url} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-mute">
           <span className="font-medium text-ink">{competitorName(meta, item.competitor)}</span>

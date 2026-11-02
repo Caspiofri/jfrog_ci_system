@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Async, Empty, ErrorNote, ExtLink, HBars, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, Empty, ErrorNote, HBars, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ItemRow } from "@/components/ItemRow";
@@ -439,7 +439,7 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
         ) : null}
         <div className="mt-1 flex flex-wrap gap-2 text-xs text-mute">
           {row.held_since ? <span>Detected {fmtDateTime(row.held_since)}</span> : null}
-          {row.page_url ? <ExtLink href={row.page_url}>tracked page</ExtLink> : null}
+          {row.page_url ? <span className="inline-flex items-center gap-0.5">tracked page<ArticleLink href={row.page_url} label="Open the tracked page in a new tab" /></span> : null}
           <span>Held at every level</span>
         </div>
         {editing ? (

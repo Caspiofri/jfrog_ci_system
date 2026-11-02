@@ -2,7 +2,7 @@
 // Log: layout and titles kept from the prototype (the user liked it as is). Data from GET /api/v1/log.
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Async, Empty, ExtLink, HBars, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
+import { Async, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
@@ -114,11 +114,7 @@ function LogTr({ r, name }: { r: LogRow; name: string }) {
       <td className={`${td} whitespace-nowrap`}>{fmtDate(r.collected_at)}</td>
       <td className={`${td} whitespace-nowrap`}>{r.competitor ? name : "—"}</td>
       <td className={td}>
-        {dropped || !r.item_id ? (
-          <ExtLink href={r.url}>{r.title || "(no title)"}</ExtLink>
-        ) : (
-          <button type="button" className="text-left hover:text-jgreen-d" onClick={() => drawer.open(r.item_id!)}>{r.title || "(no title)"}</button>
-        )}
+        <ItemTitle title={r.title} url={r.url} onOpen={dropped || !r.item_id ? undefined : () => drawer.open(r.item_id!)} />
         {dropped && r.duplicate_of ? (
           <button type="button" className="ml-1 text-xs text-mute hover:text-jgreen-d" onClick={() => drawer.open(r.duplicate_of!)}>· kept item</button>
         ) : null}

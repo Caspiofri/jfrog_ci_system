@@ -1,0 +1,46 @@
+// npm test: one link convention on every screen. An item title opens the side drawer (ItemTitle);
+// the only external link is the ↗ icon (ArticleLink), which opens the original page in a new tab.
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { test } from "node:test";
+
+const SRC = new URL("../src/", import.meta.url).pathname;
+const files = (dir) => readdirSync(dir).flatMap((f) => {
+  const p = join(dir, f);
+  return statSync(p).isDirectory() ? files(p) : /\.tsx?$/.test(f) ? [p] : [];
+});
+const APP = files(SRC).filter((p) => !p.includes("/components/ui/"));
+const read = (p) => readFileSync(p, "utf8");
+
+test("only ArticleLink opens a new tab", () => {
+  const hits = APP.filter((p) => /target="_blank"/.test(read(p)));
+  assert.deepEqual(hits.map((p) => p.replace(SRC, "")), ["components/ci.tsx"]);
+  const ci = read(join(SRC, "components/ci.tsx"));
+  assert.equal(ci.match(/target="_blank"/g).length, 1, "one external-link element in ci.tsx");
+  assert.match(ci, /export function ArticleLink[\s\S]*?target="_blank"[\s\S]*?<ArrowUpRight/);
+});
+
+test("no other link style is left: no text link to an article, no second icon", () => {
+  for (const p of APP) {
+    const s = read(p);
+    assert.doesNotMatch(s, /<ExtLink\b/, `${p} still uses ExtLink`);
+    assert.doesNotMatch(s, /\bExternalLink\b/, `${p} still uses the old ExternalLink icon`);
+    assert.doesNotMatch(s, /Open the source</, `${p} still has a text link to the source`);
+  }
+});
+
+test("every item list opens the drawer from the title and the article from the icon", () => {
+  for (const f of ["components/ItemRow.tsx", "components/brief/BriefCard.tsx", "app/log/page.tsx", "components/competitors/parts.tsx", "app/brief/page.tsx"]) {
+    const s = read(join(SRC, f));
+    assert.match(s, /<ItemTitle\b[^>]*onOpen=\{/, `${f}: the title opens the drawer`);
+  }
+  assert.match(read(join(SRC, "components/ItemDrawer.tsx")), /<ArticleLink\b/, "the drawer has the ↗ icon");
+});
+
+test("the icon is reachable by keyboard and named for screen readers", () => {
+  const ci = read(join(SRC, "components/ci.tsx"));
+  assert.match(ci, /ARTICLE_LINK_LABEL = "Open the original article in a new tab"/);
+  assert.match(ci, /aria-label=\{aria\}/);
+  assert.match(ci, /focus-visible:/);
+});

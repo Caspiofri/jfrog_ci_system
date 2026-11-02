@@ -1,9 +1,9 @@
 "use client";
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Async, Empty, ErrorNote, ExtLink, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, Empty, ErrorNote, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
@@ -424,21 +424,14 @@ function SourceLine({ id, row, withScore }: { id: string; row?: CitedItemRow; wi
           style={{ background: bg, color: fg }}>{it.score ?? "–"}</span>
       ) : null}
       <span>Source:</span>
-      <button type="button" onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
-        className="min-w-0 text-left hover:text-jgreen-d hover:underline" title="Open the item">
-        {it.title}
-      </button>
+      <ItemTitle title={it.title} onOpen={() => drawer.open(id)} />
       {it.outside ? (
         <Tag className="text-[10px]"
           title={it.belowLine ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
           not in this Brief
         </Tag>
       ) : null}
-      {it.url ? (
-        <span onClick={(e) => e.stopPropagation()} className="inline-flex">
-          <ExtLink href={it.url} className="text-mute hover:text-jgreen-d"><ExternalLink className="size-3" aria-label="Open the full article" /></ExtLink>
-        </span>
-      ) : null}
+      <ArticleLink href={it.url} />
     </div>
   );
 }

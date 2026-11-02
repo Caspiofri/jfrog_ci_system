@@ -1,9 +1,8 @@
 "use client";
 // The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Async, CategoryTag, ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { ArticleLink, Async, CategoryTag, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { LensView } from "@/components/LensView";
 import { ReopenButton } from "@/components/review/actions";
 import { useApi } from "@/lib/api";
@@ -55,7 +54,10 @@ function DrawerBody({ id }: { id: string }) {
   return (
     <>
       <SheetHeader className="px-5 pt-5 pb-0">
-        <SheetTitle className="pr-6 text-base leading-snug">{q.data?.item.title ?? "Item"}</SheetTitle>
+        <SheetTitle className="flex items-start gap-1.5 pr-6 text-base leading-snug">
+          <span>{q.data?.item.title ?? "Item"}</span>
+          {q.data ? <ArticleLink href={q.data.item.url} className="mt-1" /> : null}
+        </SheetTitle>
         <SheetDescription className="text-xs">Item {id}</SheetDescription>
       </SheetHeader>
       <div className="px-5 pb-6">
@@ -74,9 +76,6 @@ function DrawerBody({ id }: { id: string }) {
                 </div>
                 <LensBlock lens={it.lens} status={it.lens_status} />
                 {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
-                <ExtLink href={it.url} className="inline-flex items-center gap-1 text-jgreen-d">
-                  Open the source <ExternalLink className="size-3" />
-                </ExtLink>
                 <div>
                   <Field k="Competitor">{competitorName(meta, it.competitor)}{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>

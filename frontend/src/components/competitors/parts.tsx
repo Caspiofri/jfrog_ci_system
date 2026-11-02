@@ -2,7 +2,8 @@
 // Pieces shared by the Competitors overview and profile.
 import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
-import { ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { ItemTitle, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { useItemDrawer } from "@/components/ItemDrawer";
 import { CATEGORY_COLOR, SOURCE_LABEL, fmtDate, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { CompetitorCard, Deal } from "@/lib/types";
@@ -83,6 +84,7 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
 
 export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; showCompetitor?: boolean }) {
   const { data: meta } = useMeta();
+  const drawer = useItemDrawer();
   const td = "border-b border-line px-2.5 py-2 align-top";
   return (
     <div className="overflow-x-auto">
@@ -99,7 +101,7 @@ export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; sh
             <tr key={d.item_id}>
               <td className={`${td} whitespace-nowrap`}>{fmtDate(d.published_at, true)}</td>
               {showCompetitor ? <td className={`${td} whitespace-nowrap`}>{competitorName(meta, d.competitor)}</td> : null}
-              <td className={td}><ExtLink href={d.url}>{d.title}</ExtLink></td>
+              <td className={td}><ItemTitle title={d.title} url={d.url} onOpen={() => drawer.open(d.item_id)} /></td>
               <td className={`${td} text-mute`}>{d.publisher} · {label(SOURCE_LABEL, d.source)}</td>
               <td className={td}><StatusDot status={d.status} /></td>
             </tr>

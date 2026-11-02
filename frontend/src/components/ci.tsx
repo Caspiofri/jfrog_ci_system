@@ -1,7 +1,7 @@
 "use client";
 // Small shared pieces in the prototype's style. All API strings are rendered as React text (D32).
 import type { ReactNode } from "react";
-import { AlertTriangle, Inbox, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Inbox, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import type { ApiError } from "@/lib/api";
@@ -86,14 +86,37 @@ export function N({ n }: { n: number | null | undefined }) {
   return <span className="ml-1 text-[11px] font-normal text-mute tabular-nums">n={n ?? "?"}</span>;
 }
 
-/** An external link that only opens http(s) URLs (D32). Other URLs show as plain text. */
-export function ExtLink({ href, children, className }: { href: string | null | undefined; children: ReactNode; className?: string }) {
+/** External links only open http(s) URLs (D32); safeHref turns anything else into no link. */
+export const ARTICLE_LINK_LABEL = "Open the original article in a new tab";
+
+/** The one external-link style: a ↗ icon that opens the original page in a new tab. Nothing when the URL isn't http(s). */
+export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className }: { href: string | null | undefined; label?: string; className?: string }) {
   const safe = safeHref(href);
-  if (!safe) return <span className={className}>{children}</span>;
+  if (!safe) return null;
   return (
-    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" className={cn("hover:text-jgreen-d hover:underline", className)}>
-      {children}
+    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={aria} title={aria}
+      onClick={(e) => e.stopPropagation()}
+      className={cn("inline-flex shrink-0 items-center rounded text-mute hover:text-jgreen-d focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
+      <ArrowUpRight className="size-3.5" aria-hidden="true" />
     </a>
+  );
+}
+
+/** The one link convention for an item: the title opens the side drawer, the ↗ icon opens the original article. */
+export function ItemTitle({ title, url, onOpen, className }: {
+  title: string; url?: string | null; onOpen?: () => void; className?: string;
+}) {
+  const text = title || "(no title)";
+  return (
+    <span className="inline-flex min-w-0 items-start gap-1">
+      {onOpen ? (
+        <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }} title="Open the details"
+          className={cn("min-w-0 text-left hover:text-jgreen-d hover:underline", className)}>{text}</button>
+      ) : (
+        <span className={cn("min-w-0", className)}>{text}</span>
+      )}
+      <ArticleLink href={url} className="mt-0.5" />
+    </span>
   );
 }
 

@@ -2,8 +2,7 @@
 // A published item in the Brief (D44): score with its rubric label, then three labeled rows.
 // Every collected string renders as React text (D32); links go through safeHref via ExtLink.
 import type { ReactNode } from "react";
-import { ExternalLink } from "lucide-react";
-import { CategoryTag, ExtLink, ScoreBadge, Tag } from "@/components/ci";
+import { CategoryTag, ItemTitle, ScoreBadge, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { LensView } from "@/components/LensView";
 import { RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
@@ -79,12 +78,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
       </div>
       <div className="mt-1.5 flex items-start gap-1.5">
-        <button type="button" onClick={() => drawer.open(item.item_id)} className={cn("text-left font-semibold hover:text-jgreen-d", s >= 4 && "text-sm")}>
-          {item.title}
-        </button>
-        <ExtLink href={item.url} className="mt-0.5 shrink-0 text-mute">
-          <ExternalLink className="size-3.5" aria-label="Open the source" />
-        </ExtLink>
+        <ItemTitle title={item.title} url={item.url} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
       </div>
       <dl className="m-0 mt-2 grid grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)]">
         <Row label="What happened">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Empty, ExtLink, N, Tag } from "@/components/ci";
+import { Empty, ItemTitle, N, Tag } from "@/components/ci";
 import { SOURCE_LABEL, fmtDateTime, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { EvalCard, ExtractionBlock, ExtractionRow, Health, Liveness, RunInfo, RunMetrics, RunStep, TestEval } from "@/lib/types";
@@ -318,7 +318,7 @@ export function Coverage({ cv }: { cv: NonNullable<Health["coverage"]> }) {
           <h3 className="mb-1 text-xs font-semibold text-mute">Missed</h3>
           {cv.missed.map((m) => (
             <div key={m.id} className="border-t border-line py-1.5 text-xs first:border-t-0">
-              <ExtLink href={m.official_url}>{m.title}</ExtLink>
+              <ItemTitle title={m.title} url={m.official_url} />
               <span className="text-mute"> · {competitorName(meta, m.competitor)} · expected importance {m.expected_importance}</span>
             </div>
           ))}
