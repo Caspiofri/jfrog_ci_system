@@ -99,3 +99,15 @@ test("no gap, threat, ahead or behind", () => {
     assert.doesNotMatch(visible(s), /\b(gap|threat|ahead|behind)\b/i);
   }
 });
+
+test("the heatmap ends where the competitor cards end (the latest Brief's run), never at today's date", () => {
+  assert.match(comp, /const cards = useApi<Competitors>\("\/api\/v1\/competitors"\);\s*const now = cards\.data\?\.week\?\.end;/);
+  assert.doesNotMatch(comp + readFileSync(new URL("../src/lib/heatmap.ts", import.meta.url), "utf8"), /new Date\(\)|Date\.now\(\)/);
+});
+
+test("each count says what it counts: the heatmap by feed date (published or awaiting review), the cards by the date found", () => {
+  assert.match(comp, /HEATMAP_COUNTS = "Counts items by feed date, published or awaiting review\. The competitor cards count published items by the date they were found\."/);
+  assert.match(comp, /data-counts>\{HEATMAP_COUNTS\}/);
+  const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
+  assert.match(parts, /published, found in the last 7 days · \{c\.items_today\} in this Brief/);
+});

@@ -6,15 +6,17 @@ import useSWR from "swr";
 import { Empty, ErrorNote, ItemTitle, Panel, ScoreBadge } from "@/components/ci";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { useItemDrawer } from "@/components/ItemDrawer";
-import { ApiError, get, path } from "@/lib/api";
+import { ApiError, get, path, useApi } from "@/lib/api";
 import { CATEGORY_COLOR, fmtDate } from "@/lib/format";
 import { ZERO_BG, buildHeatmap, heatColor, heatmapQuery, legendSteps } from "@/lib/heatmap";
 import { useMeta } from "@/lib/meta";
 import { remainingOffsets } from "@/lib/reviewQueue";
-import type { Log, LogRow } from "@/lib/types";
+import type { Competitors, Log, LogRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const HEATMAP_CAPTION = "Activity by category, from automatic classification. Last 7 days.";
+/** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
+export const HEATMAP_COUNTS = "Counts items by feed date, published or awaiting review. The competitor cards count published items by the date they were found.";
 
 async function getAllRows(url: string): Promise<{ rows: LogRow[]; now: string }> {
   const first = await get<Log>(url);
@@ -29,7 +31,10 @@ export function ActivityHeatmap() {
   const [sel, setSel] = useState<{ c: string; k: string } | null>(null);
   const comps = (meta?.competitors ?? []).filter((c) => !c.is_industry && c.key !== "industry").slice(0, 6);
   const keys = comps.map((c) => c.key);
-  const now = meta?.meta?.now;
+  // the same window end as the competitor cards (GET /competitors week.end, the latest Brief's run): in demo mode the
+  // snapshot, never today's date
+  const cards = useApi<Competitors>("/api/v1/competitors");
+  const now = cards.data?.week?.end;
   const q = useSWR<{ rows: LogRow[]; now: string }, ApiError>(
     now && keys.length ? path("/log", heatmapQuery(keys, now)) : null, getAllRows, { revalidateOnFocus: false });
   const cats = Object.keys(CATEGORY_COLOR);
@@ -38,7 +43,8 @@ export function ActivityHeatmap() {
   const picked = hm && sel ? hm.cells[sel.c]?.[sel.k] : null;
   return (
     <Panel title="Where competitors are active">
-      <p className="m-0 mb-2 text-xs text-[#44516a]" data-caption>{HEATMAP_CAPTION}</p>
+      <p className="m-0 mb-1 text-xs text-[#44516a]" data-caption>{HEATMAP_CAPTION}</p>
+      <p className="m-0 mb-2 text-[11px] text-mute" data-counts>{HEATMAP_COUNTS}</p>
       {q.error ? <ErrorNote error={q.error} onRetry={() => q.mutate()} /> : null}
       {!hm ? (q.error ? null : <div className="py-4 text-xs text-mute" role="status">Counting the last 7 days…</div>) : !hm.total ? (
         <Empty>No items from the tracked competitors were published in the last 7 days.</Empty>

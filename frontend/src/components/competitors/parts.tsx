@@ -57,7 +57,7 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
       </div>
       <div className="flex items-baseline gap-2">
         <b className="text-[28px] font-semibold leading-none tabular-nums">{c.items_7d}</b>
-        <span className="text-mute">items in 7 days · {c.items_today} in this Brief</span>
+        <span className="text-mute">published, found in the last 7 days · {c.items_today} in this Brief</span>
       </div>
       <Trend t={c.trend} prev={c.items_prev_7d} />
       <MixBar mix={c.category_mix} />
