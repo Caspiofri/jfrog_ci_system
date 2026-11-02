@@ -25,11 +25,17 @@ export function InfoHint({ text, label: aria = "What this means" }: { text: Reac
   );
 }
 
-export function PageHead({ title, sub, tools, info }: { title: string; sub?: ReactNode; tools?: ReactNode; info?: ReactNode }) {
+export function PageHead({ title, sub, tools, info, icon, titleHint }: {
+  title: string; sub?: ReactNode; tools?: ReactNode; info?: ReactNode; icon?: ReactNode; titleHint?: ReactNode;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2.5">
       <div>
-        <h1 className="m-0 flex items-center gap-1.5 text-[22px] font-semibold">{title}<InfoHint text={info} /></h1>
+        <h1 className="m-0 flex items-center gap-1.5 text-[22px] font-semibold">
+          {icon}
+          {titleHint ? <Hint text={titleHint}>{title}</Hint> : title}
+          <InfoHint text={info} />
+        </h1>
         {sub ? <div className="mt-0.5 text-mute">{sub}</div> : null}
       </div>
       {tools ? <div className="flex flex-wrap items-center gap-2">{tools}</div> : null}

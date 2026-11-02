@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, FlaskConical, Loader2, Newspaper, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArticleLink, Async, Empty, ErrorNote, Hint, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { cn } from "@/lib/utils";
@@ -74,15 +74,17 @@ function BriefScreen() {
     <>
       <PageHead
         title="Daily Brief"
-        info={brief.data?.window ? (backfill
-          ? "The 14-day import that started the store. Everything in it was published before the first run, so \"Found late\" badges are hidden here."
-          : `Everything discovered from ${fmtDateTime(brief.data.window.prev_anchor)} to ${fmtDateTime(brief.data.window.anchor)} Israel time (${brief.data.window.hours} h).`) : undefined}
+        icon={<Newspaper className="size-5 text-jgreen-d" aria-hidden />}
+        titleHint={DAILY_BRIEF_HINT}
         sub={
           <span className="mt-1 flex items-center gap-2">
             <Button variant="outline" size="icon" className="size-7" disabled={!older} onClick={() => go(older)} aria-label="Previous Brief">
               <ChevronLeft className="size-4" />
             </Button>
-            <span className="min-w-[13rem] text-center">{date ? fmtLongDate(date) : briefs.isLoading ? "Loading…" : "No Brief yet"}</span>
+            <Hint text={brief.data?.window ? (backfill
+              ? "The 14-day import that started the store. Everything in it was published before the first run, so \"Found late\" badges are hidden here."
+              : `Everything discovered from ${fmtDateTime(brief.data.window.prev_anchor)} to ${fmtDateTime(brief.data.window.anchor)} Israel time (${brief.data.window.hours} h).`) : null}
+              className="min-w-[13rem] text-center">{date ? fmtLongDate(date) : briefs.isLoading ? "Loading…" : "No Brief yet"}</Hint>
             <Button variant="outline" size="icon" className="size-7" disabled={!newer} onClick={() => go(newer)} aria-label="Next Brief">
               <ChevronRight className="size-4" />
             </Button>
@@ -229,6 +231,10 @@ function insightState(ins: BriefInsights): string | null {
 }
 
 /** The analyst's manual check of the insights (1 Nov). Insights stay experimental until summaries stop overstating. */
+const DAILY_BRIEF_HINT = "Everything new since the previous Brief, ranked by importance.";
+const EXPERIMENTAL_HINT =
+  "AI-written summaries across several stories. Facts were checked on 1 Nov (11 of 12 claims supported), but conclusions can be overstated. Check the cited sources before sharing.";
+
 const INSIGHTS_CHECK =
   "Checked on 1 Nov: 11 of 12 claims supported and 12 of 12 citations correct, but summaries overstated in all 4 insights (n = 4); 0 of 4 expected patterns fully found.";
 
@@ -371,12 +377,15 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
   );
 }
 
-/** The "Experimental" chip: on the insights title and on every insight. */
+/** The "Experimental" chip, with a flask and its explanation on hover and focus: on the insights title and on every insight. */
 function ExperimentalChip({ small = false }: { small?: boolean }) {
   return (
-    <Tag className={cn("border border-[#f59e0b]/60 bg-[#fff7e6] font-semibold uppercase tracking-wide text-[#8a5a00]", small ? "text-[9px]" : "text-[10px]")}>
-      Experimental
-    </Tag>
+    <Hint text={EXPERIMENTAL_HINT}>
+      <Tag className={cn("inline-flex items-center gap-1 border border-[#f59e0b]/60 bg-[#fff7e6] font-semibold uppercase tracking-wide text-[#8a5a00]", small ? "text-[9px]" : "text-[10px]")}>
+        <FlaskConical className={small ? "size-2.5" : "size-3"} aria-hidden />
+        Experimental
+      </Tag>
+    </Hint>
   );
 }
 
