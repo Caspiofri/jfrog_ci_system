@@ -15,6 +15,7 @@ import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Claim, Insight, ItemDetail, Page, RunMetrics } from "@/lib/types";
 import { todayTiles } from "@/lib/briefNumbers";
+import { insightsTitle } from "@/lib/insightsTitle";
 import { CONTINUITY_TIP, continuityBadge, goneLine } from "@/lib/continuity";
 
 const TOP = 5;
@@ -259,7 +260,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
       big
       title={
         <span className="inline-flex items-center gap-2">
-          Key insights
+          {insightsTitle(insights.window)}
           <Tag className="border border-[#f59e0b]/60 bg-[#fff7e6] text-[10px] font-semibold uppercase tracking-wide text-[#8a5a00]"
             title="Pattern analysis is experimental: see the check below">Experimental</Tag>
         </span>
