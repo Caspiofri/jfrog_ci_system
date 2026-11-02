@@ -19,7 +19,7 @@ export default function CompetitorsPage() {
   const { data: meta } = useMeta();
   return (
     <>
-      <PageHead title="Competitors" info="Threat is the highest importance this week." />
+      <PageHead title="Competitors" info="Top score is the highest score of any item this week." />
       <CapabilityMatrix />
       <Async {...q} retry={() => q.mutate()} rows={6} isEmpty={(d) => !d.items.length} empty="No competitors in the config.">
         {(d) => (
@@ -29,7 +29,7 @@ export default function CompetitorsPage() {
               (held items count as awaiting review at {label(LEVEL_LABEL, d.level)}).
             </div>
             <div className="flex flex-col gap-1 rounded-md border border-line bg-card px-3 py-2" aria-label="Colour legend">
-              <ScoreLegend title="Threat colour (highest score this week):" />
+              <ScoreLegend title="Top score colour (highest score this week):" />
               <CategoryLegend title="Category bar:" categories={legendCategories(d.items.flatMap((c) => c.category_mix.map((m) => m.category)), meta?.categories)} />
             </div>
             <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">

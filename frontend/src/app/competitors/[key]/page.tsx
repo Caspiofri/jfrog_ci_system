@@ -49,7 +49,7 @@ function Profile() {
                     Week to {fmtDate(p.date, true)} · last activity {fmtDate(c.last_activity_at, true)}
                   </div>
                 </div>
-                <span className="flex items-center gap-2 text-mute">Threat this week <ScoreBadge score={c.threat} /></span>
+                <span className="flex items-center gap-2 text-mute">Top score this week <ScoreBadge score={c.threat} /></span>
               </div>
               <div className="rounded-md border border-line bg-card px-3 py-2" aria-label="Colour legend">
                 <ScoreLegend title="Score colours:" />
