@@ -17,6 +17,7 @@ import type { CompetitorProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const CAPTION = "What was found on public pages, not a verdict.";
+export const MATRIX_INFO = "A direct comparison of JFrog's capabilities with each competitor's, one capability at a time, from each vendor's public pages.";
 export const NOT_STATED_LINE = "Their page says nothing:";
 export const NOT_TRACKED_LINE = "Not tracked yet:";
 
@@ -108,7 +109,7 @@ export function CapabilityMatrix() {
   const rows = buildMatrix(profiles);
   const cur = rows[Math.min(sel, Math.max(0, rows.length - 1))];
   return (
-    <Panel title="JFrog vs competitors"
+    <Panel title="JFrog vs competitors" info={MATRIX_INFO}
       right={rows.length ? (
         <button type="button" aria-pressed={all} onClick={() => setAll(!all)} className="inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d hover:underline">
           {all ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}{all ? "Show one capability" : "Expand all"}

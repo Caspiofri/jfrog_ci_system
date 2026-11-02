@@ -187,3 +187,8 @@ test("still at the top of the Competitors view, above the cards; JFrog row first
   assert.ok(page.indexOf("<CapabilityMatrix />") < page.indexOf("<Async"));
   assert.match(comp, /<VendorRow c=\{v\.jfrog\} k="jfrog" name="JFrog" jfrog \/>[\s\S]*?\{v\.listed\.map/);
 });
+
+test("the title's (i) says it is a direct comparison of JFrog's capabilities with the competitors'", () => {
+  assert.match(comp, /<Panel title="JFrog vs competitors" info=\{MATRIX_INFO\}/);
+  assert.match(comp, /MATRIX_INFO = "A direct comparison of JFrog's capabilities with each competitor's, one capability at a time, from each vendor's public pages\.";/);
+});
