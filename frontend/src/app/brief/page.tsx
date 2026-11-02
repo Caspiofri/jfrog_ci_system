@@ -15,6 +15,8 @@ import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Claim, Insight, ItemDetail, Page, RunMetrics } from "@/lib/types";
 import { runCountsFor, todayTiles } from "@/lib/briefNumbers";
+import { CAPABILITY_ROWS } from "@/lib/capabilityRows";
+import { CAPABILITY_NAME, claimCapability, insightCapabilities } from "@/lib/capabilitySheet";
 import { insightsTitle } from "@/lib/insightsTitle";
 import { CONTINUITY_TIP, continuityBadge, goneLine } from "@/lib/continuity";
 
@@ -341,6 +343,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
       <div className="flex flex-wrap items-center gap-1.5" data-insight-header>
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
         <ContinuityBadge c={ins.continuity} />
+        <TouchesJfrog claims={ins.claims} />
       </div>
       <h3 className="m-0 text-sm font-semibold">
         <button type="button" aria-expanded={details} aria-controls={id} onClick={(e) => { e.stopPropagation(); toggle(); }}
@@ -384,6 +387,32 @@ function AiLabel() {
         {AI_LABEL}
       </span>
     </Hint>
+  );
+}
+
+/** A claim's JFrog quote with the capability it comes from: the claim's own field, or the one sheet row that holds
+ *  the quote exactly. With neither, the quote as before, credited to the capability sheet. */
+function JfrogQuote({ c }: { c: Claim }) {
+  const cap = claimCapability(c, CAPABILITY_ROWS);
+  return (
+    <div className="text-mute" data-jfrog-quote={cap.source}>
+      {cap.key ? (
+        <><b className="font-semibold text-ink">JFrog {CAPABILITY_NAME[cap.key]}:</b> <span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span></>
+      ) : (
+        <><span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span> — JFrog capability sheet</>
+      )}
+    </div>
+  );
+}
+
+/** "Touches JFrog: <capability> · <capability>" in the insight header; nothing when no claim names one. */
+function TouchesJfrog({ claims }: { claims: Claim[] }) {
+  const caps = insightCapabilities(claims, CAPABILITY_ROWS);
+  if (!caps.length) return null;
+  return (
+    <Tag className="border border-jgreen/40 bg-[#eef7f0] text-[11px] font-semibold text-jgreen-d">
+      Touches JFrog: {caps.map((k) => CAPABILITY_NAME[k]).join(" · ")}
+    </Tag>
   );
 }
 
@@ -435,9 +464,7 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
       <div className="flex min-w-0 flex-col gap-1">
         <div className="text-[13px] font-semibold text-ink">{c.text}</div>
         {c.quote ? <div className="italic text-mute">&ldquo;{c.quote}&rdquo;</div> : null}
-        {c.jfrog_quote ? (
-          <div className="text-mute"><span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span> — JFrog capability sheet</div>
-        ) : null}
+        {c.jfrog_quote ? <JfrogQuote c={c} /> : null}
         {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} />)}
       </div>
     </li>

@@ -148,6 +148,8 @@ export interface Claim {
   quote: string;
   quote_item_id: string;
   jfrog_quote?: string; // D42: verbatim from the JFrog capability sheet, when the claim is about JFrog
+  jfrog_axis?: string | null; // not served today: the capability the quote comes from, if the generator ever stores it
+  axis?: string | null;
 }
 
 export interface Insight {
