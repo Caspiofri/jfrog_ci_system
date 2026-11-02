@@ -316,7 +316,7 @@ function WindowLine({ w }: { w: BriefInsights["window"] }) {
   );
 }
 
-/** One insight per row. Always visible: type, top importance, story count, title, summary, why it matters.
+/** One insight per row. Always visible: type, top importance, title, summary, why it matters (no story count: the evidence lists them).
  * The claims with their quotes and sources sit behind "Show evidence" (D50: each cited item keeps its score and link). */
 function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: boolean; onSelect: () => void }) {
   const top = SCORE_COLOR[ins.max_score ?? 0]?.[0] ?? "#e3e8ef";
@@ -337,13 +337,9 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
       className={`flex cursor-pointer flex-col gap-2 rounded-md border bg-card px-4 py-3 transition-colors hover:border-jgreen ${selected ? "border-jgreen ring-1 ring-jgreen" : "border-line"}`}
       style={{ borderLeft: `4px solid ${top}` }}
     >
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5" data-insight-header>
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
         {ins.max_score ? <span className="text-xs text-mute">top importance {ins.max_score}</span> : null}
-        <span className="text-xs text-mute">
-          · {ins.story_ids.length} {ins.story_ids.length === 1 ? "story" : "stories"}
-          {ins.item_ids.length !== ins.story_ids.length ? `, ${ins.item_ids.length} ${ins.item_ids.length === 1 ? "item" : "items"}` : ""}
-        </span>
       </div>
       <h3 className="m-0 text-sm font-semibold">{ins.title}</h3>
       <p className="m-0 text-[#44516a]">{ins.summary}</p>
