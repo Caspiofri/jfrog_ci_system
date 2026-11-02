@@ -14,7 +14,7 @@ import { useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Claim, Insight, ItemDetail, Page, RunMetrics } from "@/lib/types";
-import { todayTiles } from "@/lib/briefNumbers";
+import { runCountsFor, todayTiles } from "@/lib/briefNumbers";
 import { insightsTitle } from "@/lib/insightsTitle";
 import { CONTINUITY_TIP, continuityBadge, goneLine } from "@/lib/continuity";
 
@@ -155,8 +155,9 @@ function BriefScreen() {
 
 /** "Today in numbers": four tiles, each number straight from the API, each explained on hover. */
 function SummaryBlock({ date, s, runId }: { date: string; s: BriefSummary; runId: string }) {
-  const run = useApi<RunMetrics>(path(`/run-metrics/${encodeURIComponent(runId)}`), { shouldRetryOnError: false });
-  const tiles = todayTiles(s, run.data?.items);
+  // keepPreviousData off: a 404 for this run must not leave the previous Brief's count on screen
+  const run = useApi<RunMetrics>(path(`/run-metrics/${encodeURIComponent(runId)}`), { shouldRetryOnError: false, keepPreviousData: false });
+  const tiles = todayTiles(s, runCountsFor(runId, run.data));
   return (
     <section aria-label="Today in numbers">
       <h2 className="m-0 mb-2 text-sm font-semibold">Today in numbers{s.mock ? <MockTag what="these counts" /> : null}</h2>

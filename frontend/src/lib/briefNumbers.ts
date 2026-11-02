@@ -5,6 +5,13 @@ import type { BriefSummary } from "./types";
 
 export interface RunItemCounts { collected?: number; kept?: number; new?: number }
 
+/** The counts of this Brief's own run, or null. A metrics row of another run (an earlier response kept while the
+ *  next request is pending or failed with 404) is never used: the tile would show the wrong day's number. */
+export function runCountsFor(runId: string, metrics: { run_id?: string; items?: RunItemCounts | null } | null | undefined): RunItemCounts | null {
+  if (!metrics || metrics.run_id !== runId) return null;
+  return metrics.items ?? null;
+}
+
 export interface Tile {
   key: "new" | "published" | "high" | "review";
   label: string;

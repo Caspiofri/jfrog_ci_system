@@ -64,3 +64,29 @@ test("the tiles are focusable for their hover (keyboard)", () => {
   const ci = readFileSync(new URL("../src/components/ci.tsx", import.meta.url), "utf8");
   assert.match(ci, /export function Hint[\s\S]*?tabIndex=\{0\}/);
 });
+
+import { runCountsFor } from "../src/lib/briefNumbers.ts";
+
+test("two Brief days with different counts: each tile uses its own Brief's run", () => {
+  const m1 = { run_id: "20261101T0400Z-e9cae4", items: { new: 26 } };
+  const m2 = { run_id: "20261102T0400Z-bed018", items: { new: 13 } };
+  const tile = (runId, m) => todayTiles(S, runCountsFor(runId, m))[0].value;
+  assert.equal(tile("20261101T0400Z-e9cae4", m1), 26);
+  assert.equal(tile("20261102T0400Z-bed018", m2), 13);
+});
+
+test("another run's metrics (kept from the previous Brief, or the request 404ed) never fill the tile", () => {
+  const m1 = { run_id: "20261101T0400Z-e9cae4", items: { new: 26 } };
+  assert.equal(runCountsFor("20261031T1345Z-802913", m1), null);
+  const t = todayTiles(S, runCountsFor("20261031T1345Z-802913", m1))[0];
+  assert.equal(t.value, null);
+  assert.match(t.hint, /isn't known/);
+  assert.equal(runCountsFor("x", undefined), null);
+});
+
+test("the Brief asks for its own run with keepPreviousData off", () => {
+  const src = readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8");
+  assert.match(src, /\/run-metrics\/\$\{encodeURIComponent\(runId\)\}`\), \{ shouldRetryOnError: false, keepPreviousData: false \}/);
+  assert.match(src, /todayTiles\(s, runCountsFor\(runId, run\.data\)\)/);
+  assert.match(src, /runId=\{b\.window\.anchor_run_id\}/);
+});
