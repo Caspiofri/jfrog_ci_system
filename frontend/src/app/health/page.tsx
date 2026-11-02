@@ -6,6 +6,7 @@ import { ChangeDetection, Coverage, EvalCards, Extraction, Funnel, LivenessAlert
 import { path, useApi, useRecord } from "@/lib/api";
 import { LEVEL_LABEL, delta, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
+import { briefForRun } from "@/lib/healthBrief";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefRow, Health, Page, RunInfo } from "@/lib/types";
 
@@ -59,7 +60,7 @@ function HealthScreen() {
               ) : runs.error ? null : runs.data ? <Empty>No runs yet.</Empty> : <Loading rows={2} />}
             </Panel>
 
-            <BriefCounts />
+            <BriefCounts runId={runId} />
 
             <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
               <Panel title="Where do items drop off?" cap={h.funnel ? `All sources, this run · published and held at ${label(LEVEL_LABEL, h.funnel.level)}` : undefined}>
@@ -103,15 +104,15 @@ function HealthScreen() {
 
 type Tile = { key: string; label: string; value: number; prev: number | null };
 
-/** The latest Brief's counts on Health. "Published" and "rated 4–5" come from the Brief's summary (scored 3+, the
+/** The Brief's counts on Health: the Brief of the run picked in the Run filter, or the latest Brief. "Published" and "rated 4–5" come from the Brief's summary (scored 3+, the
  * same numbers the Brief shows); the previous Brief's from its /briefs row. Found late and Mentions JFrog are the
  * operational counts that left the Brief: they still come from `kpis` and count every published score.
  * No delta when the previous Brief was the initial import: a 14-day backfill isn't comparable with one day. */
-function BriefCounts() {
+function BriefCounts({ runId }: { runId: string }) {
   const { data: meta } = useMeta();
-  const date = meta?.latest_brief_date;
-  const q = useRecord<Brief>(date ? path("/brief", { date, limit: 1 }) : null, date, (b) => b.date);
   const briefs = useApi<Page<BriefRow>>(path("/briefs", { limit: 200 }));
+  const { date, picked } = briefForRun(briefs.data?.items ?? [], runId, meta?.latest_brief_date);
+  const q = useRecord<Brief>(date ? path("/brief", { date, limit: 1 }) : null, date, (b) => b.date);
   const b = q.data;
   const rows = briefs.data?.items ?? [];
   const i = b ? rows.findIndex((r) => r.date === b.date) : -1;
@@ -126,9 +127,11 @@ function BriefCounts() {
   ] : [];
   const error = q.error ?? briefs.error;
   return (
-    <Panel title="How did the latest Brief's counts move?"
+    <Panel title={picked ? "How did this run's Brief counts move?" : "How did the latest Brief's counts move?"}
       cap={b ? `Brief of ${fmtLongDate(b.date)} · ${prevIsImport ? "the previous Brief was the initial import, so no comparison" : "vs the previous Brief"}` : undefined}>
-      {error ? <ErrorNote error={error} onRetry={() => { q.mutate(); briefs.mutate(); }} /> : !b || !briefs.data ? (
+      {error ? <ErrorNote error={error} onRetry={() => { q.mutate(); briefs.mutate(); }} /> : picked && briefs.data && date === null ? (
+        <Empty>This run has no Brief of its own.</Empty>
+      ) : !b || !briefs.data ? (
         meta && !meta.latest_brief_date ? <Empty>No Brief yet.</Empty> : <Loading rows={1} />
       ) : !tiles.length ? (
         <Empty>No counts for the Brief of {fmtLongDate(b.date)}.</Empty>
