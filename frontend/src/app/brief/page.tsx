@@ -457,7 +457,7 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
   const main = useCitedItem(ids[0] ?? "", ids[0] ? cited.get(ids[0]) : undefined);
   const [bg, fg] = SCORE_COLOR[main.score ?? 0] ?? SCORE_COLOR[0];
   return (
-    <li className="flex gap-2.5 rounded border border-line bg-white p-2 text-xs" data-claim-card>
+    <li className="flex gap-2.5 text-xs" data-claim-card>
       <span title={SCORE_TIP} className="flex w-7 shrink-0 items-center justify-center self-stretch rounded text-sm font-semibold tabular-nums"
         style={{ background: bg, color: fg }}>
         {main.score ?? "–"}

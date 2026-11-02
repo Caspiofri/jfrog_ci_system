@@ -52,6 +52,7 @@ test("insights: a claim card is not clickable; each cited article has a \"Reinfo
   const claim = brief.slice(brief.indexOf("function ClaimBlock"), brief.indexOf("function SourceLine"));
   const line = brief.slice(brief.indexOf("function SourceLine"), brief.indexOf("\n}\n", brief.indexOf("function SourceLine")));
   assert.doesNotMatch(claim, /role="button"|onClick|onKeyDown|cursor-pointer/);
+  assert.match(claim, /<li className="flex gap-2\.5 text-xs" data-claim-card>/, "no frame: no border, background or padding");
   assert.match(claim, /n=\{ids\.length > 1 \? k \+ 1 : null\}/, "numbered only when a claim cites several articles");
   assert.match(line, /<button type="button"[^>]*onClick=\{\(\) => drawer\.open\(id\)\}/);
   assert.match(line, /Reinforced by article\{n \? ` \$\{n\}` : ""\}/);
