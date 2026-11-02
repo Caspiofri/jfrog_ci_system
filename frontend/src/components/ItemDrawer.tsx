@@ -14,19 +14,25 @@ import { HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTi
 import { competitorName, useMeta } from "@/lib/meta";
 import type { FieldChange, ItemAction, ItemDetail, Lens, LensStatus, Meta } from "@/lib/types";
 
-const Ctx = createContext<{ open: (id: string) => void }>({ open: () => {} });
+/** Where the drawer was opened from, when that adds meaning the item alone doesn't carry: an insight's claim, with
+ *  its quote and the JFrog capability-sheet quote (and the capability it was matched to, if any). */
+export interface ClaimContext { insight?: string; claim: string; quote?: string; jfrogQuote?: string; capability?: string | null }
+
+const Ctx = createContext<{ open: (id: string, ctx?: ClaimContext) => void }>({ open: () => {} });
 export const useItemDrawer = () => useContext(Ctx);
 
 export function ItemDrawerProvider({ children }: { children: ReactNode }) {
   const [id, setId] = useState<string | null>(null);
-  const open = useCallback((x: string) => setId(x), []);
+  const [ctx, setCtx] = useState<ClaimContext | null>(null);
+  // a plain open (from a list, a card, the Log) clears any claim context, so it never sticks to another item
+  const open = useCallback((x: string, c?: ClaimContext) => { setId(x); setCtx(c ?? null); }, []);
   const value = useMemo(() => ({ open }), [open]);
   return (
     <Ctx.Provider value={value}>
       {children}
       <Sheet open={id !== null} onOpenChange={(o) => !o && setId(null)}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
-          {id ? <DrawerBody id={id} /> : null}
+          {id ? <DrawerBody id={id} ctx={ctx} /> : null}
         </SheetContent>
       </Sheet>
     </Ctx.Provider>
@@ -68,7 +74,25 @@ function MentionWhy({ d }: { d: ItemDetail }) {
   );
 }
 
-function DrawerBody({ id }: { id: string }) {
+/** "In this insight": the claim the item was opened from, its quote, and the JFrog capability-sheet quote (green
+ *  with the capability's name when the quote matched one sheet row, as in the insight). */
+function ClaimBlockInDrawer({ c }: { c: ClaimContext }) {
+  return (
+    <div className="flex flex-col gap-1 rounded border border-line bg-page px-3 py-2 text-xs" data-drawer-claim>
+      <span className="font-semibold text-mute">In this insight{c.insight ? `: ${c.insight}` : ""}</span>
+      <span className="text-[13px] font-semibold text-ink">{c.claim}</span>
+      {c.quote ? <span className="italic text-mute">&ldquo;{c.quote}&rdquo;</span> : null}
+      {c.jfrogQuote ? (
+        <span className={c.capability ? "rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2 py-0.5 text-jgreen-d" : "text-mute"} data-drawer-jfrog>
+          {c.capability ? <><b className="font-semibold">JFrog {c.capability}:</b> <span className="italic">&ldquo;{c.jfrogQuote}&rdquo;</span></>
+            : <><span className="italic">&ldquo;{c.jfrogQuote}&rdquo;</span> — JFrog capability sheet</>}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function DrawerBody({ id, ctx }: { id: string; ctx: ClaimContext | null }) {
   const { data: meta } = useMeta();
   // only the requested item, never the previous one (a 404 or a slow earlier response shows an error or loading)
   const q = useRecord<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`, id, (d) => d.item?.item_id);
@@ -95,6 +119,7 @@ function DrawerBody({ id }: { id: string }) {
                   {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
                   {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
+                {ctx ? <ClaimBlockInDrawer c={ctx} /> : null}
                 {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
                 <MentionWhy d={d} />
                 <ArticleExcerpt excerpt={it.excerpt} url={it.url} />

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArticleLink, Async, Empty, ErrorNote, Hint, ImportanceLegend, Loading, PageHead, Panel, Tag, openFromRow } from "@/components/ci";
 import { cn } from "@/lib/utils";
 import { FilterSelect } from "@/components/FilterSelect";
-import { useItemDrawer } from "@/components/ItemDrawer";
+import { type ClaimContext, useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
 import { ApiError, path, send, useApi, useRecord } from "@/lib/api";
 import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
@@ -366,7 +366,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
               </button>
               {open ? (
                 <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0" onClick={(e) => e.stopPropagation()}>
-                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} />)}
+                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} insight={ins.title} />)}
                 </ul>
               ) : null}
             </div>
@@ -452,12 +452,15 @@ const SCORE_TIP = "Importance of the cited item";
 
 /** One claim as one block: the quoted item's score down the left side, then the claim, its quote, and its sources.
  * When a claim cites several items, each extra source line carries its own small score. */
-function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }) {
+function ClaimBlock({ c, cited, insight }: { c: Claim; cited: Map<string, CitedItemRow>; insight: string }) {
   const drawer = useItemDrawer();
   const ids = [...new Set([c.quote_item_id, ...c.item_ids].filter(Boolean))];
   const main = useCitedItem(ids[0] ?? "", ids[0] ? cited.get(ids[0]) : undefined);
   const [bg, fg] = SCORE_COLOR[main.score ?? 0] ?? SCORE_COLOR[0];
-  const open = () => ids[0] && drawer.open(ids[0]);
+  // the side panel gets the claim with it: the JFrog quote and its capability live on the claim, not on the item
+  const capKey = claimCapability(c, CAPABILITY_ROWS).key;
+  const ctx = { insight, claim: c.text, quote: c.quote, jfrogQuote: c.jfrog_quote?.trim() || undefined, capability: capKey ? CAPABILITY_NAME[capKey] : null };
+  const open = () => ids[0] && drawer.open(ids[0], ctx);
   // the whole claim card, score included, opens the cited item's details; its only link is Source (the article)
   return (
     <li role="button" tabIndex={ids[0] ? 0 : -1} aria-label={`Open the item behind: ${c.text}`} data-claim-card
@@ -472,7 +475,7 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
         <div className="text-[13px] font-semibold text-ink">{c.text}</div>
         {c.quote ? <div className="italic text-mute">&ldquo;{c.quote}&rdquo;</div> : null}
         {c.jfrog_quote ? <JfrogQuote c={c} /> : null}
-        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} />)}
+        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} ctx={ctx} />)}
       </div>
     </li>
   );
@@ -480,14 +483,14 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
 
 /** One cited item's line: its score when it isn't the claim's first item, "not in this Brief" when it applies, and
  *  the one link, Source, to the article. No title: the claim card itself opens the item's details. */
-function SourceLine({ id, row, withScore }: { id: string; row?: CitedItemRow; withScore: boolean }) {
+function SourceLine({ id, row, withScore, ctx }: { id: string; row?: CitedItemRow; withScore: boolean; ctx?: ClaimContext }) {
   const drawer = useItemDrawer();
   const it = useCitedItem(id, row);
   const [bg, fg] = SCORE_COLOR[it.score ?? 0] ?? SCORE_COLOR[0];
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-mute" data-source-line={id}>
       {withScore ? (
-        <button type="button" title={`${SCORE_TIP} · open this item`} onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
+        <button type="button" title={`${SCORE_TIP} · open this item`} onClick={(e) => { e.stopPropagation(); drawer.open(id, ctx); }}
           className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums"
           style={{ background: bg, color: fg }}>{it.score ?? "–"}</button>
       ) : null}
