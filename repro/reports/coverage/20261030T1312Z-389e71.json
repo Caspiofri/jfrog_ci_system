@@ -1,0 +1,1044 @@
+{
+  "run_id": "20261030T1312Z-389e71",
+  "window_days": 14,
+  "window": {
+    "first": "2026-10-16",
+    "last": "2026-10-30"
+  },
+  "items": {
+    "kept": 282,
+    "dropped": 25
+  },
+  "overall": {
+    "events": 26,
+    "captured": 25,
+    "recall": 0.962,
+    "captured_in_kept": 25,
+    "captured_dropped_only": 0
+  },
+  "high_importance": {
+    "min": 4,
+    "events": 11,
+    "captured": 11,
+    "recall": 1.0
+  },
+  "by_competitor": {
+    "aws": {
+      "events": 2,
+      "captured": 1,
+      "recall": 0.5
+    },
+    "cloudsmith": {
+      "events": 4,
+      "captured": 4,
+      "recall": 1.0
+    },
+    "github": {
+      "events": 8,
+      "captured": 8,
+      "recall": 1.0
+    },
+    "gitlab": {
+      "events": 4,
+      "captured": 4,
+      "recall": 1.0
+    },
+    "industry": {
+      "events": 4,
+      "captured": 4,
+      "recall": 1.0
+    },
+    "snyk": {
+      "events": 3,
+      "captured": 3,
+      "recall": 1.0
+    },
+    "sonatype": {
+      "events": 1,
+      "captured": 1,
+      "recall": 1.0
+    }
+  },
+  "by_importance": {
+    "2": {
+      "events": 10,
+      "captured": 9,
+      "recall": 0.9
+    },
+    "3": {
+      "events": 5,
+      "captured": 5,
+      "recall": 1.0
+    },
+    "4": {
+      "events": 10,
+      "captured": 10,
+      "recall": 1.0
+    },
+    "5": {
+      "events": 1,
+      "captured": 1,
+      "recall": 1.0
+    }
+  },
+  "by_source_kind": {
+    "external": {
+      "events": 7,
+      "captured": 6,
+      "recall": 0.857
+    },
+    "feed": {
+      "events": 19,
+      "captured": 19,
+      "recall": 1.0
+    }
+  },
+  "missed": [
+    {
+      "id": "aws-inspector-ecr-rescan-default",
+      "title": "Amazon Inspector updates the default Amazon ECR re-scan duration to 7 days",
+      "competitor": "aws",
+      "expected_importance": 2,
+      "official_url": "https://docs.aws.amazon.com/inspector/latest/user/doc-history.html"
+    }
+  ],
+  "dropped_only": [],
+  "out_of_window": [],
+  "events": [
+    {
+      "id": "cloudsmith-trivy-deprecation",
+      "competitor": "cloudsmith",
+      "date": "2026-10-29",
+      "title": "Deprecating Trivy vulnerability scanning",
+      "official_url": "https://cloudsmith.com/changelog/deprecating-trivy-vulnerability-scanning",
+      "source_kind": "feed",
+      "category": "Product & Features",
+      "expected_importance": 3,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "7e9fda14b262312c",
+          "title": "Deprecating Trivy vulnerability scanning",
+          "url": "https://cloudsmith.com/changelog/deprecating-trivy-vulnerability-scanning",
+          "competitor": "cloudsmith",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "cloudsmith-npm-provenance",
+      "competitor": "cloudsmith",
+      "date": "2026-10-26",
+      "title": "Verify npm provenance through your Cloudsmith registry",
+      "official_url": "https://cloudsmith.com/changelog/verify-npm-provenance-through-your-cloudsmith-registry",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 3,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "51eed1b3613f6df6",
+          "title": "Verify npm provenance through your Cloudsmith registry",
+          "url": "https://cloudsmith.com/changelog/verify-npm-provenance-through-your-cloudsmith-registry",
+          "competitor": "cloudsmith",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "cloudsmith-cli-password-login-retired",
+      "competitor": "cloudsmith",
+      "date": "2026-10-22",
+      "title": "Username and password login on the Cloudsmith CLI stops working on November 20, 2026",
+      "official_url": "https://cloudsmith.com/changelog/username-and-password-login-on-the-cloudsmith-cli-stops-working-on-november-20-2026",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "b4bc00e0441d09d0",
+          "title": "CLI v1.30.0: Error reporting, TLS-intercepting proxy support, and a username and password login deprecation",
+          "url": "https://cloudsmith.com/changelog/cli-v1-30-0-error-reporting-tls-intercepting-proxy-support-and-a-username-and-password-login",
+          "competitor": "cloudsmith",
+          "reason": "url"
+        },
+        {
+          "status": "kept",
+          "id": "39b882d5b1cca127",
+          "title": "Username and password login on the Cloudsmith CLI stops working on November 20, 2026",
+          "url": "https://cloudsmith.com/changelog/username-and-password-login-on-the-cloudsmith-cli-stops-working-on-november-20-2026",
+          "competitor": "cloudsmith",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "cloudsmith-mumbai-region",
+      "competitor": "cloudsmith",
+      "date": "2026-10-22",
+      "title": "Mumbai is now a supported storage region",
+      "official_url": "https://cloudsmith.com/changelog/mumbai-is-now-a-supported-storage-region",
+      "source_kind": "feed",
+      "category": "Product & Features",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "da758eab5f5e6a73",
+          "title": "Mumbai is now a supported storage region",
+          "url": "https://cloudsmith.com/changelog/mumbai-is-now-a-supported-storage-region",
+          "competitor": "cloudsmith",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "sonatype-emudhra-assessment",
+      "competitor": "sonatype",
+      "date": "2026-10-21",
+      "title": "eMudhra CA Incident: Sonatype's Assessment and Guidance",
+      "official_url": "https://www.sonatype.com/blog/emudhra-ca-incident-sonatypes-assessment-and-guidance",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "3e953b74932f71ad",
+          "title": "eMudhra CA Incident: Sonatype's Assessment and Guidance",
+          "url": "https://www.sonatype.com/blog/emudhra-ca-incident-sonatypes-assessment-and-guidance",
+          "competitor": "sonatype",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "github-package-firewall-preview",
+      "competitor": "github",
+      "date": "2026-10-20",
+      "title": "GitHub package firewall in public preview",
+      "official_url": "https://github.blog/changelog/2026-10-20-github-package-firewall-in-public-preview",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 5,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "cf3544e85171cc16",
+          "title": "GitHub Launches npm Firewall to Block Malicious Packages Before Installation",
+          "url": "https://thehackernews.com/2026/10/github-launches-npm-firewall-to-block.html",
+          "competitor": "github",
+          "reason": "keywords: GitHub + npm firewall"
+        },
+        {
+          "status": "kept",
+          "id": "997184eddd10bc56",
+          "title": "GitHub’s npm package firewall can block brand-new versions before they install",
+          "url": "https://www.helpnetsecurity.com/2026/10/28/github-package-firewall-npm/",
+          "competitor": "github",
+          "reason": "keywords: GitHub + package firewall"
+        },
+        {
+          "status": "kept",
+          "id": "0cbbf305d7005b9f",
+          "title": "GitHub Previews Package Firewall to Block Malicious npm Dependencies",
+          "url": "https://visualstudiomagazine.com/articles/2026/10/23/github-previews-package-firewall-to-block-malicious-npm-dependencies.aspx",
+          "competitor": "github",
+          "reason": "keywords: GitHub + package firewall"
+        },
+        {
+          "status": "kept",
+          "id": "2bb59a47f2d70512",
+          "title": "GitHub introduces Npm Firewall for installation security",
+          "url": "https://www.secnews.gr/en/744257/github-npm-firewall-blocks-malicious-packages/",
+          "competitor": "github",
+          "reason": "keywords: GitHub + npm firewall"
+        },
+        {
+          "status": "kept",
+          "id": "872e0fdd89e1f137",
+          "title": "GitHub Launches New npm Package Firewall to Block Supply Chain Attacks",
+          "url": "https://www.techjuice.pk/github-launches-npm-firewall-block-supply-chain-attacks/",
+          "competitor": "github",
+          "reason": "keywords: GitHub + package firewall"
+        },
+        {
+          "status": "kept",
+          "id": "fd74c962774fb0f1",
+          "title": "GitHub Debuts npm Firewall to Prevent Supply Chain Threats",
+          "url": "https://newztodays.com/github-debuts-npm-firewall-to-prevent-supply-chain-threats/",
+          "competitor": "github",
+          "reason": "keywords: GitHub + npm firewall"
+        },
+        {
+          "status": "kept",
+          "id": "0d4fac5e3f00eb93",
+          "title": "GitHub package firewall in public preview",
+          "url": "https://github.blog/changelog/2026-10-20-github-package-firewall-in-public-preview",
+          "competitor": "github",
+          "reason": "url"
+        },
+        {
+          "status": "dropped",
+          "id": "cf3544e85171cc16",
+          "title": "GitHub Launches npm Firewall to Block Malicious Packages Before Installation",
+          "url": "https://thehackernews.com/2026/10/github-launches-npm-firewall-to-block.html",
+          "competitor": "industry",
+          "reason": "keywords: GitHub + npm firewall"
+        },
+        {
+          "status": "dropped",
+          "id": "2bb59a47f2d70512",
+          "title": "GitHub introduces Npm Firewall for installation security",
+          "url": "https://www.secnews.gr/en/744257/github-npm-firewall-blocks-malicious-packages/",
+          "competitor": "industry",
+          "reason": "keywords: GitHub + npm firewall"
+        }
+      ]
+    },
+    {
+      "id": "github-enterprise-includes-copilot",
+      "competitor": "github",
+      "date": "2026-10-28",
+      "title": "GitHub Enterprise now includes access to GitHub Copilot",
+      "official_url": "https://github.blog/changelog/2026-10-28-github-enterprise-now-includes-access-to-github-copilot",
+      "source_kind": "feed",
+      "category": "Pricing & Packaging",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "393d97d2e4478dbd",
+          "title": "GitHub Enterprise now includes access to GitHub Copilot",
+          "url": "https://github.blog/changelog/2026-10-28-github-enterprise-now-includes-access-to-github-copilot",
+          "competitor": "github",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "github-copilot-fusion",
+      "competitor": "github",
+      "date": "2026-10-28",
+      "title": "Route and orchestrate models with GitHub Copilot Fusion",
+      "official_url": "https://github.blog/changelog/2026-10-28-route-and-orchestrate-models-with-github-copilot-fusion",
+      "source_kind": "feed",
+      "category": "AI & Agents",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "67424f72bf87f0ef",
+          "title": "GitHub Launches Copilot Fusion for Smarter and Cheaper AI Coding",
+          "url": "https://cybersecuritynews.com/github-launches-copilot-fusion/",
+          "competitor": "github",
+          "reason": "keywords: Copilot Fusion"
+        },
+        {
+          "status": "kept",
+          "id": "57ad9958c768de53",
+          "title": "GitHub debuts Copilot Fusion, a new model selection & orchestration system that beats Claude Code for half the API cost",
+          "url": "https://thenewstack.io/github-copilot-fusion/",
+          "competitor": "github",
+          "reason": "keywords: Copilot Fusion"
+        },
+        {
+          "status": "kept",
+          "id": "2e59c0f7b6ad2bb6",
+          "title": "GitHub Launches Copilot Fusion to Automatically Select and Combine AI Models for Coding",
+          "url": "https://gbhackers.com/github-launches-copilot-fusion/",
+          "competitor": "github",
+          "reason": "keywords: Copilot Fusion"
+        },
+        {
+          "status": "kept",
+          "id": "98298fb7ec982cc9",
+          "title": "GitHub Launches Copilot Fusion for Smarter AI Programming",
+          "url": "https://www.rswebsols.com/news/github-introduces-copilot-fusion-for-more-intelligent-and-cost-effective-ai-programming/",
+          "competitor": "github",
+          "reason": "keywords: Copilot Fusion"
+        },
+        {
+          "status": "kept",
+          "id": "194ab4b69c2cec81",
+          "title": "Route and orchestrate models with GitHub Copilot Fusion",
+          "url": "https://github.blog/changelog/2026-10-28-route-and-orchestrate-models-with-github-copilot-fusion",
+          "competitor": "github",
+          "reason": "url"
+        },
+        {
+          "status": "kept",
+          "id": "fc595589053fff86",
+          "title": "GitHub Copilot Fusion now supports selection of local models",
+          "url": "https://github.blog/changelog/2026-10-28-github-copilot-fusion-now-supports-selection-of-local-models",
+          "competitor": "github",
+          "reason": "keywords: Copilot Fusion"
+        }
+      ]
+    },
+    {
+      "id": "github-agentic-workflows-ga",
+      "competitor": "github",
+      "date": "2026-10-28",
+      "title": "GitHub Agentic Workflows generally available",
+      "official_url": "https://github.blog/changelog/2026-10-28-github-agentic-workflows-generally-available",
+      "source_kind": "feed",
+      "category": "AI & Agents",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "1d4e78b6d168bccd",
+          "title": "GitHub Agentic Workflows generally available",
+          "url": "https://github.blog/changelog/2026-10-28-github-agentic-workflows-generally-available",
+          "competitor": "github",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "github-code-scanning-ai-apps",
+      "competitor": "github",
+      "date": "2026-10-28",
+      "title": "Code scanning for AI applications in public preview",
+      "official_url": "https://github.blog/changelog/2026-10-28-code-scanning-for-ai-applications-in-public-preview",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "6459e35859ca78c3",
+          "title": "Code scanning for AI applications in public preview",
+          "url": "https://github.blog/changelog/2026-10-28-code-scanning-for-ai-applications-in-public-preview/",
+          "competitor": "github",
+          "reason": "url"
+        },
+        {
+          "status": "dropped",
+          "id": "c54e1656c97ab630",
+          "title": "Code scanning for AI applications in public preview",
+          "url": "https://github.blog/changelog/2026-10-28-code-scanning-for-ai-applications-in-public-preview",
+          "competitor": "github",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "github-dependabot-reachability",
+      "competitor": "github",
+      "date": "2026-10-28",
+      "title": "Prioritize Dependabot alerts with reachability analysis",
+      "official_url": "https://github.blog/changelog/2026-10-28-prioritize-dependabot-alerts-with-reachability-analysis",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "d3c57ef87ce59b6a",
+          "title": "Prioritize Dependabot alerts with reachability analysis",
+          "url": "https://github.blog/changelog/2026-10-28-prioritize-dependabot-alerts-with-reachability-analysis/",
+          "competitor": "github",
+          "reason": "url"
+        },
+        {
+          "status": "dropped",
+          "id": "3e6d60bb950c637b",
+          "title": "Prioritize Dependabot alerts with reachability analysis",
+          "url": "https://github.blog/changelog/2026-10-28-prioritize-dependabot-alerts-with-reachability-analysis",
+          "competitor": "github",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "github-ai-scan-repositories",
+      "competitor": "github",
+      "date": "2026-10-28",
+      "title": "AI Scan for repositories in public preview",
+      "official_url": "https://github.blog/changelog/2026-10-28-ai-scan-for-repositories-in-public-preview",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "cc7dd103963027f0",
+          "title": "AI Scan for repositories in public preview",
+          "url": "https://github.blog/changelog/2026-10-28-ai-scan-for-repositories-in-public-preview",
+          "competitor": "github",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "github-actions-workflow-lockfiles",
+      "competitor": "github",
+      "date": "2026-10-28",
+      "title": "GitHub Actions workflow lockfiles are generally available",
+      "official_url": "https://github.blog/changelog/2026-10-28-github-actions-workflow-lockfiles-are-generally-available",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "9d50bf92757d1e48",
+          "title": "GitHub Actions workflow lockfiles are generally available",
+          "url": "https://github.blog/changelog/2026-10-28-github-actions-workflow-lockfiles-are-generally-available",
+          "competitor": "github",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "gitlab-critical-patch-19-5-1",
+      "competitor": "gitlab",
+      "date": "2026-10-21",
+      "title": "GitLab Critical Patch Release: 19.5.1, 19.4.3, 19.3.6, 19.2.9, 19.1.9, 19.0.10, 18.11.13",
+      "official_url": "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 3,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "8d8be6e05c093765",
+          "title": "GitLab patches critical vulnerability that allows code execution",
+          "url": "https://www.techzine.eu/news/security/145247/gitlab-patches-critical-vulnerability-that-allows-code-execution/",
+          "competitor": "gitlab",
+          "reason": "keywords: GitLab + patch* + critical"
+        },
+        {
+          "status": "kept",
+          "id": "1a425a273e291b93",
+          "title": "GitLab Patches Two Critical 9.9 RCE Flaws in Regex Engine",
+          "url": "https://www.techjuice.pk/gitlab-patches-critical-rce-flaws-regex-engine/",
+          "competitor": "gitlab",
+          "reason": "keywords: GitLab + patch* + critical"
+        },
+        {
+          "status": "kept",
+          "id": "9c3fe8f01f4a5c7a",
+          "title": "GitLab Critical Patch Release: 19.5.1, 19.4.3, 19.3.6, 19.2.9, 19.1.9, 19.0.10, 18.11.13",
+          "url": "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/",
+          "competitor": "gitlab",
+          "reason": "url"
+        },
+        {
+          "status": "dropped",
+          "id": "9c3fe8f01f4a5c7a",
+          "title": "GitLab Critical Patch Release: 19.5.1, 19.4.3, 19.3.6, 19.2.9, 19.1.9, 19.0.10, 18.11.13",
+          "url": "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/",
+          "competitor": "gitlab",
+          "reason": "url"
+        },
+        {
+          "status": "dropped",
+          "id": "9c3fe8f01f4a5c7a",
+          "title": "GitLab critical patch release",
+          "url": "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-1-released/",
+          "competitor": "gitlab",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "gitlab-cve-2026-97229-kev",
+      "competitor": "gitlab",
+      "date": "2026-10-29",
+      "title": "CISA adds GitLab CVE-2026-97229 to the Known Exploited Vulnerabilities catalog",
+      "official_url": "https://www.cisa.gov/news-events/alerts/2026/10/29/cisa-adds-two-known-exploited-vulnerabilities-catalog",
+      "source_kind": "external",
+      "category": "Security",
+      "expected_importance": 3,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "44fc9bc4c4f60f96",
+          "title": "CISA Warns of GitLab Integer Overflow Vulnerability Exploited in Attacks",
+          "url": "https://cybersecuritynews.com/gitlab-integer-overflow-vulnerability-exploited/",
+          "competitor": "gitlab",
+          "reason": "keywords: CISA + GitLab + exploit*"
+        },
+        {
+          "status": "kept",
+          "id": "8e9c21c115665496",
+          "title": "CISA Confirms Active Exploitation of GitLab Vulnerability CVE-2026-97229",
+          "url": "https://gbhackers.com/cisa-gitlab-vulnerability-cve-2026-97229/amp/",
+          "competitor": "gitlab",
+          "reason": "keywords: CISA + GitLab + exploit*"
+        },
+        {
+          "status": "kept",
+          "id": "5100bc6323f06f1c",
+          "title": "CISA Adds Actively Exploited GitLab RCE and Cisco Firewall DoS Flaws to KEV",
+          "url": "https://thehackernews.com/2026/10/cisa-adds-actively-exploited-gitlab-rce.html",
+          "competitor": "gitlab",
+          "reason": "keywords: CISA + GitLab + exploit*"
+        }
+      ]
+    },
+    {
+      "id": "gitlab-orbit-ga",
+      "competitor": "gitlab",
+      "date": "2026-10-29",
+      "title": "GitLab Orbit is GA: Higher agent accuracy, lower token cost",
+      "official_url": "https://about.gitlab.com/blog/gitlab-orbit-ga/",
+      "source_kind": "feed",
+      "category": "AI & Agents",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "11b8d6d862f2d177",
+          "title": "GitLab Orbit, Now Generally Available, Makes AI Agents More Accurate and Less Expensive to Run",
+          "url": "https://aithority.com/machine-learning/gitlab-orbit-now-generally-available-makes-ai-agents-more-accurate-and-less-expensive-to-run/",
+          "competitor": "gitlab",
+          "reason": "keywords: GitLab Orbit"
+        },
+        {
+          "status": "kept",
+          "id": "25a8884aa6560c90",
+          "title": "GitLab Orbit is GA: Higher agent accuracy, lower token cost",
+          "url": "https://about.gitlab.com/blog/gitlab-orbit-ga/",
+          "competitor": "gitlab",
+          "reason": "url"
+        },
+        {
+          "status": "kept",
+          "id": "0c85ec4e8428ce5b",
+          "title": "GitLab Orbit: Find vulnerability blast radius without the manual hunt",
+          "url": "https://about.gitlab.com/blog/find-vulnerability-blast-radius-with-gitlab-orbit/",
+          "competitor": "gitlab",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "gitlab-patch-19-5-3",
+      "competitor": "gitlab",
+      "date": "2026-10-29",
+      "title": "GitLab Patch Release and Security Update: 19.5.3, 19.4.5, 19.3.7, 19.2.10, 19.1.10, 19.0.11, 18.11.14",
+      "official_url": "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-3-released/",
+      "source_kind": "feed",
+      "category": "Security",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "e30ab49652d6854c",
+          "title": "GitLab Patch Release and Security Update: 19.5.3, 19.4.5, 19.3.7, 19.2.10, 19.1.10, 19.0.11, 18.11.14",
+          "url": "https://docs.gitlab.com/releases/patches/patch-release-gitlab-19-5-3-released/",
+          "competitor": "gitlab",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "snyk-evo-remediation-agent",
+      "competitor": "snyk",
+      "date": "2026-10-22",
+      "title": "Turn Your Vulnerability Backlog Into Pull Requests With Agentic Remediation",
+      "official_url": "https://snyk.io/blog/evo-remediation-agent-open-preview/",
+      "source_kind": "feed",
+      "category": "AI & Agents",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "e06709d10f45823e",
+          "title": "Turn Your Vulnerability Backlog Into Pull Requests With Agentic Remediation",
+          "url": "https://snyk.io/blog/evo-remediation-agent-open-preview/",
+          "competitor": "snyk",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "snyk-secrets-inventory",
+      "competitor": "snyk",
+      "date": "2026-10-19",
+      "title": "Added Secrets in Inventory and centrally manage Secrets scan frequency",
+      "official_url": "https://updates.snyk.io/secrets-repository-monitoring-inventory/",
+      "source_kind": "feed",
+      "category": "Product & Features",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "92704c09ce84143d",
+          "title": "Added Secrets in Inventory and centrally manage Secrets scan frequency",
+          "url": "https://updates.snyk.io/secrets-repository-monitoring-inventory/",
+          "competitor": "snyk",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "snyk-python-3-15",
+      "competitor": "snyk",
+      "date": "2026-10-29",
+      "title": "Python 3.15 support is now available",
+      "official_url": "https://updates.snyk.io/python-3-15-support-is-now-available/",
+      "source_kind": "feed",
+      "category": "Product & Features",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "9c431e4d2ea0fa55",
+          "title": "Python 3.15 support is now available",
+          "url": "https://updates.snyk.io/python-3-15-support-is-now-available/",
+          "competitor": "snyk",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "aws-inspector-ecr-rescan-default",
+      "competitor": "aws",
+      "date": "2026-10-21",
+      "title": "Amazon Inspector updates the default Amazon ECR re-scan duration to 7 days",
+      "official_url": "https://docs.aws.amazon.com/inspector/latest/user/doc-history.html",
+      "source_kind": "external",
+      "category": "Product & Features",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": false,
+      "kept": false,
+      "dropped_only": false,
+      "matches": []
+    },
+    {
+      "id": "aws-nitro-supply-chain-attestation",
+      "competitor": "aws",
+      "date": "2026-10-27",
+      "title": "Verify software supply chain security using AWS Nitro cryptographic verification",
+      "official_url": "https://aws.amazon.com/blogs/publicsector/verify-software-supply-chain-security-using-aws-nitro-cryptographic-verification/",
+      "source_kind": "external",
+      "category": "Security",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "fb62102dd9764090",
+          "title": "Verify software supply chain security using AWS Nitro cryptographic verification",
+          "url": "https://aws.amazon.com/blogs/publicsector/verify-software-supply-chain-security-using-aws-nitro-cryptographic-verification/",
+          "competitor": "aws",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "industry-litellm-pypi-compromise",
+      "competitor": "industry",
+      "date": "2026-10-21",
+      "title": "Contained: Oct 21, 2026 LiteLLM release v1.107.0 Compromised",
+      "official_url": "https://docs.litellm.ai/blog/security-incident-oct-21-2026",
+      "source_kind": "external",
+      "category": "Security",
+      "expected_importance": 4,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "abfff6ba3917a252",
+          "title": "Inside the LiteLLM 1.107.0 supply chain compromise: Credential theft through Python startup hooks",
+          "url": "https://www.microsoft.com/en-us/security/blog/2026/10/23/inside-the-litellm-1-107-0-supply-chain-compromise-credential-theft-through-python-startup-hooks/",
+          "competitor": "github",
+          "reason": "keywords: LiteLLM + 1.107.0"
+        },
+        {
+          "status": "kept",
+          "id": "bd085db74ff16cd1",
+          "title": "LiteLLM Supply Chain Attack: 7 Wheels, 2 Hours [2026]",
+          "url": "https://shattered.io/litellm-supply-chain-attack-pypi-ovhcloud-cli-2026/",
+          "competitor": "industry",
+          "reason": "keywords: LiteLLM + supply chain"
+        },
+        {
+          "status": "kept",
+          "id": "2cabe090cd194407",
+          "title": "LiteLLM 1.107.0 compromised on PyPI",
+          "url": "https://cloudsmith.com/blog/litellm-1-107-0-compromised-on-pypi",
+          "competitor": "cloudsmith",
+          "reason": "keywords: LiteLLM + 1.107.0"
+        },
+        {
+          "status": "kept",
+          "id": "1a47a5dbcb816a0e",
+          "title": "LiteLLM supply chain attack started with an exposed master key",
+          "url": "https://www.theregister.com/security/2026/10/26/litellm-supply-chain-attack-started-with-an-exposed-master-key/5305544",
+          "competitor": "industry",
+          "reason": "keywords: LiteLLM + supply chain"
+        },
+        {
+          "status": "kept",
+          "id": "ed453db3f24caab7",
+          "title": "LiteLLM supply chain attack hoovers up passwords and secrets",
+          "url": "https://www.theregister.com/security/2026/10/21/litellm-supply-chain-attack-hoovers-up-passwords-and-secrets/5304548",
+          "competitor": "industry",
+          "reason": "keywords: LiteLLM + supply chain"
+        }
+      ]
+    },
+    {
+      "id": "industry-php2shell",
+      "competitor": "industry",
+      "date": "2026-10-21",
+      "title": "Security advisory: Critical remote code execution vulnerabilities, update now (PHP2Shell)",
+      "official_url": "https://www.php.net/archive/2026.php#2026-10-21-5",
+      "source_kind": "external",
+      "category": "Security",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "57831cdf5a4026e7",
+          "title": "PHP2Shell: Prepare for the Next Vulnerability",
+          "url": "https://snyk.io/blog/php2shell-where-next-one-will-show-up-first/",
+          "competitor": "snyk",
+          "reason": "keywords: PHP2Shell"
+        },
+        {
+          "status": "kept",
+          "id": "327724a6de34565d",
+          "title": "Critical PHP vulnerabilities in PHP2Shell expose web infrastructure to remote code execution",
+          "url": "https://cloudsmith.com/blog/critical-php-vulnerabilities-in-php2shell-expose-web-infrastructure-to-remote-code-execution",
+          "competitor": "cloudsmith",
+          "reason": "keywords: PHP2Shell"
+        },
+        {
+          "status": "kept",
+          "id": "6be522afbeb14a03",
+          "title": "PHP2Shell Makes PHP Inventory and Patch Ownership Urgent",
+          "url": "https://www.sonatype.com/blog/php2shell-makes-php-inventory-and-patch-ownership-urgent",
+          "competitor": "sonatype",
+          "reason": "keywords: PHP2Shell"
+        },
+        {
+          "status": "kept",
+          "id": "6cdadcab7b70fcc3",
+          "title": "PHP2Shell: GitLab helps find and remediate critical PHP flaws",
+          "url": "https://about.gitlab.com/blog/gitlab-helps-remediate-critical-php-flaws/",
+          "competitor": "gitlab",
+          "reason": "keywords: PHP2Shell"
+        },
+        {
+          "status": "kept",
+          "id": "e118bf82346f1ff1",
+          "title": "PHP2Shell, LiteLLM, GitLab: Find What You Need to Patch",
+          "url": "https://cloudsleuth.io/blog/php2shell-litellm-gitlab-find-what-you-run/",
+          "competitor": "gitlab",
+          "reason": "keywords: PHP2Shell"
+        },
+        {
+          "status": "dropped",
+          "id": "57831cdf5a4026e7",
+          "title": "PHP2Shell Won't Be the Last. Here's Where the Next One Will Show Up First.",
+          "url": "https://snyk.io/blog/php2shell-where-next-one-will-show-up-first/",
+          "competitor": "snyk",
+          "reason": "keywords: PHP2Shell"
+        },
+        {
+          "status": "dropped",
+          "id": "ae8fa2af5412dd9d",
+          "title": "PHP Patches Two Critical Unauthenticated RCEs (CVE-2026-109618, CVE-2026-109619): [Updated for CVE-2026-115560]",
+          "url": "https://snyk.io/blog/php-patches-critical-unauthenticated-rces/",
+          "competitor": "snyk",
+          "reason": "keywords: CVE-2026-109618"
+        }
+      ]
+    },
+    {
+      "id": "industry-ruby-onigmo-gitlab-cves",
+      "competitor": "industry",
+      "date": "2026-10-23",
+      "title": "Regexp compilation fixes related to GitLab's CVE-2026-89078, CVE-2026-93577, CVE-2026-97229 and CVE-2026-110264",
+      "official_url": "https://www.ruby-lang.org/en/news/2026/10/23/regexp-fixes-for-gitlab-cves/",
+      "source_kind": "external",
+      "category": "Security",
+      "expected_importance": 3,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "4645fb818a8e9e28",
+          "title": "Ruby Fixes Three Regex Engine Bugs Responsible for Four Critical GitLab RCE Flaws",
+          "url": "https://thehackernews.com/2026/10/ruby-fixes-three-regex-engine-bugs.html",
+          "competitor": "gitlab",
+          "reason": "keywords: Ruby + regex* + GitLab"
+        },
+        {
+          "status": "kept",
+          "id": "5573e7738a5c0104",
+          "title": "Ruby Fixes the Onigmo Regexp Bugs Behind GitLab's Four CVEs: Upgrade to 4.0.9, 3.4.12 or 3.3.13 If Your Apps Compile Untrusted Patterns",
+          "url": "https://www.rescana.com/post/ruby-onigmo-regexp-fixes-gitlab-cves-october-2026",
+          "competitor": "gitlab",
+          "reason": "keywords: Ruby + regex* + GitLab"
+        },
+        {
+          "status": "kept",
+          "id": "a5d897784c2bcd4d",
+          "title": "Ruby Fixes Three Regex Engine Bugs Responsible for Four Critical GitLab RCE Flaws – Lifeboat News: The Blog",
+          "url": "https://t.co/nqLwea6MAE",
+          "competitor": "gitlab",
+          "reason": "keywords: Ruby + regex* + GitLab"
+        },
+        {
+          "status": "kept",
+          "id": "979c3085ca3231df",
+          "title": "Ruby Regexp compilation fixes related to GitLab",
+          "url": "https://www.ruby-lang.org/en/news/2026/10/23/regexp-fixes-for-gitlab-cves/",
+          "competitor": "gitlab",
+          "reason": "url"
+        },
+        {
+          "status": "dropped",
+          "id": "979c3085ca3231df",
+          "title": "Ruby RegEx could lead to RCE",
+          "url": "https://www.ruby-lang.org/en/news/2026/10/23/regexp-fixes-for-gitlab-cves/",
+          "competitor": "gitlab",
+          "reason": "url"
+        }
+      ]
+    },
+    {
+      "id": "industry-emudhra-ca-compromise",
+      "competitor": "industry",
+      "date": "2026-10-20",
+      "title": "Protecting Chrome and Android Users from Compromised eMudhra Intermediate CA Certificates",
+      "official_url": "https://blog.google/security/protecting-chrome-and-android-users-from-compromised-emudhra-intermediate-ca-certificates/",
+      "source_kind": "external",
+      "category": "Security",
+      "expected_importance": 2,
+      "in_window": true,
+      "captured": true,
+      "kept": true,
+      "dropped_only": false,
+      "matches": [
+        {
+          "status": "kept",
+          "id": "d56452a8e34a0f0b",
+          "title": "20 October 2026: eMudhra intermediate CA certificates",
+          "url": "https://cloudsmith.com/blog/emudhra-intermediate-ca-certificates-customer-comms",
+          "competitor": "cloudsmith",
+          "reason": "keywords: eMudhra"
+        },
+        {
+          "status": "kept",
+          "id": "3e953b74932f71ad",
+          "title": "eMudhra CA Incident: Sonatype's Assessment and Guidance",
+          "url": "https://www.sonatype.com/blog/emudhra-ca-incident-sonatypes-assessment-and-guidance",
+          "competitor": "sonatype",
+          "reason": "keywords: eMudhra"
+        },
+        {
+          "status": "dropped",
+          "id": "830ef2aa63e802c1",
+          "title": "eMudhra Incident: A Practical Audit to Inspect Tools",
+          "url": "https://www.sonatype.com/blog/a-protected-browser-doesnt-mean-your-enterprise-is-remediated",
+          "competitor": "sonatype",
+          "reason": "keywords: eMudhra"
+        }
+      ]
+    }
+  ]
+}
