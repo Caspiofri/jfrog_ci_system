@@ -83,9 +83,11 @@ function Profile() {
               </div>
 
               {p.head_to_head ? (
+                <div id="head-to-head" className="scroll-mt-20">
                 <Panel title="How do they compare with JFrog?" info="Changed cells are highlighted and go to review. Not stated means the page says nothing on that axis, not that there is a gap.">
                   <HeadToHead competitor={p.key} name={p.name} axes={p.head_to_head.axes} />
                 </Panel>
+                </div>
               ) : (
                 <Panel title="How do they compare with JFrog?"><Empty>{p.name} is a channel, not a vendor: no head-to-head.</Empty></Panel>
               )}

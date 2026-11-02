@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { NOT_FOUND, SHORT_MAX, STATE_INFO, STATE_ORDER, anyMark, buildMatrix, matrixCell, shortWords, shorten } from "../src/lib/matrix.ts";
+import { NOT_FOUND, SHORT_MAX, STATE_INFO, STATE_ORDER, anyMark, buildMatrix, capabilityCount, capabilityRows, matrixCell, shortWords, shorten, stateTotals } from "../src/lib/matrix.ts";
 
 const AXES = [["deployment", "Deployment"], ["package_coverage", "Package coverage"], ["security_scanning", "Security scanning"],
   ["curation_gating", "Curation/gating"], ["ai_mcp", "AI & MCP"], ["cicd_integration", "CI/CD integration"], ["pricing_model", "Pricing model"]];
@@ -68,36 +68,6 @@ const comp = readFileSync(new URL("../src/components/competitors/Matrix.tsx", im
 const lib = readFileSync(new URL("../src/lib/matrix.ts", import.meta.url), "utf8");
 const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
 
-test("hover and keyboard focus show the state, full text, source and date", () => {
-  assert.match(comp, /<Hint text=\{<CellHint/);
-  assert.match(comp, /\{STATE_INFO\[c\.state\]\.label\}/);
-  assert.match(comp, /\{c\.full \? <span>\{c\.full\}<\/span>/);
-  assert.match(comp, /Source: \{host\(c\.source\)\}/);
-  assert.match(comp, /as of \$\{fmtDate\(c\.asOf, true\)\}/);
-  assert.match(comp, /<ArticleLink href=\{c\.source\}/);
-});
-
-test("columns: JFrog first, then the six tracked competitors with avatars, not Industry", () => {
-  assert.match(comp, /Capability<\/th>\s*<th[^>]*>JFrog<\/th>/);
-  assert.match(comp, /!c\.is_industry && c\.key !== "industry"/);
-  assert.match(comp, /<CompetitorAvatar k=\{p\.key\}/);
-});
-
-test("title, caption, legend; at the top of the Competitors view, above the cards", () => {
-  assert.match(comp, /title="JFrog vs competitors"/);
-  assert.match(comp, /export const CAPTION = "Colour shows what we found on each competitor's public pages, not a verdict on their product\.";/);
-  assert.match(comp, /data-caption>\{CAPTION\}/);
-  assert.doesNotMatch(comp, /Capabilities from public sources/);
-  assert.match(comp, /data-legend/);
-  assert.ok(page.indexOf("<CapabilityMatrix />") > -1 && page.indexOf("<CapabilityMatrix />") < page.indexOf("<CompetitorCardView"));
-  assert.ok(page.indexOf("<CapabilityMatrix />") < page.indexOf("<Async"), "above everything else on the page");
-});
-
-test("narrow screens: the matrix scrolls by itself, first column sticky", () => {
-  assert.match(comp, /<div className="overflow-x-auto" data-matrix>/);
-  assert.match(comp, /sticky left-0/);
-});
-
 test("no verdicts: no gap, threat, ahead, behind or lens relation in the matrix", () => {
   const visible = (s) => s.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "").replace(/className=("[^"]*"|\{[^}]*\})/g, "");
   for (const s of [comp, lib]) assert.doesNotMatch(visible(s), /\bgap\b|threat|ahead|behind|relation|closes_gap|opens_gap/i);
@@ -126,18 +96,6 @@ test("each state maps to its cell: value and stale keep a few words of the value
   assert.ok(shortWords("one two three four five six").split(" ").length <= 4);
 });
 
-test("JFrog's column uses the same cell: the check icon with its own short value", () => {
-  const [r] = buildMatrix([profile("github")]);
-  assert.deepEqual([r.jfrog.state, r.jfrog.short], ["value", "JFrog deployment"]);
-  assert.match(comp, /<MatrixTd c=\{r\.jfrog\} who="JFrog"/);
-});
-
-test("icon and colour always together; the legend lists the four states with both", () => {
-  assert.match(comp, /<td[^>]*style=\{\{ background: st\.bg \}\}[\s\S]*?<StateIcon state=\{c\.state\} \/>/);
-  assert.match(comp, /STATE_ORDER\.map\(\(k\) => \([\s\S]*?<StateIcon state=\{k\} \/>[\s\S]*?\{STATE_INFO\[k\]\.label\}/);
-  assert.match(comp, /role="img" aria-label=\{s\.label\}/);
-});
-
 test("no cell text, label, legend or caption says present, absent, partial, gap, threat, ahead or behind", () => {
   const banned = /\b(present|absent|partial|gap|threat|ahead|behind)\b/i;
   for (const k of STATE_ORDER) assert.doesNotMatch(STATE_INFO[k].label, banned);
@@ -147,4 +105,67 @@ test("no cell text, label, legend or caption says present, absent, partial, gap,
     const m = matrixCell(c);
     assert.doesNotMatch(`${m.short} ${m.why ?? ""}`, banned);
   }
+});
+
+// ---- capability-first view (D75) ----
+const ORDER = ["cloudsmith", "sonatype", "github", "gitlab", "snyk", "aws"];
+const sixProfiles = (over = {}) => ORDER.map((k) => profile(k, over[k] ?? {}));
+
+test("left column counts 'n of 7 pages state something' from the cells: value and stale count, the rest don't", () => {
+  const rows = buildMatrix(sixProfiles({
+    snyk: { ai_mcp: cell({ state: "not_stated", value: "" }) },
+    aws: { ai_mcp: cell({ state: "not_tracked", value: null }) },
+    cloudsmith: { ai_mcp: cell({ state: "stale", value: "old" }) },
+  }));
+  const ai = rows.find((r) => r.axis === "ai_mcp");
+  assert.deepEqual(capabilityCount(ai), { n: 5, of: 7 }); // JFrog + 4 competitors (one stale)
+  assert.deepEqual(capabilityCount(rows[0]), { n: 7, of: 7 });
+});
+
+test("rows for one capability: JFrog first, then competitors that state something; the others fold into two name lists", () => {
+  const rows = buildMatrix(sixProfiles({ snyk: { ai_mcp: cell({ state: "not_stated", value: "" }) }, aws: { ai_mcp: cell({ state: "not_tracked", value: null }) } }));
+  const v = capabilityRows(rows.find((r) => r.axis === "ai_mcp"), ORDER);
+  assert.equal(v.jfrog.short, "JFrog ai_mcp");
+  assert.deepEqual(v.listed, ["cloudsmith", "sonatype", "github", "gitlab"]);
+  assert.deepEqual(v.notStated, ["snyk"]);
+  assert.deepEqual(v.notTracked, ["aws"]);
+});
+
+test("totals add up: 42 competitor cells, 49 with JFrog, on data shaped like 1 Nov", () => {
+  const over = {
+    cloudsmith: { package_coverage: cell({ state: "stale", value: "34 formats" }), pricing_model: cell({ state: "not_tracked", value: null }) },
+    snyk: { package_coverage: cell({ state: "not_stated", value: "" }), curation_gating: cell({ state: "not_tracked", value: null }), ai_mcp: cell({ state: "not_stated", value: "" }) },
+    aws: { security_scanning: cell({ state: "not_tracked", value: null }), ai_mcp: cell({ state: "not_tracked", value: null }), cicd_integration: cell({ state: "not_stated", value: "" }) },
+  };
+  const { comp, all } = stateTotals(buildMatrix(sixProfiles(over)));
+  assert.deepEqual(comp, { value: 34, stale: 1, not_tracked: 4, not_stated: 3 });
+  assert.equal(Object.values(comp).reduce((a, b) => a + b, 0), 42);
+  assert.equal(Object.values(all).reduce((a, b) => a + b, 0), 49);
+});
+
+test("the view: capability list (select on narrow screens), first one open, Expand all, caption, no grid", () => {
+  assert.match(comp, /const \[sel, setSel\] = useState\(0\)/);
+  assert.match(comp, /role="tablist" aria-label="Capabilities"/);
+  assert.match(comp, /<select value=\{sel\}/);
+  assert.match(comp, /md:hidden/);
+  assert.match(comp, /\{all \? "Show one capability" : "Expand all"\}/);
+  assert.match(comp, /CAPTION = "What was found on public pages, not a verdict\."/);
+  assert.doesNotMatch(comp, /<table|overflow-x-auto|StateIcon/);
+});
+
+test("vendor row: name beside every avatar, value clamped to 2 lines and expandable, Source, as-of date, stale clock, profile link", () => {
+  assert.match(comp, /<CompetitorAvatar k=\{k\} name=\{name\} size="md" \/>\}\s*\{name\}/);
+  assert.match(comp, /aria-expanded=\{open\}[\s\S]*?!open && "line-clamp-2"/);
+  assert.match(comp, /<ArticleLink href=\{c\.source\}/);
+  assert.match(comp, /<Clock className="size-3" aria-hidden \/> Stale/);
+  assert.match(comp, /as of \{fmtDate\(c\.asOf, true\)\}/);
+  assert.match(comp, /href=\{`\/competitors\/\$\{encodeURIComponent\(k\)\}#head-to-head`\}/);
+  assert.match(readFileSync(new URL("../src/app/competitors/[key]/page.tsx", import.meta.url), "utf8"), /id="head-to-head"/);
+  assert.match(comp, /NOT_STATED_LINE = "Their page says nothing:"/);
+  assert.match(comp, /NOT_TRACKED_LINE = "Not tracked yet:"/);
+});
+
+test("still at the top of the Competitors view, above the cards; JFrog row first with a light tint", () => {
+  assert.ok(page.indexOf("<CapabilityMatrix />") < page.indexOf("<Async"));
+  assert.match(comp, /<VendorRow c=\{v\.jfrog\} k="jfrog" name="JFrog" jfrog \/>\s*\{v\.listed\.map/);
 });

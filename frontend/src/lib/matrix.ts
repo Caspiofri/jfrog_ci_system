@@ -93,3 +93,34 @@ export function buildMatrix(profiles: { key: string; axes: H2HAxis[] | null | un
 export function anyMark(rows: MatrixRow[], k: "changedAt" | "stale" | "needsReview"): boolean {
   return rows.some((r) => [r.jfrog, ...Object.values(r.cells)].some((c) => Boolean(c[k])));
 }
+
+// ---- capability-first view (D75) ----
+
+/** A page "states something" when its cell has a value: state value or stale. */
+export const states = (c: MatrixCell) => c.state === "value" || c.state === "stale";
+
+/** "n of 7 pages state something": JFrog's page plus each competitor's, counted from the cells. */
+export function capabilityCount(r: MatrixRow): { n: number; of: number } {
+  const all = [r.jfrog, ...Object.values(r.cells)];
+  return { n: all.filter(states).length, of: all.length };
+}
+
+/** One capability's rows: JFrog first, then each competitor whose page states something (in the given order);
+ *  competitors whose page says nothing or that aren't tracked are folded into two name lists. */
+export function capabilityRows(r: MatrixRow, order: string[]) {
+  const listed = order.filter((k) => r.cells[k] && states(r.cells[k]));
+  const notStated = order.filter((k) => r.cells[k]?.state === "not_stated");
+  const notTracked = order.filter((k) => !r.cells[k] || r.cells[k].state === "not_tracked");
+  return { jfrog: r.jfrog, listed, notStated, notTracked };
+}
+
+/** Every cell's state, counted (competitor cells, and with JFrog), for the report and the tests. */
+export function stateTotals(rows: MatrixRow[]) {
+  const comp: Record<string, number> = {};
+  const all: Record<string, number> = {};
+  for (const r of rows) {
+    for (const c of Object.values(r.cells)) comp[c.state] = (comp[c.state] ?? 0) + 1;
+    for (const c of [r.jfrog, ...Object.values(r.cells)]) all[c.state] = (all[c.state] ?? 0) + 1;
+  }
+  return { comp, all };
+}
