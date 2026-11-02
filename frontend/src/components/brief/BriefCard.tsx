@@ -4,7 +4,7 @@
 import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
-import { CategoryTag, ItemTitle, ScoreBadge, Tag } from "@/components/ci";
+import { CategoryTag, ItemTitle, ScoreBadge, Tag, openFromRow } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { LensView } from "@/components/LensView";
 import { RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
@@ -65,8 +65,9 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
   const basis = textBasisWords(item.text_basis);
   return (
     <article
-      className={cn("border-t border-line px-3 py-3 first:border-t-0", EMPHASIS[s], highlight && "bg-[#f3fbf4] ring-2 ring-inset ring-jgreen")}
+      className={cn("cursor-pointer border-t border-line px-3 py-3 first:border-t-0 hover:bg-page/60", EMPHASIS[s], highlight && "bg-[#f3fbf4] ring-2 ring-inset ring-jgreen")}
       data-item={item.item_id}
+      onClick={(e) => openFromRow(e, () => drawer.open(item.item_id))}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <ScoreLabel score={item.score} competitor={item.competitor} reason={item.reason} />

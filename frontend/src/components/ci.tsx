@@ -302,3 +302,15 @@ export function KpiTile({ value, label: l, sub }: { value: ReactNode; label: str
     </div>
   );
 }
+
+/** A click anywhere on an item row or card opens the item's drawer, except on its own controls (buttons, links, fields, menus),
+ *  inside a dialog or menu rendered elsewhere (React bubbles portal clicks), or when the user is selecting text.
+ *  Keyboard users open it with the title button. */
+const INTERACTIVE = "button, a, input, textarea, select, label, [role='menuitem'], [role='menu'], [role='dialog'], [role='radio']";
+export function openFromRow(e: React.MouseEvent<HTMLElement>, open: () => void) {
+  const t = e.target as HTMLElement;
+  if (!e.currentTarget.contains(t)) return; // a portal (Edit dialog, Dismiss menu)
+  if (t.closest(INTERACTIVE)) return;
+  if (typeof window !== "undefined" && window.getSelection()?.toString()) return;
+  open();
+}

@@ -3,7 +3,7 @@
 import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
-import { CategoryTag, ItemTitle, ScoreBadge, Tag } from "@/components/ci";
+import { CategoryTag, ItemTitle, ScoreBadge, Tag, openFromRow } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { NO_TEXT, itemDateText } from "@/lib/format";
 import type { Item } from "@/lib/types";
@@ -64,14 +64,3 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
   );
 }
 
-/** A click anywhere on the row opens the item's drawer, except on its own controls (buttons, links, fields, menus),
- *  inside a dialog or menu rendered elsewhere (React bubbles portal clicks), or when the user is selecting text.
- *  Keyboard users open it with the title button. */
-const INTERACTIVE = "button, a, input, textarea, select, label, [role='menuitem'], [role='menu'], [role='dialog'], [role='radio']";
-function openFromRow(e: React.MouseEvent<HTMLElement>, open: () => void) {
-  const t = e.target as HTMLElement;
-  if (!e.currentTarget.contains(t)) return; // a portal (Edit dialog, Dismiss menu)
-  if (t.closest(INTERACTIVE)) return;
-  if (typeof window !== "undefined" && window.getSelection()?.toString()) return;
-  open();
-}
