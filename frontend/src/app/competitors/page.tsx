@@ -19,10 +19,10 @@ export default function CompetitorsPage() {
               Week {fmtDate(d.week.start)}–{fmtDate(d.week.end)}, counted by discovery time; published items only
               (held items count as awaiting review at {label(LEVEL_LABEL, d.level)}).
             </div>
-            <ColourLegends />
             <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
               {d.items.map((c) => <CompetitorCardView key={c.key} c={c} />)}
             </div>
+            <ColourLegends />
             <Panel title="Who is buying and partnering?" cap={`${d.deals.category} items as collected · ${d.deals.total} items`}>
               {d.deals.items.length ? <DealsTable deals={d.deals.items} /> : <Empty>No funding, M&amp;A or partnership items yet.</Empty>}
               <div className="mt-2 text-[11px] text-mute">
