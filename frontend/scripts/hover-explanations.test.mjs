@@ -38,7 +38,8 @@ test("Review: level help is on hover of each level, not a visible line", () => {
 });
 
 test("kept visible: Experimental chip, the measured line, the AI warning, Feed date, the sort line, actions", () => {
-  assert.match(brief, />Experimental<\/Tag>/);
+  assert.match(brief, /function ExperimentalChip[\s\S]*?Experimental\s*<\/Tag>/);
+  assert.match(brief, /<ExperimentalChip \/>/);
   assert.match(brief, /<p className="[^"]*">\{INSIGHTS_CHECK\}<\/p>/);
   assert.match(brief, /AI-generated — check the cited sources/);
   assert.match(read("components/ItemDrawer.tsx") + read("components/competitors/parts.tsx"), /Feed date/);

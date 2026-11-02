@@ -261,8 +261,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
       title={
         <span className="inline-flex items-center gap-2">
           {insightsTitle(insights.window)}
-          <Tag className="border border-[#f59e0b]/60 bg-[#fff7e6] text-[10px] font-semibold uppercase tracking-wide text-[#8a5a00]"
-            title="Pattern analysis is experimental: see the check below">Experimental</Tag>
+          <ExperimentalChip />
         </span>
       }
       cap={cap}
@@ -313,47 +312,71 @@ function windowText(w: BriefInsights["window"]): string | undefined {
  * The claims with their quotes and sources sit behind "Show evidence" (D50: each cited item keeps its score and link). */
 function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: boolean; onSelect: () => void }) {
   const top = SCORE_COLOR[ins.max_score ?? 0]?.[0] ?? "#e3e8ef";
-  const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState(false); // collapsed by default: title and chips only
+  const [open, setOpen] = useState(false); // the claims, inside the details
   const cited = useMemo(() => {
     const m = new Map<string, CitedItemRow>();
     for (const c of ins.cited_items ?? []) if (!m.has(c.item_id)) m.set(c.item_id, c);
     return m;
   }, [ins.cited_items]);
   const n = ins.claims.length;
+  const toggle = () => {
+    const next = !details;
+    setDetails(next);
+    if (next !== selected) onSelect(); // opening highlights its items in the Brief; closing clears it
+  };
+  const id = `ins-${ins.insight_id}`;
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      onClick={onSelect}
-      onKeyDown={(e) => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect())}
+      onClick={toggle}
+      data-insight={ins.insight_id}
       className={`flex cursor-pointer flex-col gap-2 rounded-md border bg-card px-4 py-3 transition-colors hover:border-jgreen ${selected ? "border-jgreen ring-1 ring-jgreen" : "border-line"}`}
       style={{ borderLeft: `4px solid ${top}` }}
     >
       <div className="flex flex-wrap items-center gap-1.5" data-insight-header>
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
         <ContinuityBadge c={ins.continuity} />
-        {ins.max_score ? <span className="text-xs text-mute">top importance {ins.max_score}</span> : null}
+        <ExperimentalChip small />
       </div>
-      <h3 className="m-0 text-sm font-semibold">{ins.title}</h3>
-      <p className="m-0 text-[#44516a]">{ins.summary}</p>
-      {ins.why_it_matters ? <p className="m-0 text-xs text-mute"><b className="font-semibold text-ink">Why it matters: </b>{ins.why_it_matters}</p> : null}
-      {n ? (
-        <div>
-          <button type="button" aria-expanded={open} onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d hover:underline">
-            {open ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}
-            {open ? "Hide evidence" : `Show evidence (${n} ${n === 1 ? "claim" : "claims"})`}
-          </button>
-          {open ? (
-            <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0">
-              {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} />)}
-            </ul>
+      <h3 className="m-0 text-sm font-semibold">
+        <button type="button" aria-expanded={details} aria-controls={id} onClick={(e) => { e.stopPropagation(); toggle(); }}
+          className="inline-flex items-start gap-1 text-left hover:text-jgreen-d">
+          {details ? <ChevronDown className="mt-0.5 size-3.5 shrink-0" aria-hidden /> : <ChevronRight className="mt-0.5 size-3.5 shrink-0" aria-hidden />}
+          {ins.title}
+        </button>
+      </h3>
+      {details ? (
+        <div id={id} className="flex flex-col gap-2" data-insight-details>
+          {ins.max_score ? <span className="text-xs text-mute">Top importance of its items: {ins.max_score}</span> : null}
+          <p className="m-0 text-[#44516a]">{ins.summary}</p>
+          {ins.why_it_matters ? <p className="m-0 text-xs text-mute"><b className="font-semibold text-ink">Why it matters: </b>{ins.why_it_matters}</p> : null}
+          {n ? (
+            <div>
+              <button type="button" aria-expanded={open} onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d hover:underline">
+                {open ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}
+                {open ? "Hide evidence" : `Show evidence (${n} ${n === 1 ? "claim" : "claims"})`}
+              </button>
+              {open ? (
+                <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0" onClick={(e) => e.stopPropagation()}>
+                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} />)}
+                </ul>
+              ) : null}
+            </div>
           ) : null}
+          {ins.baseline_note ? <div className="text-[11px] text-mute">{ins.baseline_note}</div> : null}
         </div>
       ) : null}
-      {ins.baseline_note ? <div className="text-[11px] text-mute">{ins.baseline_note}</div> : null}
     </div>
+  );
+}
+
+/** The "Experimental" chip: on the insights title and on every insight. */
+function ExperimentalChip({ small = false }: { small?: boolean }) {
+  return (
+    <Tag className={cn("border border-[#f59e0b]/60 bg-[#fff7e6] font-semibold uppercase tracking-wide text-[#8a5a00]", small ? "text-[9px]" : "text-[10px]")}>
+      Experimental
+    </Tag>
   );
 }
 

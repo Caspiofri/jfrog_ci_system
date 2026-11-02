@@ -19,6 +19,6 @@ test("no window served (older data, or an insights state with none): a plain tit
 
 test("the Brief uses it, and keeps the Experimental chip next to it", () => {
   const src = readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8");
-  assert.match(src, /\{insightsTitle\(insights\.window\)\}\s*<Tag[\s\S]*?>Experimental<\/Tag>/);
+  assert.match(src, /\{insightsTitle\(insights\.window\)\}\s*<ExperimentalChip \/>/);
   assert.doesNotMatch(src, /Key insights/);
 });
