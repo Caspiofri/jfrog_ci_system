@@ -8,6 +8,9 @@ import { cardTotals } from "@/lib/cardTotals";
 import { LEVEL_LABEL, fmtDate, label } from "@/lib/format";
 import type { Competitors } from "@/lib/types";
 
+const PAGE_INFO =
+  "JFrog's tracked competitors and how they compare with JFrog: what each one's public pages state on the 7 JFrog capabilities, where they were active this week, and their published items. It shows what was found, not a verdict.";
+
 const CARDS_EXPLAIN =
   "All published and awaiting-review items per competitor, found in the last 7 days. Noise and dismissed items are left out; Industry is market news with no tracked competitor.";
 
@@ -15,7 +18,7 @@ export default function CompetitorsPage() {
   const q = useApi<Competitors>("/api/v1/competitors");
   return (
     <>
-      <PageHead title="Competitors" info="Top score is the highest score of any item this week." />
+      <PageHead title="Competitors" info={PAGE_INFO} />
       <CapabilityMatrix />
       <ActivityHeatmap />
       <Async {...q} retry={() => q.mutate()} rows={6} isEmpty={(d) => !d.items.length} empty="No competitors in the config.">

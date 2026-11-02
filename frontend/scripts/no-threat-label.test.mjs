@@ -10,6 +10,6 @@ for (const f of ["app/competitors/page.tsx", "app/competitors/[key]/page.tsx", "
   });
 }
 test("cards and profile say top score", () => {
-  assert.match(readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8"), /top score <ScoreBadge score=\{c\.threat\} \/>/);
+  assert.match(readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8"), /top score <ScoreBadge score=\{c\.threat\} title=/);
   assert.match(readFileSync(new URL("../src/app/competitors/[key]/page.tsx", import.meta.url), "utf8"), /Top score this week <ScoreBadge/);
 });
