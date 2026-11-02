@@ -4,6 +4,7 @@ import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
 import { CategoryTag, ItemTitle, ScoreBadge, Tag, openFromRow } from "@/components/ci";
+import { ReviewedMark } from "@/components/ReviewedMark";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { NO_TEXT, itemDateText } from "@/lib/format";
 import type { Item } from "@/lib/types";
@@ -50,6 +51,7 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
           ) : null}
           {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} /> : null}
           {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
+          <ReviewedMark item={item} />
         </div>
         {item.why_it_matters ? <div className="mt-1 text-[#44516a]">{item.why_it_matters}</div> : null}
         {item.excerpt ? (

@@ -5,6 +5,7 @@ import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
 import { CategoryTag, ItemTitle, ScoreBadge, Tag, openFromRow } from "@/components/ci";
+import { ReviewedMark } from "@/components/ReviewedMark";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { LensView } from "@/components/LensView";
 import { RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
@@ -78,6 +79,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         ) : null}
         {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} /> : null}
         {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
+        <ReviewedMark item={item} />
       </div>
       <div className="mt-1.5 flex items-start gap-1.5">
         <ItemTitle title={item.title} url={item.url} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
