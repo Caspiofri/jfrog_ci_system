@@ -28,8 +28,9 @@ test("the excerpt is shown as served: not stripped, shortened or rewritten", () 
   assert.doesNotMatch(body, /\.(replace|slice|substring|split)\(/);
 });
 
-test("drawer: the JFrog sentence shows only when the excerpt holds it; the tag is the Brief's 'Mentions JFrog'", () => {
-  assert.match(drawer, /\{it\.mentions_jfrog && jfrogSentence\(it\.excerpt\) \? \([\s\S]*?JFrog is mentioned:[\s\S]*?\{jfrogSentence\(it\.excerpt\)\}/);
+test("drawer: the 'Why Mentions JFrog' block and the Brief's 'Mentions JFrog' tag", () => {
+  assert.match(drawer, /<MentionWhy d=\{d\} \/>/);
+  assert.match(drawer, /const m = mentionExplanation\(d\);\s*if \(!m\) return null;/);
   assert.match(drawer, /\{it\.mentions_jfrog \? <MentionsJfrog excerpt=\{it\.excerpt\} \/> : null\}/);
   assert.match(card, /<MentionsJfrog excerpt=\{item\.excerpt\} \/>/);
 });

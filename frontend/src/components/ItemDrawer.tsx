@@ -2,7 +2,7 @@
 // The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
 import { ArticleExcerpt } from "@/components/ArticleExcerpt";
 import { MentionsJfrog } from "@/components/MentionsJfrog";
-import { jfrogSentence, showLensBlock } from "@/lib/jfrogMention";
+import { mentionExplanation, showLensBlock } from "@/lib/jfrogMention";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -52,6 +52,22 @@ function LensBlock({ lens, status }: { lens?: Lens | null; status?: LensStatus |
   );
 }
 
+/** Why the item is tagged "Mentions JFrog": how the tag is set, the sentence when the excerpt holds it, what the tag
+ *  changed, and the model's note when it names JFrog. Only fields the API serves; nothing is guessed. */
+function MentionWhy({ d }: { d: ItemDetail }) {
+  const m = mentionExplanation(d);
+  if (!m) return null;
+  return (
+    <div className="flex flex-col gap-1 rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2.5 py-1.5 text-xs text-jgreen-d" data-jfrog-mention>
+      <b className="font-semibold">Why &ldquo;Mentions JFrog&rdquo;</b>
+      <span className="text-ink">{m.how}</span>
+      {m.sentence ? <span className="italic">&ldquo;{m.sentence}&rdquo;</span> : null}
+      {m.effect.map((e) => <span key={e} className="text-ink">{e}</span>)}
+      {m.modelNote ? <span className="text-ink"><span className="text-mute">The model&apos;s note: </span>{m.modelNote}</span> : null}
+    </div>
+  );
+}
+
 function DrawerBody({ id }: { id: string }) {
   const { data: meta } = useMeta();
   // only the requested item, never the previous one (a 404 or a slow earlier response shows an error or loading)
@@ -80,11 +96,7 @@ function DrawerBody({ id }: { id: string }) {
                   {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
                 {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
-                {it.mentions_jfrog && jfrogSentence(it.excerpt) ? (
-                  <div className="rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2 py-1 text-xs text-jgreen-d" data-jfrog-mention>
-                    <b className="font-semibold">JFrog is mentioned:</b> <span className="italic">&ldquo;{jfrogSentence(it.excerpt)}&rdquo;</span>
-                  </div>
-                ) : null}
+                <MentionWhy d={d} />
                 <ArticleExcerpt excerpt={it.excerpt} url={it.url} />
                 <div>
                   <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>
