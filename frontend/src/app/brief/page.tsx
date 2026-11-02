@@ -420,7 +420,7 @@ function TouchesJfrog({ claims }: { claims: Claim[] }) {
 const BADGE_STYLE: Record<string, string> = {
   new: "border-[#3f5b8f]/40 bg-[#e8eefb] text-[#3f5b8f]",
   continuing: "border-line bg-page text-ink",
-  strengthened: "border-jgreen/50 bg-[#eef7f0] text-jgreen-d",
+  strengthened: "border-[#1e63a6]/40 bg-[#e3f0fb] text-[#1e63a6]", // sky blue: apart from New (slate blue) and the JFrog greens
 };
 
 /** New / Also in previous Brief (<date>) [· +N new sources], from the API's continuity field; nothing when absent. */

@@ -58,3 +58,11 @@ test("the Brief puts the badge next to the pattern chip and the line under the i
   assert.match(src, /\{goneLine\(insights\.previous\) \? <p[^>]*data-gone-line>/);
   assert.match(src, /<Hint text=\{CONTINUITY_TIP\}>/);
 });
+
+test("badge colours: strengthened is blue, distinct from New and from the JFrog green", () => {
+  const src = readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8");
+  const style = (k) => src.match(new RegExp(`  ${k}: "([^"]+)"`))[1];
+  assert.match(style("strengthened"), /bg-\[#e3f0fb\] text-\[#1e63a6\]/);
+  assert.notEqual(style("strengthened"), style("new"));
+  assert.doesNotMatch(style("strengthened"), /jgreen/);
+});
