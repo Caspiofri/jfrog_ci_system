@@ -66,7 +66,7 @@ test("Competitors overview: the legends sit under the competitor cards, not abov
 test("Importance legend names every score, 2 and 1 in the rubric's own words", async () => {
   const { RUBRIC } = await import("../src/lib/format.ts");
   assert.deepEqual([5, 4, 3, 2, 1].map((n) => RUBRIC[n].label),
-    ["Strategic move", "Material change", "Relevant development", "Intelligence value, no new event", "Routine operational event"]);
+    ["Strategic move", "Material change", "Relevant development", "Intelligence value", "Routine update"]);
   assert.match(RUBRIC[2].competitor, /^No new event, but intelligence value/); // rubric v2 row 2, verbatim
   assert.match(RUBRIC[1].competitor, /^A routine operational event/); // rubric v2 row 1, verbatim
 });
