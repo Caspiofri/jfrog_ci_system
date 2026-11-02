@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS analyst_actions (
     action_id INTEGER PRIMARY KEY AUTOINCREMENT,
     target_kind TEXT NOT NULL,       -- item | source
     target_id TEXT NOT NULL,
-    action TEXT NOT NULL,            -- approve | dismiss | edit | flag | unflag | trust | untrust
+    action TEXT NOT NULL,            -- approve | dismiss | reopen | edit | flag | unflag | trust | untrust
     reason TEXT,
     note TEXT,
     payload TEXT NOT NULL,           -- before/after values, what the action measures
@@ -188,9 +188,15 @@ def _not_after(row: dict, seen_at: str) -> dict:
 
 
 class Store:
-    def __init__(self, path: Path = STORE_PATH):
-        path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, path: Path = STORE_PATH, read_only: bool = False):
+        """read_only: open an existing file that never changes (the demo snapshot): no schema, no repair, no writes,
+        no lock or journal files, so it works from a read-only mount."""
         self.path = path
+        if read_only:
+            self._db = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True, check_same_thread=False)
+            self._db.row_factory = sqlite3.Row
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(path)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(SCHEMA)

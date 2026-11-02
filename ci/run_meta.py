@@ -8,12 +8,16 @@ says which code ran; `dirty` is true when tracked files differed from that commi
 Every field is best-effort: a value that can't be read is None, never an exception.
 """
 import hashlib
+import inspect
 import json
 import logging
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePath
 
-from ci import eval_golden, insights, lens, llm
+from ci import classify as classify_mod
+from ci import eval_golden, extraction_quality, insights, lens, llm, prefilter
+from ci import rank as rank_mod
+from ci.llm import FakeLLM
 from modules import llm_clients
 
 log = logging.getLogger(__name__)
@@ -35,7 +39,10 @@ FINGERPRINT_CHANGES = (
                                "eval_golden.rebuild_item",
                      "store_items": 351, "golden_rows": 107, "prompts_compared": 3 * (351 + 107),
                      "differences": 0, "batches_identical": True, "control_poisoned_prompt_differs": True},
-     "lens_unchanged": "1692c04ba7df"},
+     "lens_unchanged": "1692c04ba7df",
+     "portable": "e04716a2a1d6",  # D59: the same setup without paths; equal on the Pi, in a worktree, in a clone
+     "portable_note": "the legacy value also hashes 4 absolute paths, so it is 99b79890ceea only at "
+                      "/home/ofri/jfrog_project/agent_backbone"},
 )
 
 
@@ -73,6 +80,56 @@ def git_commit(repo: Path = REPO) -> dict:
     return {"sha": sha, "dirty": dirty}
 
 
+def _portable(value, repo: Path):
+    """A value as the legacy fingerprint freezes it, except a path: the path relative to the repo plus the sha256 of
+    the file's content, so the same checkout hashes the same anywhere and a changed rubric or config still shows."""
+    if isinstance(value, PurePath):
+        p = Path(value)
+        try:
+            rel = p.resolve().relative_to(repo.resolve()).as_posix()
+        except ValueError:
+            rel = p.name
+        return {"path": rel, "sha256": hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None}
+    if isinstance(value, dict):
+        return {str(k): _portable(v, repo) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_portable(v, repo) for v in value]
+    return eval_golden._frozen(value)
+
+
+def portable_classify_rank(cfg=None, repo: Path | None = None) -> str:
+    """D59: the classify_rank fingerprint without absolute paths. The same parts as ci.eval_golden.fingerprint (both
+    prompts, the source and constants of classify, rank, prefilter and extraction_quality, the eval knobs, the rubric
+    and the whole competitors config), with every path constant replaced by its repo-relative path and its file's
+    content hash. The legacy value (99b79890ceea on the Pi's checkout) is kept and still recorded; this one is equal
+    in any checkout of the same commit."""
+    from ci import config as ci_config
+    from config.settings import ROOT  # the checkout the hashed modules come from
+
+    cfg = cfg or ci_config.load()
+    repo = repo or ROOT
+    g = eval_golden
+    parts = {
+        "classify_prompt": classify_mod.Classifier(FakeLLM(), cfg).prompt([]),
+        "rank_prompt": rank_mod.Ranker.prompt([]),
+        **{f"classify.{k}": _portable(v, repo) for k, v in sorted(vars(classify_mod).items()) if k.isupper()},
+        **{f"rank.{k}": _portable(v, repo) for k, v in sorted(vars(rank_mod).items()) if k.isupper()},
+        "eval.STORY_SIMILARITY": g.STORY_SIMILARITY, "eval.EMBED_MODEL_TAG": g.EMBED_MODEL_TAG,
+        "eval.EMBED_TEXT_CHARS": g.EMBED_TEXT_CHARS, "eval.TEST_PERCENT": g.TEST_PERCENT,
+        "eval.IMPORTANT_MIN": g.IMPORTANT_MIN,
+        "eval.metrics": "".join(inspect.getsource(f) for f in (g.evaluate, g.detector_vs_flags, g._pr, g.label_score)),
+        "classify.source": inspect.getsource(classify_mod), "rank.source": inspect.getsource(rank_mod),
+        "rubric_v2.sha256": g.rubric_sha(),
+        "extraction_quality.source": inspect.getsource(extraction_quality),
+        "prefilter.source": inspect.getsource(prefilter),
+        **{f"prefilter.{k}": _portable(v, repo) for k, v in sorted(vars(prefilter).items()) if k.isupper()},
+        **{f"extraction_quality.{k}": _portable(v, repo) for k, v in sorted(vars(extraction_quality).items())
+           if k.isupper()},
+        "config": cfg.model_dump(mode="json"),
+    }
+    return _sha(json.dumps(parts, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+
+
 def combine(fingerprints: dict, sheet: str | None, model_names: dict, settings: dict) -> str:
     parts = {"fingerprints": fingerprints, "sheet_sha": sheet, "models": model_names, "call_settings": settings}
     return _sha(json.dumps(parts, sort_keys=True).encode())
@@ -92,8 +149,17 @@ def collect(*, fingerprints: dict | None = None, model: str | None = None, cfg=N
                 fps[key] = None
     fps = {k: fps[k] for k in ("classify_rank", "lens", "insights")}
     sheet, names, settings = sheet_sha(sheet_path), models(model), call_settings()
+    try:
+        portable_cr = portable_classify_rank(cfg)
+    except Exception as e:
+        log.warning("portable fingerprint not recorded: %s", e)
+        portable_cr = None
+    portable_fps = {**fps, "classify_rank": portable_cr}  # lens and insights hash no path: already portable
     return {"fingerprints": fps, "sheet_sha": sheet, "models": names, "call_settings": settings,
             "combined": combine(fps, sheet, names, settings), "commit": git_commit(repo),
+            "portable": {"classify_rank": portable_cr, "combined": combine(portable_fps, sheet, names, settings),
+                         "note": "no absolute paths: equal in every checkout of one commit (D59); fingerprints."
+                                 "classify_rank is the legacy value, which also hashes 4 absolute paths"},
             "fingerprint_changes": list(FINGERPRINT_CHANGES)}
 
 

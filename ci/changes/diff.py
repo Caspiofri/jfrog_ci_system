@@ -281,7 +281,10 @@ def make_change(run_id: str, page_type: str, old: Cell, new: AxisField, new_url:
 class CellStore:
     """Head-to-head cells (current value per competitor x axis) and their history, in sqlite."""
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, read_only: bool = False):
+        if read_only:  # the demo snapshot: never written, no schema or migration
+            self._db = sqlite3.connect(f"file:{db_path}?mode=ro&immutable=1", uri=True, check_same_thread=False)
+            return
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(db_path, check_same_thread=False)
         cols = ("competitor TEXT, axis TEXT, value TEXT, evidence TEXT, confidence REAL, tiers TEXT, "

@@ -29,6 +29,11 @@ evals/golden_set.jsonl
 evals/ranking_golden.json
 evals/split_assignments.json
 
+# the web UI has its own image (docker/ui.Dockerfile); its build output never goes into the API image
+frontend/node_modules
+frontend/.next
+frontend/.next-build
+
 # docs and images are not needed in the image
 docs
 README.md

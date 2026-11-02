@@ -259,6 +259,7 @@ The response to `POST`:
 
 `GET /api/v1/log?run_id=&date_from=&date_to=&competitor=&category=&status=&stage=&source=&q=&sort=&limit=&offset=`
 - **Rows:** one row per sighting (item × run), with `status`, `stage` and `stage_reason`.
+- **`dismiss_reason`** (added 1 Nov): on every row. For a dismissed item, the reason of its latest dismiss action (`wrong_competitor`, `wrong_category`, `not_relevant` or `duplicate`); `null` on every other row, dropped rows included. `reason` is unchanged (`dismissed` for an analyst-stage dismissed row).
 - **Counts:** by status and by stage.
 - **Layout:** as the prototype; Ofri liked it as is.
 - **Gaps today:**
@@ -521,6 +522,15 @@ Every `Item` gains `text_basis`, and `lens` gains `why_it_matters`:
   - `axis` is `null` for `not_related`.
   - `capability_quote` is `null` for `not_related`, else the verbatim line from the capability sheet.
   - `why_it_matters` is the lens sentence. `why` is the same text, kept for the current UI and deprecated.
+- **`lens_status`** (added 1 Nov): the status of the item's latest lens row, so the UI can tell why `lens` is `null`.
+
+  | `lens_status` | Meaning | `lens` |
+  |---|---|---|
+  | `ok` | The lens ran and its quote check passed | the object above |
+  | `rejected` | The lens ran but its answer broke a rule (e.g. the capability quote is not on the sheet, or no answer for this item) | `null` |
+  | `failed` | The lens call for its batch failed (model or parse error) | `null` |
+  | `null` | No lens row: the lens was not run on this item | `null` |
+
 - The item's own `why_it_matters` (the ranker's summary) is unchanged.
 - **Not built:**
   - `lens.source_url` / `source_label` (#3d). The sheet's Sources list isn't labelled by axis, and most lines hold several links, so choosing one per axis would be a guess. It needs the sheet to name a source per axis row.
@@ -595,3 +605,63 @@ A run that stops before it writes its own row (another run held the lock, the sp
 - Until the test eval runs, the response is `{status: "none", note}`.
 - `health.eval` keeps showing the newest report of any split. A later train run therefore replaces the test numbers in `eval`, but not in `test_eval`.
 
+
+## 12. Demo mode and request guards (1 Nov; as built)
+
+### 12.1 The demo marker: `meta.mode` and `meta.snapshot`
+
+Every `meta` block says which data it serves. Every success body and every route error has one; the three guard errors in 12.2 answer before any route runs and have none.
+
+```json
+"meta": {
+  "mode": "demo",                       // "live" for the real store
+  "now": "2026-11-01T04:04:12+00:00",   // demo: frozen at the snapshot's as_of
+  "api_version": "…",
+  "snapshot": {                         // demo mode only; the key is absent in live mode
+    "date": "2026-11-01",               // the snapshot's Brief date (Israel date): show it in the badge
+    "as_of": "2026-11-01T04:04:12+00:00",
+    "label": "",                        // a note the builder gave, may be empty
+    "built_at": "…",
+    "commit": "…"                       // the commit the snapshot was built from
+  }
+}
+```
+
+- The date for the badge is **`meta.snapshot.date`**, e.g. "Demo snapshot 2026-11-01".
+- Live mode never has `meta.snapshot`; test `meta.mode === "demo"`, not the key's presence alone.
+
+### 12.2 Errors the guards return
+
+| Status | `error.code` | When |
+|---|---|---|
+| 403 | `demo_read_only` | Any POST, PUT, PATCH or DELETE in demo mode, before any route runs |
+| 403 | `csrf_refused` | A cross-site write (`Origin` / `Sec-Fetch-Site`) in either mode |
+| 400 | `untrusted_host` | A `Host` header other than localhost, 127.0.0.1, ::1 or a name in `CI_TRUSTED_HOSTS` |
+
+These three bodies are `{"error": {code, message, details}}` with no `meta`.
+
+## 13. Analyst actions: reopen and per-field edit notes (1 Nov; as built)
+
+### 13.1 `POST /api/v1/items/{id}/reopen`: undo a dismiss
+
+- **Body:** optional `{"note": "…"}`. **If-Match:** the item version, optional, as for the other actions (a stale one answers 409 `conflict`).
+- **Allowed from:** `dismissed` only. Any other status answers `409 conflict` with `{status, allowed_from: ["dismissed"]}`; an unknown item `404 not_found`. In demo mode, 403 `demo_read_only`.
+- **What it does:** appends a `reopen` action; the dismiss stays in the history. The decision and flag go back to what they were before the latest dismiss, so the item returns to the status it had then:
+
+  | Status before the dismiss | After reopen |
+  |---|---|
+  | `awaiting_review` / `auto_published` | no decision: routing decides again, at the current level and vetted list |
+  | `approved` | `approved` |
+  | `flagged` | `flagged` (and the decision under the flag comes back too) |
+
+  Edits made before or after the dismiss are kept. Nothing is written to `evals/analyst_labels.jsonl`.
+- **Response:** the action envelope (`action_id`, `action: "reopen"`, `status`, `flagged`, `version`, `at`, `meta`…) plus `reopens_action_id` (the dismiss it undid) and `status_before_dismiss`.
+- **Reads:** `GET /items/{id}` → `actions[]` gets `{action: "reopen", payload: {before, state_before, reopens_action_id, status_before_dismiss}}`. The Log row shows the new status, with `dismiss_reason: null`.
+- From 1 Nov every item action's payload also holds `state_before: {decision, flagged}`. A dismiss logged before that has none and is restored from its `before.status` (the table above).
+
+### 13.2 `PATCH /api/v1/items/{id}`: a note per changed field
+
+- **Body:** `{competitor?, category?, score?, note?, notes?: {competitor?, category?, score?}}`. `notes` keys must be fields this edit changes, else `422 validation_error`. A field without its own note gets `note`. `noise` isn't an editable field.
+- **Still one action** in the history: `action: "edit"`, `note` = the shared `note`, and `payload.changes: [{field, old, new, note}]`, one per changed field (`old` is the value the API showed before the edit). The response carries the same `changes`.
+- **Candidates:** `evals/analyst_labels.jsonl` gets one line per changed field: `{"id", "field", "old", "new", "note", "source": "analyst", "action_id", "at"}`. Lines written before 1 Nov have the old shape: one per edit, `{"id", <field>: <new value>…, "note", "source", "at"}`, with no old value.
+- **Where it shows:** `GET /items/{id}` → `actions[].payload.changes`. Log rows don't carry edits.

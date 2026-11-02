@@ -1,4 +1,81 @@
-# Newsletter Agent
+# Jessi
+
+**JFrog's Engine for Strategic Signals & Intelligence.** Jessi keeps JFrog's competitive-intelligence team updated
+daily on what the main competitors (GitHub, GitLab, Snyk, Sonatype, Cloudsmith, AWS) ship and say, and shows how
+JFrog compares. Every claim links to its source, and every number is reported with its n.
+
+> This README is the short version for the release; the full one (results, limits, screenshots) follows.
+
+## Run the demo (no API key)
+
+```bash
+git clone <this repo> && cd agent_backbone
+docker compose up --build        # first build takes a few minutes
+```
+
+Open **http://127.0.0.1:3000**. The UI runs on a **demo snapshot**: a frozen, read-only copy of a real daily run
+(`demo/snapshot/`), built by `python -m ci.demo build`. A "Demo snapshot" marker shows in the header. Nothing is
+simulated, no model is called, and writes (approve, dismiss, trust, refresh) are refused. Full article text is never in
+the snapshot: items keep the D34 field allowlist and a 280-character excerpt. The API is on
+http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+
+Without Docker: `pip install -r requirements.txt`, then `python -m ci.api --demo demo/snapshot --port 8011`, and the
+UI from `frontend/` (`npm install && CI_API_URL=http://127.0.0.1:8011 npm run dev`).
+
+The live system (a daily run that calls Gemini) needs `GOOGLE_API_KEY` in `.env`, the frozen split file and the
+pipeline services (`docker compose --profile pipeline ...`, with `APP_UID=$(id -u)`; see `docker-compose.yml`).
+
+## What is built now
+
+- **Daily run at 06:00** (`ci/daily_cron.sh`, `python -m ci.daily`): collect, dedupe, read, classify, rank, route,
+  explain, summarize. Each run records its commit, its fingerprints and its counts (`run_metrics`).
+- **Daily Brief:** the published items scored 3+ for the day, what is held for review (counted by preliminary
+  score), and insights across items, each claim quoting its source.
+- **Review queue** with three autonomy levels (Strict by default): unvetted sources, pricing, M&A, JFrog mentions
+  and snippet-only high scores are held for an analyst.
+- **Competitors:** a head-to-head per competitor against JFrog's capability sheet (`config/jfrog_capabilities.md`),
+  with source and as-of date per cell; change detection on tracked pricing and product pages.
+- **Health:** run history with ok / degraded / failed / stale / overdue, the funnel, extraction success and the eval
+  numbers with n.
+- **Evaluation:** a labeled golden set with a frozen train/test split, a coverage check against known events,
+  reliability checks of daily runs marked field by field, and a reproducibility pack: `python -m ci.repro recompute
+  repro` recomputes every reported metric from saved reports with no model call.
+
+## Architecture in short
+
+```
+collectors (Google News, vendor feeds, Hacker News, GitHub releases, tracked pages)
+  -> dedupe (URL, then embedding similarity)  -> full text + extraction check
+  -> classify (Gemini: competitor, category, noise)  -> rank (Gemini, rubric v2: score 1-5)
+  -> validate (schema + rules, D32)  -> route (hold reasons x autonomy level)
+  -> lens (closest JFrog capability, quote checked against the sheet)  -> insights (quotes checked in code)
+  -> SQLite store  -> FastAPI (ci/api)  -> Next.js UI (frontend/)
+```
+
+Article text is untrusted: it reaches the model only inside delimited, defanged blocks, and every quoted claim is
+checked in code (see *prompt-injection defense* below). The API has no login and binds 127.0.0.1; it refuses
+cross-site writes and foreign Host headers.
+
+## Which items the insights look at
+
+Insights read only the published items: auto-published, approved or flagged at the Brief's autonomy level. Held and
+rejected items never reach them. Of those, an item is in the window when one of these holds:
+- it was published in the 7 days before the Brief's daily run started;
+- it was found since the previous Brief's run, whatever its date, so a late-found article still counts once.
+
+Items about the same story count as one story. With fewer than 15 stories in 7 days, the window widens to 14 days,
+once. It never widens further, and the window the insights used (dates, items, stories, late-found items) is stored
+with them. Insights are only proposed for groups of at least 2 stories: one competitor's moves, one category across
+2 or more competitors, or Security news across vendors.
+
+---
+
+## Origin: the newsletter agent
+
+Jessi grew out of the newsletter agent below (collectors, dedupe, reader, ranker, eval harness). Its own setup still
+applies to `python main.py`.
+
+### Newsletter Agent
 
 An end-to-end multi-source AI pipeline. Parallel collectors gather articles from your Gmail newsletters, Medium tag feeds and Hacker News; a reader fetches the full text of a shortlist; an LLM ranker picks the best; and a personalized Hebrew digest is delivered to your inbox — fully automated, daily.
 
@@ -292,7 +369,47 @@ metadata (`ci/run_meta.py`).
 - **No classifier for injected text.** Nothing detects or strips injection attempts before the prompt.
 
 Traces: LangSmith tracing is off in every eval run, whatever the environment says, which `ci/tracing.py` enforces
-with a test. The daily run may trace only with `CI_LANGSMITH_TRACING=true`, which is off by default (D48, D51).
+with a test. No Jessi run sends traces in this submission (see *Future*).
+
+## Jessi: known issues (not fixed before the freeze)
+
+Both are left as they are on purpose: the freeze keeps the measured system unchanged, and the second one feeds the
+insights window.
+
+**1. "Mentions JFrog" can come from page text the model never sees.**
+- **What happens:** the mention counter runs over the whole fetched page (`ci/pipeline.py`, `read_full_text`), but
+  only the first 6,000 characters are stored and sent to the model (`TEXT_MAX_CHARS`). A JFrog, Artifactory,
+  Frogbot or SwampUp match further down the page (a listicle entry, a nav or footer link, a related-posts block)
+  sets `mentions_jfrog`. That holds the item for review (`ci/route.py`) and adds +1 to its score (`ci/rank.py`,
+  `JFROG_BONUS`).
+- **Evidence:** 5 of the 351 stored items are flagged. For 1 of them the stored title and text contain no JFrog
+  term: `d776107280a9fb12` (OX Security, "Top 10 Application Security Testing Tools (2026 Edition)", 6,000 stored
+  characters). Its score was raised from 2 to 3 by the bonus; it is one of the 15 items of the 1 Nov reliability
+  check. What the match was isn't known: the full page isn't stored.
+- **Fix later:** take the flag from the stored text only, or store the matched snippet with the flag so a reviewer
+  can see it.
+
+**2. The source date of Google News items is the feed's date, not the publisher's.**
+- **What happens:** `ci/collectors/google_news.py` (`_published`) takes `published_at` from the RSS `<pubDate>`. No
+  code reads the article's own date (`article:published_time`, `datePublished`). For Google News that is when Google
+  dated the story, which can be an index or last-modified date. The date can then look recent for an old article.
+- **Why it isn't changed now:** the date decides the insights window (D37). Changing it changes which items the
+  insights analyze, after they were measured.
+- **Evidence (n = 2, checked against the publisher's page):**
+  - `08a1c43f07150ac3` (eSecurity Planet) is stored as 27 Oct 07:00Z; the page says published 11 Aug 2026.
+  - `d645b44fc2ae971b` (Netguru) is stored as 29 Oct 09:52Z; the page says published 6 Feb 2025, modified 29 Oct
+    2026.
+  - 207 of the 351 stored items come from Google News. How many of them have a wrong date isn't measured.
+- **In the UI:** the date is labelled "Feed date".
+- **Fix later:** read the page's own date during the fetch, keep the feed date beside it, and use the page date when
+  both exist.
+
+## Jessi: future (not in this submission)
+
+- **LangSmith tracing of the daily run (D48) is dropped for this submission.** `ci/tracing.py` is the switch it would
+  use (daily only, off by default, never in an eval). Today no Jessi code sends traces.
+- **Security advisories stay unvetted (D53, D56).** The store holds 0 GitHub or GitLab advisory pages (n = 351), so
+  vetting them would change nothing today. Revisit when advisory pages appear in the data.
 
 ---
 

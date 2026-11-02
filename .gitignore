@@ -43,3 +43,4 @@ docs/PRD-upgrade.md
 evals/golden_set.jsonl
 evals/analyst_labels.jsonl
 *.marks.json
+evals/reliability/

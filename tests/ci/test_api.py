@@ -97,6 +97,7 @@ def test_meta(env):
     m = c.get("/api/v1/meta").json()
     assert m["level"] == "strict" and m["latest_brief_date"] == "2026-10-31" and m["insights_enabled"] is False
     assert [x["key"] for x in m["competitors"]] == ["github", "snyk", "industry"] and m["meta"]["mode"] == "live"
+    assert "snapshot" not in m["meta"]  # the demo marker only exists in demo mode
 
 
 def test_brief_window_badges_order_and_published_only(env):
@@ -194,9 +195,77 @@ def test_edit_validates_against_the_config_and_writes_a_candidate_not_a_label(en
     assert r["action"] == "edit"
     item = c.get("/api/v1/items/late").json()["item"]
     assert item["category"] == "Security" and item["edited"] == {"category": "Security"}
-    row = json.loads(labels.read_text().splitlines()[0])
-    assert row["id"] == "late" and row["source"] == "analyst" and row["category"] == "Security"
+    [row] = [json.loads(x) for x in labels.read_text().splitlines()]
+    assert (row["id"], row["field"], row["new"], row["note"], row["source"]) == \
+        ("late", "category", "Security", "it is", "analyst")
+    assert row["action_id"] == r["action_id"] and "old" in row
     assert c.patch("/api/v1/items/held_out", json={"score": 3}).status_code == 409  # test split: no edits
+
+
+def test_an_edit_writes_one_candidate_per_field_with_old_new_and_its_own_note(env):
+    c, store_path, labels = env
+    before = c.get("/api/v1/items/uv").json()["item"]
+    body = {"competitor": "industry", "score": 2, "category": "Security", "note": "shared",
+            "notes": {"competitor": "GitHub is the venue", "score": "no victims reported"}}
+    r = c.patch("/api/v1/items/uv", json=body).json()
+    rows = [json.loads(x) for x in labels.read_text().splitlines()]
+    assert [(x["field"], x["old"], x["new"], x["note"]) for x in rows] == [
+        ("competitor", before["competitor"], "industry", "GitHub is the venue"),
+        ("category", before["category"], "Security", "shared"),  # no note of its own: the shared one
+        ("score", before["score"], 2, "no victims reported")]
+    assert {x["action_id"] for x in rows} == {r["action_id"]} and r["changes"] == [
+        {k: x[k] for k in ("field", "old", "new", "note")} for x in rows]
+    with Store(store_path) as s:  # still one action in the history, with the per-field changes
+        [a] = s.actions("uv")
+    assert a["action"] == "edit" and a["note"] == "shared" and a["payload"]["changes"] == r["changes"]
+    assert c.get("/api/v1/items/uv").json()["actions"][-1]["payload"]["changes"] == r["changes"]
+    bad = c.patch("/api/v1/items/uv", json={"score": 3, "notes": {"competitor": "x"}})
+    assert bad.status_code == 422  # a note for a field the edit doesn't change
+    assert c.patch("/api/v1/items/uv", json={"score": 3, "notes": {"noise": "x"}}).status_code == 422
+
+
+def test_reopen_undoes_a_dismiss_and_keeps_it_in_the_history(env):
+    c, store_path, labels = env
+    assert c.get("/api/v1/items/uv").json()["item"]["status"] == "awaiting_review"
+    assert c.post("/api/v1/items/uv/reopen").status_code == 409  # not dismissed
+    c.patch("/api/v1/items/uv", json={"competitor": "industry"})
+    labels_before = labels.read_text()
+    d = c.post("/api/v1/items/uv/dismiss", json={"reason": "wrong_competitor"}).json()
+    assert c.post("/api/v1/items/uv/reopen", headers={"If-Match": "1"}).status_code == 409  # stale version
+    r = c.post("/api/v1/items/uv/reopen", json={"note": "meant to edit"}, headers={"If-Match": str(d["version"])})
+    r = r.json()
+    assert (r["action"], r["status"], r["reopens_action_id"], r["status_before_dismiss"]) == \
+        ("reopen", "awaiting_review", d["action_id"], "awaiting_review")
+    got = c.get("/api/v1/items/uv").json()
+    item = got["item"]
+    assert item["status"] == "awaiting_review" and item["edited"] == {"competitor": "industry"}  # edit kept
+    assert [a["action"] for a in got["actions"]] == ["edit", "dismiss", "reopen"]
+    assert labels.read_text() == labels_before  # reopen writes no candidate
+    log = {x["item_id"]: x for x in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}
+    assert log["uv"]["status"] == "awaiting_review" and log["uv"]["dismiss_reason"] is None
+    assert c.post("/api/v1/items/uv/reopen").status_code == 409  # only once per dismiss
+
+
+def test_reopen_restores_approved_and_flagged_items(env):
+    c, _, _ = env
+    assert c.post("/api/v1/items/uv/approve").json()["status"] == "approved"
+    c.post("/api/v1/items/uv/dismiss", json={"reason": "duplicate"})
+    assert c.post("/api/v1/items/uv/reopen").json()["status"] == "approved"
+    assert c.post("/api/v1/items/uv4/flag").json()["status"] == "flagged"  # from awaiting_review: approved + flag
+    c.post("/api/v1/items/uv4/dismiss", json={"reason": "not_relevant"})
+    assert c.post("/api/v1/items/uv4/reopen").json()["status"] == "flagged"
+    assert c.delete("/api/v1/items/uv4/flag").json()["status"] == "approved"  # the decision came back too
+
+
+def test_reopen_of_a_dismiss_logged_before_state_before_existed(env):
+    c, store_path, _ = env
+    with Store(store_path) as s:  # as action #2 in the live store: no state_before in its payload
+        s.apply_item_action("uv", "dismiss", {"decision": "dismissed", "flagged": 0}, reason="wrong_competitor",
+                            payload={"before": {"status": "awaiting_review", "competitor": "github",
+                                                "category": "Security", "score": 5, "flagged": False},
+                                     "measures": "classifier"})
+    assert c.get("/api/v1/items/uv").json()["item"]["status"] == "dismissed"
+    assert c.post("/api/v1/items/uv/reopen").json()["status"] == "awaiting_review"
 
 
 def test_trust_this_source_releases_and_can_be_undone(env):
@@ -247,6 +316,21 @@ def test_log_has_every_sighting_and_every_drop_with_its_stage(env):
     assert ids(only["items"]) == ["dup1"] and only["counts"]["status"]["dropped"] == 2
     assert ids(c.get("/api/v1/log", params={"run_id": RUN2}).json()["items"]) == ["new2"]
     assert c.get("/api/v1/log", params={"limit": 0}).status_code == 400
+
+
+def test_a_dismissed_items_log_row_carries_the_dismiss_reason(env):
+    c, _, _ = env
+    rows = {r["item_id"]: r for r in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}
+    assert all("dismiss_reason" in r and r["dismiss_reason"] is None for r in rows.values())  # every row has the key
+    assert c.post("/api/v1/items/uv/dismiss", json={"reason": "wrong_competitor"}).status_code == 200
+    rows = {r["item_id"]: r for r in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}
+    assert (rows["uv"]["status"], rows["uv"]["stage"], rows["uv"]["dismiss_reason"]) == \
+        ("dismissed", "analyst", "wrong_competitor")
+    assert rows["uv"]["reason"] == "dismissed"  # the existing field is unchanged
+    assert rows["pub1"]["dismiss_reason"] is None and rows["dup1"]["dismiss_reason"] is None
+    c.patch("/api/v1/items/uv", json={"competitor": "industry"})  # an edit after the dismiss keeps the reason
+    assert {r["item_id"]: r for r in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}["uv"][
+        "dismiss_reason"] == "wrong_competitor"
 
 
 def test_refresh_insights_is_off_until_enabled(env):

@@ -67,7 +67,7 @@ def register(app, d) -> None:
     """d: ok, snap, item_out, page, ApiError, cfg, now, changes_path, store_path."""
 
     def cells() -> CellStore | None:
-        return CellStore(d.changes_path) if Path(d.changes_path).exists() else None
+        return CellStore(d.changes_path, read_only=d.read_only) if Path(d.changes_path).exists() else None
 
     def recent_changes(cs: CellStore | None, anchor) -> dict[tuple[str, str], dict]:
         """(competitor, axis) -> the latest change detected in the 7 days to the anchor, or still awaiting review."""
@@ -246,12 +246,12 @@ def register(app, d) -> None:
         return decide(change_id, "edit", value=body.value, note=body.note)
 
 
-def awaiting_change_rows(changes_path) -> list[dict]:
+def awaiting_change_rows(changes_path, read_only: bool = False) -> list[dict]:
     """The changed cells awaiting review, for the Review queue (every level holds them, D9)."""
     if not Path(changes_path).exists():
         return []
     try:
-        cs = CellStore(changes_path)
+        cs = CellStore(changes_path, read_only=read_only)
     except sqlite3.Error:
         return []
     try:

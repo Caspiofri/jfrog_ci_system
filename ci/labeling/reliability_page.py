@@ -10,9 +10,18 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from ci import reliability
+from ci import reliability_insights as ri
 from ci.store import STORE_PATH
 
 PAGE_PATH = Path(__file__).with_name("reliability_page.html")
+INSIGHTS_PAGE_PATH = Path(__file__).with_name("reliability_insights.html")
+
+
+class InsightMarkIn(BaseModel):
+    target: str  # an insight id, or "<insight id>/c<n>" for a claim
+    field: str
+    mark: str | None = None
+    note: str = Field(default="", max_length=ri.NOTE_MAX_CHARS)
 
 
 class MarkIn(BaseModel):
@@ -60,3 +69,40 @@ def add_routes(app: FastAPI, reviews_dir: Path = reliability.REVIEW_DIR, store_p
                  **{k: (marks.get(x["id"], {}).get(f) or {}).get(k) for k in ("mark", "note", "at")}}
                 for x in reliability.sheet(run_id, reviews_dir, store_path)["items"] for f in reliability.FIELD_KEYS]
         return {"run_id": run_id, "marks": rows}
+
+    # ---- the insights sheet: the stored insights of a run's Brief, exported once (ci.reliability_insights) ----
+
+    def insights_run(run_id: str) -> str:
+        if run_id not in ri.export_runs(reviews_dir):  # also guards against path tricks in run_id
+            raise HTTPException(404, f"no insights export for run {run_id}")
+        return run_id
+
+    @app.get("/reliability/insights", response_class=HTMLResponse)
+    def reliability_insights_page() -> str:
+        return INSIGHTS_PAGE_PATH.read_text(encoding="utf-8")
+
+    @app.get("/api/reliability-insights")
+    def reliability_insights_runs() -> dict:
+        return {"runs": ri.export_runs(reviews_dir), "marks": list(ri.MARKS)}
+
+    @app.get("/api/reliability-insights/{run_id}")
+    def reliability_insights_sheet(run_id: str) -> dict:
+        run_id = insights_run(run_id)
+        return {**ri.sheet(run_id, reviews_dir), "marks": ri.load_marks(run_id, reviews_dir)}
+
+    @app.put("/api/reliability-insights/{run_id}/marks")
+    def reliability_insights_mark(run_id: str, m: InsightMarkIn) -> dict:
+        run_id = insights_run(run_id)
+        with lock:
+            try:
+                return ri.save_mark(run_id, m.target, m.field, m.mark, m.note, reviews_dir)
+            except ValueError as e:
+                raise HTTPException(422, str(e)) from e
+
+    @app.get("/api/reliability-insights/{run_id}/export")
+    def reliability_insights_export(run_id: str) -> dict:
+        run_id = insights_run(run_id)
+        s, marks = ri.sheet(run_id, reviews_dir), ri.load_marks(run_id, reviews_dir)
+        rows = [{"target": t, "field": f, **{k: (marks.get(t, {}).get(f) or {}).get(k) for k in ("mark", "note", "at")}}
+                for t, fields in s["targets"].items() for f in fields]
+        return {"run_id": run_id, "source": s["source"], "marks": rows}

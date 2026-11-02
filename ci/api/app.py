@@ -27,7 +27,7 @@ from ci.api import health as health_api
 from ci.api import service as svc
 from ci.api.service import Snapshot
 from ci.classify import CATEGORIES
-from ci.csrf import CSRFMiddleware
+from ci.csrf import CSRFMiddleware, TrustedHostMiddleware
 from ci.pipeline import RUNS_DIR
 from ci.store import STORE_PATH, Store
 from config.settings import DATA_DIR, EVALS_DIR, OUTPUT_DIR
@@ -90,6 +90,7 @@ class ItemOut(BaseModel):
     fingerprint: str | None
     event_id: str | None
     lens: dict | None  # D42: {axis, capability_quote, relation, why_it_matters, why}; None when none passed its check
+    lens_status: Literal["ok", "rejected", "failed"] | None  # the latest lens row's status; None when no lens row
     text_basis: "TextBasisOut"  # D39/D44
 
 
@@ -118,11 +119,15 @@ class Dismiss(BaseModel):
     note: str | None = None
 
 
+EditField = Literal["competitor", "category", "score"]
+
+
 class Edit(BaseModel):
     competitor: str | None = None
     category: str | None = None
     score: int | None = Field(default=None, ge=1, le=5)
-    note: str | None = None
+    note: str | None = None  # for every changed field that has no note of its own in notes
+    notes: dict[EditField, str] | None = None  # a note per changed field
 
 
 class LevelBody(BaseModel):
@@ -148,20 +153,36 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                evals_dir: Path = eval_golden.EVALS_OUT_DIR, coverage_dir: Path = coverage.COVERAGE_DIR,
                events_path: Path = coverage.EVENTS_PATH, changes_out_dir: Path = OUTPUT_DIR / "changes",
                labels_path: Path = eval_golden.LABELS_PATH, sheet_path: Path = lens_mod.SHEET_PATH,
-               brief_config_path: Path = svc.BRIEF_CONFIG_PATH) -> FastAPI:
+               brief_config_path: Path = svc.BRIEF_CONFIG_PATH, demo: dict | None = None,
+               trusted_hosts: frozenset[str] | None = None) -> FastAPI:
+    """demo: a snapshot manifest from ci.demo.load(). The API then reads that snapshot read-only, refuses writes,
+    calls no model and keeps its clock at the snapshot time (D34, D59)."""
     cfg = cfg or ci_config.load()
     min_score = svc.brief_min_score(brief_config_path)
     app = FastAPI(title="JFrog CI API", version=API_VERSION)
     app.add_middleware(CSRFMiddleware)  # no login, so a cross-site page must not change state
+    app.add_middleware(TrustedHostMiddleware, hosts=trusted_hosts)  # outermost: DNS rebinding (D59)
+    read_only = demo is not None
+    if demo is not None:
+        from ci import demo as demo_mod
+
+        store_path, changes_path = demo["store_path"], demo["changes_path"]
+        now, insights_llm, embed_fn = demo_mod.clock(demo), None, None
+        app.add_middleware(demo_mod.ReadOnlyMiddleware, date=demo.get("date"))
+    snapshot = None if demo is None else {k: demo.get(k) for k in ("date", "as_of", "label", "built_at", "commit")}
 
     def meta() -> dict:
-        return {"mode": "live", "now": svc.iso(now()), "api_version": API_VERSION}
+        out = {"mode": "demo" if read_only else "live", "now": svc.iso(now()), "api_version": API_VERSION}
+        return out | ({"snapshot": snapshot} if snapshot else {})
+
+    def open_store() -> Store:
+        return Store(store_path, read_only=read_only)
 
     def ok(body: dict) -> dict:
         return {**body, "meta": meta()}
 
     def snap() -> tuple[Store, Snapshot]:
-        store = Store(store_path)
+        store = open_store()
         return store, Snapshot.read(store, cfg, now())
 
     def item_out(s: Snapshot, item_id: str, level: str | None = None, badge: str | None = None) -> dict:
@@ -217,7 +238,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     # ---- Brief -------------------------------------------------------------------------------------------------
 
     def insights_enabled() -> bool:
-        with Store(store_path) as store:
+        with open_store() as store:
             return store.setting("insights_enabled", "false") == "true"
 
     def brief_counts(s: Snapshot, w: dict) -> dict:
@@ -378,7 +399,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 for lv in route.LEVELS]
 
     def change_rows(competitor: list[str] | None) -> list[dict]:
-        rows = competitors_api.awaiting_change_rows(changes_path)
+        rows = competitors_api.awaiting_change_rows(changes_path, read_only=read_only)
         return [r for r in rows if not competitor or r["competitor"] in competitor]
 
     @app.get("/api/v1/review")
@@ -431,7 +452,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     @app.put("/api/v1/settings/autonomy-level")
     def put_level(body: LevelBody):
-        with Store(store_path) as store:
+        with open_store() as store:
             store.set_autonomy_level(body.level)
         return get_level()
 
@@ -439,7 +460,10 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     def act(item_id: str, action: str, allowed: tuple[str, ...], update: Callable[[dict, str], dict],
             if_match: str | None, reason: str | None = None, note: str | None = None,
-            measures: Callable[[dict], str] = lambda it: "") -> dict:
+            measures: Callable[[dict], str] = lambda it: "",
+            extra: Callable[[dict, list[dict]], dict] = lambda before, history: {}) -> dict:
+        """extra(item before, the item's actions so far): more payload for the action row, read in the same
+        snapshot as the checks."""
         store, s = snap()
         with store:
             if item_id not in s.items:
@@ -453,12 +477,18 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             except ValueError:
                 raise ApiError(400, "bad_request", "If-Match must be the item version (an integer)") from None
             state = s.states.get(item_id) or {}
+            more = extra(before, store.actions(item_id))
             try:
                 res = store.apply_item_action(item_id, action, update(state, before["status"]), reason=reason,
                                               note=note, payload={"before": {k: before[k] for k in
                                                                             ("status", "competitor", "category",
                                                                              "score", "flagged")},
-                                                                  "measures": measures(before)},
+                                                                  # the stored decision and flag, so reopen can
+                                                                  # restore them exactly
+                                                                  "state_before": {
+                                                                      "decision": state.get("decision"),
+                                                                      "flagged": int(state.get("flagged") or 0)},
+                                                                  "measures": measures(before), **more},
                                               expect_version=expect)
             except ValueError:
                 raise ApiError(409, "conflict", "the item changed since you read it (If-Match)",
@@ -481,6 +511,35 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                    lambda st, _: {"decision": "dismissed", "flagged": 0}, if_match, reason=body.reason,
                    note=body.note, measures=lambda it: stage)
 
+    def restore_before_dismiss(history: list[dict]) -> tuple[dict, dict]:
+        """(item_state update, the dismiss action) from the item's latest dismiss. A dismiss logged with state_before
+        is restored exactly; an older one from its before status (approved -> approved; flagged -> flagged;
+        awaiting_review or auto_published -> no decision, so routing decides again)."""
+        dismiss = next((a for a in reversed(history) if a["action"] == "dismiss"), None)
+        if dismiss is None:
+            raise ApiError(409, "conflict", "no dismiss action to reopen")
+        sb = dismiss["payload"].get("state_before")
+        if sb is not None:
+            return {"decision": sb["decision"], "flagged": int(sb["flagged"])}, dismiss
+        st = dismiss["payload"]["before"]["status"]
+        return {"decision": "approved" if st == "approved" else None, "flagged": int(st == "flagged")}, dismiss
+
+    @app.post("/api/v1/items/{item_id}/reopen")
+    def reopen(item_id: str, body: Note | None = None, if_match: str | None = Header(default=None)):
+        """Undo a dismiss: a new 'reopen' action (the dismiss stays in the history) puts the decision and flag back
+        as they were before it. Edits are kept; nothing goes to the candidate-labels file."""
+        found: dict = {}
+
+        def extra(before: dict, history: list[dict]) -> dict:
+            found["update"], found["dismiss"] = restore_before_dismiss(history)
+            return {"reopens_action_id": found["dismiss"]["action_id"],
+                    "status_before_dismiss": found["dismiss"]["payload"]["before"]["status"]}
+
+        res = act(item_id, "reopen", ("dismissed",), lambda st, _: found["update"], if_match,
+                  note=body.note if body else None, extra=extra)
+        return {**res, "reopens_action_id": found["dismiss"]["action_id"],
+                "status_before_dismiss": found["dismiss"]["payload"]["before"]["status"]}
+
     @app.post("/api/v1/items/{item_id}/flag")
     def flag(item_id: str, body: Note | None = None, if_match: str | None = Header(default=None)):
         return act(item_id, "flag", ("auto_published", "approved", "awaiting_review"),
@@ -494,9 +553,12 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     @app.patch("/api/v1/items/{item_id}")
     def edit(item_id: str, body: Edit, if_match: str | None = Header(default=None)):
-        fields = body.model_dump(exclude_none=True, exclude={"note"})
+        fields = body.model_dump(exclude_none=True, exclude={"note", "notes"})
         if not fields:
             raise ApiError(400, "bad_request", "give at least one of competitor, category, score")
+        notes = body.notes or {}
+        if set(notes) - set(fields):
+            raise ApiError(422, "validation_error", f"notes for fields not changed: {sorted(set(notes) - set(fields))}")
         if "competitor" in fields and fields["competitor"] not in svc.competitor_keys(cfg):
             raise ApiError(422, "validation_error", f"competitor {fields['competitor']!r} not in the config list")
         if "category" in fields and fields["category"] not in CATEGORIES:
@@ -504,14 +566,22 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
         if item_id in eval_golden.load_assignments(split_path) and \
                 eval_golden.load_assignments(split_path)[item_id] == "test":
             raise ApiError(409, "conflict", "a golden-set test-split item: no edits until after the test eval")
+        changes: list[dict] = []
+
+        def extra(before: dict, history: list[dict]) -> dict:  # each field: old value, new value, its own note
+            changes[:] = [{"field": k, "old": before[k], "new": v, "note": notes.get(k) or body.note}
+                          for k, v in fields.items()]
+            return {"changes": changes}
+
         res = act(item_id, "edit", ("awaiting_review", "auto_published", "approved", "flagged", "dismissed"),
                   lambda st, _: {f"edit_{k}": v for k, v in fields.items()}, if_match, note=body.note,
-                  measures=lambda it: "label_candidate")
+                  measures=lambda it: "label_candidate", extra=extra)
         labels_out.parent.mkdir(parents=True, exist_ok=True)
-        with labels_out.open("a", encoding="utf-8") as f:  # a candidate for Ofri to merge by hand, never a label
-            f.write(json.dumps({"id": item_id, **fields, "note": body.note, "source": "analyst",
-                                "at": res["at"]}, ensure_ascii=False) + "\n")
-        return res
+        with labels_out.open("a", encoding="utf-8") as f:  # candidates for Ofri to merge by hand, never labels
+            for ch in changes:  # one entry per changed field, all from the same action
+                f.write(json.dumps({"id": item_id, **ch, "source": "analyst", "action_id": res["action_id"],
+                                    "at": res["at"]}, ensure_ascii=False) + "\n")
+        return {**res, "changes": changes}
 
     # ---- Trust this source (D34) ----------------------------------------------------------------------------------
 
@@ -550,7 +620,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     @app.delete("/api/v1/sources/trust/{host}")
     def untrust(host: str):
         h = clean_host(host)
-        with Store(store_path) as store:
+        with open_store() as store:
             if sources.is_vetted(f"https://{h}/") and h not in store.trusted_hosts():
                 raise ApiError(409, "conflict", f"{h} is on the reviewed list in config/vetted_sources.yaml")
             if h not in store.trusted_hosts():
@@ -585,7 +655,10 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     # ---- Log ---------------------------------------------------------------------------------------------------
 
-    def log_rows(s: Snapshot) -> list[dict]:
+    def log_rows(s: Snapshot, actions: list[dict] = ()) -> list[dict]:
+        """actions: the analyst actions, oldest first; a dismissed item's row carries its latest dismiss reason."""
+        dismissed_for = {a["target_id"]: a["reason"] for a in actions
+                         if a["target_kind"] == "item" and a["action"] == "dismiss"}
         rows = []
         for sg in s.sightings:
             i = sg["item_id"]
@@ -611,6 +684,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                          "category": it["category"], "score": it["score"], "published_at": it["published_at"],
                          "collected_at": sg["seen_at"], "discovered_at": it["discovered_at"], "status": it["status"],
                          "stage": stage, "reason": why, "duplicate_of": None,
+                         "dismiss_reason": dismissed_for.get(i) if it["status"] == "dismissed" else None,
                          "text_status": s.items[i]["raw"].get("text_status")})
         for d in svc.dropped_rows(runs_dir, [r["run_id"] for r in s.runs]):
             rows.append({"item_id": d.get("id"), "run_id": d.get("run_id"), "title": d.get("title") or "",
@@ -620,7 +694,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                          "published_at": d.get("published_at"), "collected_at": d.get("collected_at"),
                          "discovered_at": None, "status": "dropped", "stage": d.get("drop_stage"),
                          "reason": d.get("drop_reason") or "", "duplicate_of": d.get("duplicate_of"),
-                         "text_status": d.get("text_status")})
+                         "dismiss_reason": None, "text_status": d.get("text_status")})
         return rows
 
     @app.get("/api/v1/log")
@@ -631,7 +705,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 limit: int = 50, offset: int = 0):
         store, s = snap()
         with store:
-            rows = log_rows(s)
+            rows = log_rows(s, store.actions())
 
         def day(r: dict) -> str:
             ts = svc.parse_ts(r["collected_at"])
@@ -651,8 +725,9 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     deps = SimpleNamespace(ok=ok, snap=snap, item_out=item_out, page=page, ApiError=ApiError, cfg=cfg, now=now,
                            changes_path=changes_path, store_path=store_path, runs_dir=runs_dir,
-                           store=lambda: Store(store_path), evals_dir=evals_dir, coverage_dir=coverage_dir,
-                           events_path=events_path, changes_out_dir=changes_out_dir, labels_path=labels_path)
+                           store=open_store, evals_dir=evals_dir, coverage_dir=coverage_dir,
+                           events_path=events_path, changes_out_dir=changes_out_dir, labels_path=labels_path,
+                           read_only=read_only)
     competitors_api.register(app, deps)
     health_api.register(app, deps)
     return app
