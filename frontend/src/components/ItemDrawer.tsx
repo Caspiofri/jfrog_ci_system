@@ -1,5 +1,6 @@
 "use client";
 // The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
+import { ArticleExcerpt, EXCERPT_LABEL } from "@/components/ArticleExcerpt";
 import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { showLensBlock } from "@/lib/jfrogMention";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
@@ -9,7 +10,7 @@ import { ArticleLink, Async, CategoryTag, ScoreBadge, StatusDot, Tag } from "@/c
 import { LensView } from "@/components/LensView";
 import { ReopenButton } from "@/components/review/actions";
 import { useRecord } from "@/lib/api";
-import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { FieldChange, ItemAction, ItemDetail, Lens, LensStatus, Meta } from "@/lib/types";
 
@@ -79,7 +80,10 @@ function DrawerBody({ id }: { id: string }) {
                   {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
                 {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
-                {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-mute">{EXCERPT_LABEL}</div>
+                  <ArticleExcerpt excerpt={it.excerpt} />
+                </div>
                 <div>
                   <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>

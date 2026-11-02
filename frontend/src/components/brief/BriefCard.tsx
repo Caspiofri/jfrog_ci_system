@@ -1,6 +1,8 @@
 "use client";
 // A published item in the Brief (D44): score with its rubric label, then three labeled rows.
 // Every collected string renders as React text (D32); links go through safeHref via ExtLink.
+import { ArticleExcerpt, EXCERPT_LABEL } from "@/components/ArticleExcerpt";
+import { showLensBlock } from "@/lib/jfrogMention";
 import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
@@ -37,7 +39,7 @@ function rubricFor(meta: Meta | undefined, score: number | null, competitor: str
 }
 
 /** Score badge plus its rubric v2 label. Tooltip: the rubric line (industry column for industry items), then the
- * ranker's reason for this item: interpretation lives here, not in the card's "What happened". */
+ * ranker's reason for this item: interpretation lives here, not in the card's "From the article". */
 export function ScoreLabel({ score, competitor, reason }: { score: number | null; competitor: string; reason?: string }) {
   const { data: meta } = useMeta();
   const r = rubricFor(meta, score, competitor);
@@ -82,10 +84,10 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         <ItemTitle title={item.title} url={item.url} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
       </div>
       <dl className="m-0 mt-2 grid grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)]">
-        <Row label="What happened">
-          {item.excerpt.trim() ? <span className="text-[#44516a]">{item.excerpt}</span> : <span className="text-mute">Only the headline is available.</span>}
-        </Row>
-        <Row label="Why it matters to JFrog"><LensView lens={item.lens} status={item.lens_status} /></Row>
+        <Row label={EXCERPT_LABEL}><ArticleExcerpt excerpt={item.excerpt} /></Row>
+        {showLensBlock(item.lens, item.lens_status) ? (
+          <Row label="Why it matters to JFrog"><LensView lens={item.lens} status={item.lens_status} /></Row>
+        ) : null}
         <Row label="Evidence">
           <span className="text-xs text-mute">
             {item.publisher} · {itemDateText(item)} ·{" "}
