@@ -2,6 +2,7 @@
 import { Async, ColourLegends, Empty, PageHead, Panel } from "@/components/ci";
 import { CompetitorCardView, DealsTable } from "@/components/competitors/parts";
 import { CapabilityMatrix } from "@/components/competitors/Matrix";
+import { ActivityHeatmap } from "@/components/competitors/Heatmap";
 import { useApi } from "@/lib/api";
 import { LEVEL_LABEL, fmtDate, label } from "@/lib/format";
 import type { Competitors } from "@/lib/types";
@@ -12,6 +13,7 @@ export default function CompetitorsPage() {
     <>
       <PageHead title="Competitors" info="Top score is the highest score of any item this week." />
       <CapabilityMatrix />
+      <ActivityHeatmap />
       <Async {...q} retry={() => q.mutate()} rows={6} isEmpty={(d) => !d.items.length} empty="No competitors in the config.">
         {(d) => (
           <>
