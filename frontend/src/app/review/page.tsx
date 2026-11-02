@@ -440,7 +440,7 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
         ) : null}
         <div className="mt-1 flex flex-wrap gap-2 text-xs text-mute">
           {row.held_since ? <span>Detected {fmtDateTime(row.held_since)}</span> : null}
-          {row.page_url ? <span className="inline-flex items-center gap-0.5">tracked page<ArticleLink href={row.page_url} label="Open the tracked page in a new tab" /></span> : null}
+          {row.page_url ? <ArticleLink href={row.page_url} label="Open the tracked page in a new tab" /> : null}
           <span>Held at every level</span>
         </div>
         {editing ? (

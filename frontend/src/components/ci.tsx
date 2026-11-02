@@ -1,7 +1,7 @@
 "use client";
 // Small shared pieces in the prototype's style. All API strings are rendered as React text (D32).
 import type { ReactNode } from "react";
-import { AlertTriangle, ArrowUpRight, Inbox, Info, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, Inbox, Info, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -156,20 +156,21 @@ export function N({ n }: { n: number | null | undefined }) {
 /** External links only open http(s) URLs (D32); safeHref turns anything else into no link. */
 export const ARTICLE_LINK_LABEL = "Open the original article in a new tab";
 
-/** The one external-link style: a ↗ icon that opens the original page in a new tab. Nothing when the URL isn't http(s). */
+/** The one external-link style: "Source" with the external-link icon (box with arrow), opening the original page in
+ *  a new tab. Nothing when the URL isn't http(s). */
 export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className }: { href: string | null | undefined; label?: string; className?: string }) {
   const safe = safeHref(href);
   if (!safe) return null;
   return (
     <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={aria} title={aria}
       onClick={(e) => e.stopPropagation()}
-      className={cn("inline-flex shrink-0 items-center rounded text-mute hover:text-jgreen-d focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
-      <ArrowUpRight className="size-3.5" aria-hidden="true" />
+      className={cn("inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[11px] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
+      Source<ExternalLink className="size-3" aria-hidden="true" />
     </a>
   );
 }
 
-/** The one link convention for an item: the title opens the side drawer, the ↗ icon opens the original article. */
+/** The one link convention for an item: the title opens the side drawer, "Source" opens the original article. */
 export function ItemTitle({ title, url, onOpen, className }: {
   title: string; url?: string | null; onOpen?: () => void; className?: string;
 }) {

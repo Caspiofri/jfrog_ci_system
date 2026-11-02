@@ -75,7 +75,7 @@ export function CapabilityMatrix() {
         {marks.stale ? <span className="inline-flex items-center gap-1"><i className="inline-block size-2.5 rounded-sm ring-1 ring-black/10" style={{ background: STALE_BG }} aria-hidden /><StaleMark />: the source page could not be re-checked</span> : null}
         {marks.changed ? <span className="inline-flex items-center gap-1"><i className="inline-block size-2.5 rounded-sm ring-1 ring-black/10" style={{ background: CHANGED_BG }} aria-hidden /><ChangedMark text="changed + date" />: found by change detection on that date</span> : null}
         {marks.review ? <span className="inline-flex items-center gap-1"><ReviewMark />: an analyst should confirm this value</span> : null}
-        <span>↗ opens the source page · hover or focus a cell for its full text, source and date</span>
+        <span>Source opens the page a value came from · hover or focus a cell for its full text, source and date</span>
       </div>
       {loading ? <div className="py-4 text-xs text-mute" role="status">Loading the head-to-head data…</div> : (
         <div className="overflow-x-auto" data-matrix>

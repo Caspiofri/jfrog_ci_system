@@ -1,5 +1,5 @@
 // npm test: one link convention on every screen. An item title opens the side drawer (ItemTitle);
-// the only external link is the ↗ icon (ArticleLink), which opens the original page in a new tab.
+// the only external link is "Source" with the external-link icon (ArticleLink), opening the original page in a new tab.
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -18,14 +18,16 @@ test("only ArticleLink opens a new tab", () => {
   assert.deepEqual(hits.map((p) => p.replace(SRC, "")), ["components/ci.tsx"]);
   const ci = read(join(SRC, "components/ci.tsx"));
   assert.equal(ci.match(/target="_blank"/g).length, 1, "one external-link element in ci.tsx");
-  assert.match(ci, /export function ArticleLink[\s\S]*?target="_blank"[\s\S]*?<ArrowUpRight/);
+  assert.match(ci, /export function ArticleLink[\s\S]*?target="_blank"[\s\S]*?Source<ExternalLink/);
 });
 
-test("no other link style is left: no text link to an article, no second icon", () => {
+test("no other link style is left: no text link to an article, no chain-link or arrow icon", () => {
   for (const p of APP) {
     const s = read(p);
     assert.doesNotMatch(s, /<ExtLink\b/, `${p} still uses ExtLink`);
-    assert.doesNotMatch(s, /\bExternalLink\b/, `${p} still uses the old ExternalLink icon`);
+    assert.doesNotMatch(s, /\b(Link2|Link2Off|LinkIcon|Unlink)\b|🔗/, `${p} has a chain-link icon`);
+    if (!p.endsWith("components/ci.tsx")) assert.doesNotMatch(s, /<ExternalLink\b/, `${p} draws its own external-link icon`);
+    assert.doesNotMatch(s, /↗/, `${p} still shows the bare arrow`);
     assert.doesNotMatch(s, /Open the source</, `${p} still has a text link to the source`);
   }
 });
@@ -35,7 +37,7 @@ test("every item list opens the drawer from the title and the article from the i
     const s = read(join(SRC, f));
     assert.match(s, /<ItemTitle\b[^>]*onOpen=\{/, `${f}: the title opens the drawer`);
   }
-  assert.match(read(join(SRC, "components/ItemDrawer.tsx")), /<ArticleLink\b/, "the drawer has the ↗ icon");
+  assert.match(read(join(SRC, "components/ItemDrawer.tsx")), /<ArticleLink\b/, "the drawer has the Source control");
 });
 
 test("the icon is reachable by keyboard and named for screen readers", () => {

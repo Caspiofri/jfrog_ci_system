@@ -24,7 +24,7 @@ function CellView({ c }: { c: Cell }) {
       <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-mute">
         {c.state === "stale" ? <Tag className="bg-[#fff4e0] text-[#8a5a00]" title={c.stale_reason}>Stale{c.stale_reason ? `: ${c.stale_reason}` : ""}</Tag> : null}
         {c.needs_review ? <Tag className="bg-[#fffaf0] text-[#8a5a00]" title={c.review_reason}>Needs review</Tag> : null}
-        {c.source_url ? <span className="inline-flex items-center gap-0.5">source<ArticleLink href={c.source_url} label="Open the source page in a new tab" /></span> : null}
+        {c.source_url ? <ArticleLink href={c.source_url} label="Open the source page in a new tab" /> : null}
         {c.as_of ? <span>as of {fmtDate(c.as_of, true)}</span> : null}
         {c.note ? <span>· {c.note}</span> : null}
       </span>
