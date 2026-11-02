@@ -33,7 +33,7 @@ test("no other link style is left: no text link to an article, no chain-link or 
 });
 
 test("every item list opens the drawer from the title and the article from the icon", () => {
-  for (const f of ["components/ItemRow.tsx", "components/brief/BriefCard.tsx", "app/log/page.tsx", "components/competitors/parts.tsx", "app/brief/page.tsx"]) {
+  for (const f of ["components/ItemRow.tsx", "components/brief/BriefCard.tsx", "app/log/page.tsx", "components/competitors/parts.tsx"]) {
     const s = read(join(SRC, f));
     assert.match(s, /<ItemTitle\b[^>]*onOpen=\{/, `${f}: the title opens the drawer`);
   }
@@ -45,4 +45,14 @@ test("the icon is reachable by keyboard and named for screen readers", () => {
   assert.match(ci, /ARTICLE_LINK_LABEL = "Open the original article in a new tab"/);
   assert.match(ci, /aria-label=\{aria\}/);
   assert.match(ci, /focus-visible:/);
+});
+
+test("insights: the whole claim card (score included) opens the cited item; its only text link is Source to the article", () => {
+  const brief = read(join(SRC, "app/brief/page.tsx"));
+  const claim = brief.slice(brief.indexOf("function ClaimBlock"), brief.indexOf("function SourceLine"));
+  const line = brief.slice(brief.indexOf("function SourceLine"), brief.indexOf("\n}\n", brief.indexOf("function SourceLine")));
+  assert.match(claim, /<li role="button" tabIndex=\{ids\[0\] \? 0 : -1\}[\s\S]*?onClick=\{\(e\) => \{ e\.stopPropagation\(\); openFromRow\(e, open\); \}\}/);
+  assert.match(claim, /e\.key === "Enter" \|\| e\.key === " "/);
+  assert.doesNotMatch(line, /Source:|\{it\.title\}|<ItemTitle/);
+  assert.equal((line.match(/<ArticleLink\b/g) ?? []).length, 1);
 });

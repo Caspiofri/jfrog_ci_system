@@ -3,7 +3,7 @@ import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, Newspaper, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArticleLink, Async, Empty, ErrorNote, Hint, ImportanceLegend, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, Empty, ErrorNote, Hint, ImportanceLegend, Loading, PageHead, Panel, Tag, openFromRow } from "@/components/ci";
 import { cn } from "@/lib/utils";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
@@ -453,11 +453,17 @@ const SCORE_TIP = "Importance of the cited item";
 /** One claim as one block: the quoted item's score down the left side, then the claim, its quote, and its sources.
  * When a claim cites several items, each extra source line carries its own small score. */
 function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }) {
+  const drawer = useItemDrawer();
   const ids = [...new Set([c.quote_item_id, ...c.item_ids].filter(Boolean))];
   const main = useCitedItem(ids[0] ?? "", ids[0] ? cited.get(ids[0]) : undefined);
   const [bg, fg] = SCORE_COLOR[main.score ?? 0] ?? SCORE_COLOR[0];
+  const open = () => ids[0] && drawer.open(ids[0]);
+  // the whole claim card, score included, opens the cited item's details; its only link is Source (the article)
   return (
-    <li className="flex gap-2.5 text-xs">
+    <li role="button" tabIndex={ids[0] ? 0 : -1} aria-label={`Open the item behind: ${c.text}`} data-claim-card
+      onClick={(e) => { e.stopPropagation(); openFromRow(e, open); }}
+      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
+      className="flex cursor-pointer gap-2.5 rounded border border-line bg-white p-2 text-xs transition-colors hover:border-jgreen hover:bg-page focus-visible:outline-2 focus-visible:outline-jgreen">
       <span title={SCORE_TIP} className="flex w-7 shrink-0 items-center justify-center self-stretch rounded text-sm font-semibold tabular-nums"
         style={{ background: bg, color: fg }}>
         {main.score ?? "–"}
@@ -472,19 +478,19 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
   );
 }
 
-/** "Source: <title>" (opens the drawer), "not in this Brief" when it applies, link to the full article. */
+/** One cited item's line: its score when it isn't the claim's first item, "not in this Brief" when it applies, and
+ *  the one link, Source, to the article. No title: the claim card itself opens the item's details. */
 function SourceLine({ id, row, withScore }: { id: string; row?: CitedItemRow; withScore: boolean }) {
   const drawer = useItemDrawer();
   const it = useCitedItem(id, row);
   const [bg, fg] = SCORE_COLOR[it.score ?? 0] ?? SCORE_COLOR[0];
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-mute">
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-mute" data-source-line={id}>
       {withScore ? (
-        <span title={SCORE_TIP} className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums"
-          style={{ background: bg, color: fg }}>{it.score ?? "–"}</span>
+        <button type="button" title={`${SCORE_TIP} · open this item`} onClick={(e) => { e.stopPropagation(); drawer.open(id); }}
+          className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums"
+          style={{ background: bg, color: fg }}>{it.score ?? "–"}</button>
       ) : null}
-      <span>Source:</span>
-      <ItemTitle title={it.title} onOpen={() => drawer.open(id)} />
       {it.outside ? (
         <Tag className="text-[10px]"
           title={it.belowLine ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
