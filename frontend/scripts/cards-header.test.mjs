@@ -15,11 +15,13 @@ test("totals sum the six competitors' cards; Industry is not a competitor", () =
 
 const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
 
-test("a clear header above the cards: title, the window, published and awaiting-review totals, a visible explanation", () => {
+test("a clear header above the cards: title, the window, totals; the explanation in the (i) hint", () => {
   assert.match(page, /Published competitor items <span[^>]*>· found \{fmtDate\(d\.week\.start\)\}–\{fmtDate\(d\.week\.end\)\}/);
   assert.match(page, /\{cardTotals\(d\.items\)\.published\}<\/b> published/);
   assert.match(page, /\{cardTotals\(d\.items\)\.queued\}<\/b> awaiting review/);
   assert.match(page, /CARDS_EXPLAIN =[\s\S]*?published to analysts; items still queued for an analyst are not in it/);
+  assert.match(page, /<InfoHint text=\{`\$\{CARDS_EXPLAIN\} Queue level: \$\{label\(LEVEL_LABEL, d\.level\)\}\.`\} label="What the cards count" \/>/);
+  assert.doesNotMatch(page, /data-cards-explain/);
   assert.ok(page.indexOf("data-cards-header") < page.indexOf("<CompetitorCardView"), "above the cards");
   assert.doesNotMatch(page, /counted by discovery time; published items only/);
 });
