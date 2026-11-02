@@ -392,16 +392,18 @@ function AiLabel() {
 
 /** A claim's JFrog quote with the capability it comes from: the claim's own field, or the one sheet row that holds
  *  the quote exactly. With neither, the quote as before, credited to the capability sheet. */
+const JFROG_LINE_TIP =
+  "AI comparison, not from the article: the insight writer paired this claim with a line from JFrog's own capability sheet.";
+
 function JfrogQuote({ c }: { c: Claim }) {
   const cap = claimCapability(c, CAPABILITY_ROWS);
   return (
-    <div data-jfrog-quote={cap.source}
-      className={cap.key ? "rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2 py-0.5 text-jgreen-d" : "text-mute"}>
-      {cap.key ? (
-        <><b className="font-semibold">JFrog {CAPABILITY_NAME[cap.key]}:</b> <span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span></>
-      ) : (
-        <><span className="italic">&ldquo;{c.jfrog_quote}&rdquo;</span> — JFrog capability sheet</>
-      )}
+    <div data-jfrog-quote={cap.source} title={JFROG_LINE_TIP}
+      className={cap.key ? "mt-1 flex items-start gap-1 rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2 py-0.5 text-jgreen-d" : "mt-1 flex items-start gap-1 text-mute"}>
+      <Sparkles className="mt-0.5 size-3 shrink-0" aria-label="AI" />
+      <span>
+        <b className="font-semibold">Compared with JFrog{cap.key ? ` ${CAPABILITY_NAME[cap.key]}` : ""}</b> (JFrog capability sheet): {c.jfrog_quote}
+      </span>
     </div>
   );
 }

@@ -43,9 +43,13 @@ test("Touches JFrog: distinct capabilities in the order of the 7; none when no c
 
 const brief = readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8");
 
-test("the claim shows 'JFrog <capability>:' before the quote, or the quote credited to the sheet", () => {
-  assert.match(brief, /JFrog \{CAPABILITY_NAME\[cap\.key\]\}:<\/b> <span className="italic">&ldquo;\{c\.jfrog_quote\}&rdquo;/);
-  assert.match(brief, /&ldquo;\{c\.jfrog_quote\}&rdquo;<\/span> — JFrog capability sheet/);
+test("the claim's JFrog line is marked as an AI comparison from JFrog's capability sheet, not an article quote", () => {
+  const line = brief.slice(brief.indexOf("function JfrogQuote"), brief.indexOf("\n}\n", brief.indexOf("function JfrogQuote")));
+  assert.match(line, /<Sparkles [^>]*aria-label="AI" \/>/);
+  assert.match(line, /Compared with JFrog\{cap\.key \? ` \$\{CAPABILITY_NAME\[cap\.key\]\}` : ""\}<\/b> \(JFrog capability sheet\): \{c\.jfrog_quote\}/);
+  assert.match(line, /title=\{JFROG_LINE_TIP\}/);
+  assert.match(brief, /AI comparison, not from the article/);
+  assert.doesNotMatch(line, /italic|&ldquo;/, "not styled like the article's quote");
 });
 
 test("the chip is in the header, visible while collapsed", () => {
@@ -56,7 +60,7 @@ test("the chip is in the header, visible while collapsed", () => {
 });
 
 test("a named capability line is green like the Touches JFrog chip; an unnamed quote stays muted", () => {
-  assert.match(brief, /className=\{cap\.key \? "[^"]*bg-\[#eef7f0\][^"]*text-jgreen-d" : "text-mute"\}/);
+  assert.match(brief, /className=\{cap\.key \? "[^"]*bg-\[#eef7f0\][^"]*text-jgreen-d" : "[^"]*text-mute"\}/);
   assert.match(brief, /<Tag className="[^"]*bg-\[#eef7f0\][^"]*text-jgreen-d">\s*Touches JFrog/);
 });
 

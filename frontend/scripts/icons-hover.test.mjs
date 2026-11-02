@@ -12,7 +12,7 @@ test("insights: one AI label with sparkles, the visible text and the exact hover
   assert.match(brief, /const AI_LABEL = "AI-generated — check the cited sources";/);
   assert.match(brief, /const AI_HINT =\s*"AI-written summary that connects several stories\. Checked on a small sample \(1 Nov: 4 insights, 12 claims\): facts were well supported \(11 of 12 claims\), but some conclusions were stronger than the evidence\. Open the cited sources before sharing\.";/);
   assert.match(brief, /function AiLabel[\s\S]*?<Hint text=\{AI_HINT\}>[\s\S]*?<Sparkles[\s\S]*?\{AI_LABEL\}/);
-  assert.equal((brief.match(/<Sparkles\b/g) ?? []).length, 1, "one AI icon");
+  assert.equal((brief.match(/<Sparkles\b/g) ?? []).length, 2, "the insights label, plus the AI mark on a claim's JFrog comparison line");
   assert.equal((brief.match(/<AiLabel \/>/g) ?? []).length, 1, "one AI label");
   for (const f of ["app/brief/page.tsx", "components/health/parts.tsx", "components/ci.tsx"]) {
     const s = read(f).replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "");
