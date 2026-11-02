@@ -5,7 +5,7 @@ import Link from "next/link";
 import { History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArticleLink, Async, ColorLegend, Tag } from "@/components/ci";
-import { path, useApi } from "@/lib/api";
+import { path, useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import type { Cell, CellHistoryRow, H2HAxis, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -42,7 +42,8 @@ function CellView({ c }: { c: Cell }) {
 }
 
 function HistoryRows({ who, axis, name }: { who: string; axis: string; name: string }) {
-  const q = useApi<Page<CellHistoryRow> & { competitor: string; axis: string }>(path(`/competitors/${encodeURIComponent(who)}/cells/${encodeURIComponent(axis)}/history`));
+  const q = useRecord<Page<CellHistoryRow> & { competitor: string; axis: string }>(
+    path(`/competitors/${encodeURIComponent(who)}/cells/${encodeURIComponent(axis)}/history`), `${who}/${axis}`, (d) => `${d.competitor}/${d.axis}`);
   return (
     <div>
       <div className="mb-1 text-xs font-semibold text-mute">{name}</div>

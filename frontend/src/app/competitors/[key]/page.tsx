@@ -10,7 +10,7 @@ import { ItemRow } from "@/components/ItemRow";
 import { ActivityChart } from "@/components/competitors/ActivityChart";
 import { HeadToHead } from "@/components/competitors/HeadToHead";
 import { DealsTable, MixBar, Trend } from "@/components/competitors/parts";
-import { path, useApi } from "@/lib/api";
+import { path, useRecord } from "@/lib/api";
 import { CATEGORY_COLOR, fmtDate } from "@/lib/format";
 import { useUrlState } from "@/lib/useParams";
 import type { CompetitorProfile } from "@/lib/types";
@@ -29,7 +29,7 @@ function Profile() {
   const { key } = useParams<{ key: string }>();
   const { get, set } = useUrlState();
   const offset = Number(get("offset") || 0);
-  const q = useApi<CompetitorProfile>(path(`/competitors/${encodeURIComponent(key)}`, { limit: PAGE, offset }));
+  const q = useRecord<CompetitorProfile>(path(`/competitors/${encodeURIComponent(key)}`, { limit: PAGE, offset }), key, (d) => d.key);
   return (
     <>
       <div>

@@ -3,7 +3,7 @@
 // head-to-head data holds them; no comparison, no verdict (the analyst draws the conclusion).
 import { ArticleLink, ErrorNote, Hint, Panel } from "@/components/ci";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
-import { useApi } from "@/lib/api";
+import { useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import { STATE_INFO, STATE_ORDER, anyMark, buildMatrix, type DataState, type MatrixCell } from "@/lib/matrix";
 import { Check, Clock, HelpCircle, Minus } from "lucide-react";
@@ -73,7 +73,7 @@ export const CAPTION = "Colour shows what we found on each competitor's public p
 export function CapabilityMatrix() {
   const { data: meta } = useMeta();
   const keys = (meta?.competitors ?? []).filter((c) => !c.is_industry && c.key !== "industry").map((c) => c.key).slice(0, 6);
-  const q = [0, 1, 2, 3, 4, 5].map((i) => useApi<CompetitorProfile>(keys[i] ? `/api/v1/competitors/${encodeURIComponent(keys[i])}` : null)); // eslint-disable-line react-hooks/rules-of-hooks
+  const q = [0, 1, 2, 3, 4, 5].map((i) => useRecord<CompetitorProfile>(keys[i] ? `/api/v1/competitors/${encodeURIComponent(keys[i])}` : null, keys[i], (d) => d.key)); // eslint-disable-line react-hooks/rules-of-hooks
   const loading = !meta || q.slice(0, keys.length).some((x) => !x.data && !x.error);
   const errors = q.filter((x) => x.error);
   const profiles = keys.map((k, i) => ({ key: k, name: q[i].data?.name ?? k, axes: q[i].data?.head_to_head?.axes }));

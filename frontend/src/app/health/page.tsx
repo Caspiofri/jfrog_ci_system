@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { Async, Empty, ErrorNote, KpiTile, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ChangeDetection, Coverage, EvalCards, Extraction, Funnel, LivenessAlert, MARKER, RunHistory, SilentAlert, SilentTable, SourcesTable, TestEvalBlock } from "@/components/health/parts";
-import { path, useApi } from "@/lib/api";
+import { path, useApi, useRecord } from "@/lib/api";
 import { LEVEL_LABEL, delta, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
@@ -21,7 +21,8 @@ function HealthScreen() {
   const { get, set } = useUrlState();
   const runId = get("run");
   const runs = useApi<Page<RunInfo>>(path("/runs", { limit: 50 }));
-  const q = useApi<Health>(path("/health", { run_id: runId || undefined }));
+  // a chosen run: shown only when the response is that run; the latest run (no choice) has nothing to match
+  const q = useRecord<Health>(path("/health", { run_id: runId || undefined }), runId || "latest", (d) => (runId ? d.run?.run_id : "latest"));
   return (
     <>
       <PageHead
@@ -109,7 +110,7 @@ type Tile = { key: string; label: string; value: number; prev: number | null };
 function BriefCounts() {
   const { data: meta } = useMeta();
   const date = meta?.latest_brief_date;
-  const q = useApi<Brief>(date ? path("/brief", { date, limit: 1 }) : null);
+  const q = useRecord<Brief>(date ? path("/brief", { date, limit: 1 }) : null, date, (b) => b.date);
   const briefs = useApi<Page<BriefRow>>(path("/briefs", { limit: 200 }));
   const b = q.data;
   const rows = briefs.data?.items ?? [];

@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { ArticleLink, Async, CategoryTag, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { LensView } from "@/components/LensView";
 import { ReopenButton } from "@/components/review/actions";
-import { useApi } from "@/lib/api";
+import { useRecord } from "@/lib/api";
 import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { FieldChange, ItemAction, ItemDetail, Lens, LensStatus, Meta } from "@/lib/types";
@@ -53,7 +53,8 @@ function LensBlock({ lens, status }: { lens?: Lens | null; status?: LensStatus |
 
 function DrawerBody({ id }: { id: string }) {
   const { data: meta } = useMeta();
-  const q = useApi<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`);
+  // only the requested item, never the previous one (a 404 or a slow earlier response shows an error or loading)
+  const q = useRecord<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`, id, (d) => d.item?.item_id);
   return (
     <>
       <SheetHeader className="px-5 pt-5 pb-0">

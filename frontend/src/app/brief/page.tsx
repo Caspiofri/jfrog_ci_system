@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
-import { ApiError, path, send, useApi } from "@/lib/api";
+import { ApiError, path, send, useApi, useRecord } from "@/lib/api";
 import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
@@ -47,8 +47,9 @@ function BriefScreen() {
   const offset = Number(get("offset") || 0);
   const [hl, setHl] = useState<string | null>(null);
 
-  const raw = useApi<Brief>(
+  const raw = useRecord<Brief>(
     briefs.data ? path("/brief", { date: date || undefined, competitor, category, limit: all ? PAGE : TOP, offset: all ? offset : 0 }) : null,
+    date, (b) => b.date,
   );
   const mock = useMock();
   const scenario = MOCK && mock ? get("mock") : "";
@@ -406,7 +407,7 @@ function ContinuityBadge({ c }: { c: Insight["continuity"] }) {
 /** A cited item's row: served in insights.cited_items, or fetched (same SWR key as the drawer) when it wasn't.
  * A fetched item has no in_brief, so no "not in this Brief" tag is shown for it. */
 function useCitedItem(id: string, row?: CitedItemRow) {
-  const q = useApi<ItemDetail>(row || !id ? null : `/api/v1/items/${encodeURIComponent(id)}`);
+  const q = useRecord<ItemDetail>(row || !id ? null : `/api/v1/items/${encodeURIComponent(id)}`, id, (d) => d.item?.item_id);
   const it = row ?? q.data?.item;
   return {
     title: it ? it.title : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`,
