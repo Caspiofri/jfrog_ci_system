@@ -9,7 +9,7 @@ import { LEVEL_LABEL, fmtDate, label } from "@/lib/format";
 import type { Competitors } from "@/lib/types";
 
 const CARDS_EXPLAIN =
-  "Each card counts a competitor's relevant articles found in the last 7 days. The big number is what was published to analysts; items still queued for an analyst are not in it and show as \"awaiting review\". Noise and dismissed items are left out. The Industry card holds market news with no tracked competitor.";
+  "All published and awaiting-review items per competitor, found in the last 7 days. Noise and dismissed items are left out; Industry is market news with no tracked competitor.";
 
 export default function CompetitorsPage() {
   const q = useApi<Competitors>("/api/v1/competitors");
