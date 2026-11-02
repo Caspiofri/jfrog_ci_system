@@ -47,12 +47,15 @@ test("the icon is reachable by keyboard and named for screen readers", () => {
   assert.match(ci, /focus-visible:/);
 });
 
-test("insights: the whole claim card (score included) opens the cited item; its only text link is Source to the article", () => {
+test("insights: a claim card is not clickable; each cited article has a \"Reinforced by article\" button and one Source link", () => {
   const brief = read(join(SRC, "app/brief/page.tsx"));
   const claim = brief.slice(brief.indexOf("function ClaimBlock"), brief.indexOf("function SourceLine"));
   const line = brief.slice(brief.indexOf("function SourceLine"), brief.indexOf("\n}\n", brief.indexOf("function SourceLine")));
-  assert.match(claim, /<li role="button" tabIndex=\{ids\[0\] \? 0 : -1\}[\s\S]*?onClick=\{\(e\) => \{ e\.stopPropagation\(\); openFromRow\(e, open\); \}\}/);
-  assert.match(claim, /e\.key === "Enter" \|\| e\.key === " "/);
-  assert.doesNotMatch(line, /Source:|\{it\.title\}|<ItemTitle/);
+  assert.doesNotMatch(claim, /role="button"|onClick|onKeyDown|cursor-pointer/);
+  assert.match(claim, /n=\{ids\.length > 1 \? k \+ 1 : null\}/, "numbered only when a claim cites several articles");
+  assert.match(line, /<button type="button"[^>]*onClick=\{\(\) => drawer\.open\(id\)\}/);
+  assert.match(line, /Reinforced by article\{n \? ` \$\{n\}` : ""\}/);
+  assert.equal((line.match(/<button\b/g) ?? []).length, 1, "the score is no longer a second button");
+  assert.doesNotMatch(line, /Source:|\{it\.title\}<|<ItemTitle/);
   assert.equal((line.match(/<ArticleLink\b/g) ?? []).length, 1);
 });

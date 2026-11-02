@@ -3,10 +3,10 @@ import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, Newspaper, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArticleLink, Async, Empty, ErrorNote, Hint, ImportanceLegend, Loading, PageHead, Panel, Tag, openFromRow } from "@/components/ci";
+import { ArticleLink, Async, Empty, ErrorNote, Hint, ImportanceLegend, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { cn } from "@/lib/utils";
 import { FilterSelect } from "@/components/FilterSelect";
-import { type ClaimContext, useItemDrawer } from "@/components/ItemDrawer";
+import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
 import { ApiError, path, send, useApi, useRecord } from "@/lib/api";
 import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
@@ -366,7 +366,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
               </button>
               {open ? (
                 <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0" onClick={(e) => e.stopPropagation()}>
-                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} insight={ins.title} />)}
+                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} />)}
                 </ul>
               ) : null}
             </div>
@@ -450,23 +450,14 @@ function useCitedItem(id: string, row?: CitedItemRow) {
 
 const SCORE_TIP = "Importance of the cited item";
 
-/** One claim as one block: the quoted item's score down the left side, then the claim, its quote, and its sources.
- * When a claim cites several items, each extra source line carries its own small score. */
-function ClaimBlock({ c, cited, insight }: { c: Claim; cited: Map<string, CitedItemRow>; insight: string }) {
-  const drawer = useItemDrawer();
+/** One claim as one block: the quoted item's score down the left side, then the claim, its quote, and one line per
+ * cited article. The card itself is not clickable; each article's "Reinforced by article" button opens its side panel. */
+function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }) {
   const ids = [...new Set([c.quote_item_id, ...c.item_ids].filter(Boolean))];
   const main = useCitedItem(ids[0] ?? "", ids[0] ? cited.get(ids[0]) : undefined);
   const [bg, fg] = SCORE_COLOR[main.score ?? 0] ?? SCORE_COLOR[0];
-  // the side panel gets the claim with it: the JFrog quote and its capability live on the claim, not on the item
-  const capKey = claimCapability(c, CAPABILITY_ROWS).key;
-  const ctx = { insight, claim: c.text, quote: c.quote, jfrogQuote: c.jfrog_quote?.trim() || undefined, capability: capKey ? CAPABILITY_NAME[capKey] : null };
-  const open = () => ids[0] && drawer.open(ids[0], ctx);
-  // the whole claim card, score included, opens the cited item's details; its only link is Source (the article)
   return (
-    <li role="button" tabIndex={ids[0] ? 0 : -1} aria-label={`Open the item behind: ${c.text}`} data-claim-card
-      onClick={(e) => { e.stopPropagation(); openFromRow(e, open); }}
-      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); open(); } }}
-      className="flex cursor-pointer gap-2.5 rounded border border-line bg-white p-2 text-xs transition-colors hover:border-jgreen hover:bg-page focus-visible:outline-2 focus-visible:outline-jgreen">
+    <li className="flex gap-2.5 rounded border border-line bg-white p-2 text-xs" data-claim-card>
       <span title={SCORE_TIP} className="flex w-7 shrink-0 items-center justify-center self-stretch rounded text-sm font-semibold tabular-nums"
         style={{ background: bg, color: fg }}>
         {main.score ?? "–"}
@@ -475,24 +466,27 @@ function ClaimBlock({ c, cited, insight }: { c: Claim; cited: Map<string, CitedI
         <div className="text-[13px] font-semibold text-ink">{c.text}</div>
         {c.quote ? <div className="italic text-mute">&ldquo;{c.quote}&rdquo;</div> : null}
         {c.jfrog_quote ? <JfrogQuote c={c} /> : null}
-        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} ctx={ctx} />)}
+        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} n={ids.length > 1 ? k + 1 : null} />)}
       </div>
     </li>
   );
 }
 
-/** One cited item's line: its score when it isn't the claim's first item, "not in this Brief" when it applies, and
- *  the one link, Source, to the article. No title: the claim card itself opens the item's details. */
-function SourceLine({ id, row, withScore, ctx }: { id: string; row?: CitedItemRow; withScore: boolean; ctx?: ClaimContext }) {
+/** One cited article's line: "Reinforced by article" (numbered when the claim cites several) opens its side panel,
+ *  then its score when it isn't the claim's first item, "not in this Brief" when it applies, and Source to the article. */
+function SourceLine({ id, row, withScore, n }: { id: string; row?: CitedItemRow; withScore: boolean; n: number | null }) {
   const drawer = useItemDrawer();
   const it = useCitedItem(id, row);
   const [bg, fg] = SCORE_COLOR[it.score ?? 0] ?? SCORE_COLOR[0];
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-mute" data-source-line={id}>
+      <button type="button" title={`Open the details of: ${it.title}`} onClick={() => drawer.open(id)} data-reinforced-by
+        className="rounded border border-line bg-page px-1.5 py-0.5 font-medium text-ink transition-colors hover:border-jgreen hover:text-jgreen-d focus-visible:outline-2 focus-visible:outline-jgreen">
+        Reinforced by article{n ? ` ${n}` : ""}
+      </button>
       {withScore ? (
-        <button type="button" title={`${SCORE_TIP} · open this item`} onClick={(e) => { e.stopPropagation(); drawer.open(id, ctx); }}
-          className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums"
-          style={{ background: bg, color: fg }}>{it.score ?? "–"}</button>
+        <span title={SCORE_TIP} className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums"
+          style={{ background: bg, color: fg }}>{it.score ?? "–"}</span>
       ) : null}
       {it.outside ? (
         <Tag className="text-[10px]"

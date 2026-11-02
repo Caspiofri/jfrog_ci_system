@@ -62,20 +62,8 @@ test("a named capability line is green like the Touches JFrog chip; an unnamed q
 
 const drawer = readFileSync(new URL("../src/components/ItemDrawer.tsx", import.meta.url), "utf8");
 
-test("a claim card opens the side panel with its claim, quote and JFrog line (green with the capability when matched)", () => {
-  assert.match(brief, /const ctx = \{ insight, claim: c\.text, quote: c\.quote, jfrogQuote: c\.jfrog_quote\?\.trim\(\) \|\| undefined, capability: capKey \? CAPABILITY_NAME\[capKey\] : null \};/);
-  assert.match(brief, /const open = \(\) => ids\[0\] && drawer\.open\(ids\[0\], ctx\);/);
-  assert.match(brief, /drawer\.open\(id, ctx\)/);
-  assert.match(drawer, /\{ctx \? <ClaimBlockInDrawer c=\{ctx\} \/> : null\}/);
-  assert.match(drawer, /This article is cited in the insight/);
-  assert.match(drawer, /the claim is the insight&apos;s own wording, not the article&apos;s/);
-  assert.match(drawer, /Quoted from this article: /);
-  assert.match(drawer, /Article headline · item \{id\}/);
-  assert.match(drawer, /c\.capability \? "[^"]*bg-\[#eef7f0\][^"]*text-jgreen-d" : "text-mute"/);
-  assert.match(drawer, /JFrog \{c\.capability\}:<\/b> <span className="italic">&ldquo;\{c\.jfrogQuote\}&rdquo;/);
-  assert.match(drawer, /&ldquo;\{c\.jfrogQuote\}&rdquo;<\/span> — JFrog capability sheet/);
-});
-
-test("opening the panel from anywhere else clears the claim, so it never sticks to another item", () => {
-  assert.match(drawer, /const open = useCallback\(\(x: string, c\?: ClaimContext\) => \{ setId\(x\); setCtx\(c \?\? null\); \}, \[\]\);/);
+test("the side panel carries no insight claim block; the claim and its JFrog line stay on the claim card", () => {
+  assert.doesNotMatch(drawer, /ClaimContext|ClaimBlockInDrawer|This article is cited in the insight/);
+  assert.match(drawer, /const open = useCallback\(\(x: string\) => setId\(x\), \[\]\);/);
+  assert.match(brief, /\{c\.jfrog_quote \? <JfrogQuote c=\{c\} \/> : null\}/);
 });
