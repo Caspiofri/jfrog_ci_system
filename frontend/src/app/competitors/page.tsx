@@ -4,7 +4,6 @@ import { CompetitorCardView, DealsTable } from "@/components/competitors/parts";
 import { CapabilityMatrix } from "@/components/competitors/Matrix";
 import { ActivityHeatmap } from "@/components/competitors/Heatmap";
 import { useApi } from "@/lib/api";
-import { cardTotals } from "@/lib/cardTotals";
 import { LEVEL_LABEL, fmtDate, label } from "@/lib/format";
 import type { Competitors } from "@/lib/types";
 
@@ -12,7 +11,7 @@ const PAGE_INFO =
   "JFrog's tracked competitors and how they compare with JFrog: what each one's public pages state on the 7 JFrog capabilities, where they were active this week, and their published items. It shows what was found, not a verdict.";
 
 const CARDS_EXPLAIN =
-  "All published and awaiting-review items per competitor, counted by the date they were found, in the last 7 days. Noise and dismissed items are left out; Industry is market news with no tracked competitor.";
+  "The big number on each card counts that competitor's published items, by the date they were found, in the last 7 days. Items awaiting review are not in it; they show as a separate \"awaiting review\" tag. Industry is market news with no tracked competitor.";
 
 export default function CompetitorsPage() {
   const q = useApi<Competitors>("/api/v1/competitors");
@@ -29,11 +28,6 @@ export default function CompetitorsPage() {
                 Published competitor items <span className="text-sm font-normal text-mute">· found {fmtDate(d.week.start)}–{fmtDate(d.week.end)}</span>
                 <InfoHint text={`${CARDS_EXPLAIN} Queue level: ${label(LEVEL_LABEL, d.level)}.`} label="What the cards count" />
               </h2>
-              <p className="m-0 flex flex-wrap items-baseline gap-x-3 text-sm">
-                <span><b className="text-xl font-semibold tabular-nums">{cardTotals(d.items).published}</b> published</span>
-                <span><b className="text-xl font-semibold tabular-nums text-[#8a5a00]">{cardTotals(d.items).queued}</b> awaiting review</span>
-                <span className="text-xs text-mute">across the six competitors</span>
-              </p>
             </section>
             <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
               {d.items.map((c) => <CompetitorCardView key={c.key} c={c} />)}
