@@ -295,11 +295,14 @@ export function HBars({ rows, color = "var(--bar)", max: fixedMax }: { rows: { l
 }
 
 /** The 4 KPI tiles. */
-export function KpiTile({ value, label: l, sub }: { value: ReactNode; label: string; sub?: ReactNode }) {
+export function KpiTile({ value, label: l, sub, future = false }: { value: ReactNode; label: string; sub?: ReactNode; future?: boolean }) {
   return (
-    <div className="rounded-md border border-line bg-card px-[18px] py-4">
+    <div className={cn("rounded-md border border-line bg-card px-[18px] py-4", future && "border-dashed opacity-70")} data-future={future ? "1" : undefined}>
       <div className="text-[30px] font-semibold leading-[1.1] tabular-nums">{value}</div>
-      <div className="mt-1 text-mute">{l}</div>
+      <div className="mt-1 flex items-center gap-1.5 text-mute">
+        {l}
+        {future ? <Tag className="bg-[#e8eefb] text-[10px] font-semibold uppercase tracking-wide text-[#3f5b8f]">Future</Tag> : null}
+      </div>
       {sub ? <div className="mt-1.5 text-xs">{sub}</div> : null}
     </div>
   );

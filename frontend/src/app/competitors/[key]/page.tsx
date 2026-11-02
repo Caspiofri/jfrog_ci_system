@@ -56,7 +56,7 @@ function Profile() {
                 <KpiTile value={c.items_7d} label="Published in 7 days" sub={<Trend t={c.trend} prev={c.items_prev_7d} />} />
                 <KpiTile value={c.items_today} label="In this Brief" />
                 <KpiTile value={c.pending_review} label="Awaiting review" sub={c.pending_max_score ? <span className="text-mute">highest score {c.pending_max_score}</span> : undefined} />
-                <KpiTile value={c.head_to_head_changes ?? "—"} label="Head-to-head changes" sub={<span className="text-mute">{c.tracked_changes ?? 0} tracked-page changes</span>} />
+                <KpiTile future value={c.head_to_head_changes ?? "—"} label="Head-to-head changes" sub={<span className="text-mute">{c.tracked_changes ?? 0} tracked-page changes</span>} />
               </div>
 
               <Panel title="What happened this week?">

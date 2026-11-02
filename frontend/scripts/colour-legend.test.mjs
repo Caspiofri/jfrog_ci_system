@@ -70,3 +70,8 @@ test("Importance legend names every score, 2 and 1 in the rubric's own words", a
   assert.match(RUBRIC[2].competitor, /^No new event, but intelligence value/); // rubric v2 row 2, verbatim
   assert.match(RUBRIC[1].competitor, /^A routine operational event/); // rubric v2 row 1, verbatim
 });
+
+test("competitor profile: the head-to-head changes tile is marked Future", () => {
+  assert.match(profile, /<KpiTile future value=\{c\.head_to_head_changes \?\? "—"\} label="Head-to-head changes"/);
+  assert.match(ci, /\{future \? <Tag[^>]*>Future<\/Tag> : null\}/);
+});
