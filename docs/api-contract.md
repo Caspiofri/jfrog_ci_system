@@ -665,3 +665,25 @@ These three bodies are `{"error": {code, message, details}}` with no `meta`.
 - **Still one action** in the history: `action: "edit"`, `note` = the shared `note`, and `payload.changes: [{field, old, new, note}]`, one per changed field (`old` is the value the API showed before the edit). The response carries the same `changes`.
 - **Candidates:** `evals/analyst_labels.jsonl` gets one line per changed field: `{"id", "field", "old", "new", "note", "source": "analyst", "action_id", "at"}`. Lines written before 1 Nov have the old shape: one per edit, `{"id", <field>: <new value>…, "note", "source", "at"}`, with no old value.
 - **Where it shows:** `GET /items/{id}` → `actions[].payload.changes`. Log rows don't carry edits.
+
+## 14. Insight continuity (1 Nov; as built, API layer only)
+
+`GET /api/v1/brief` → each item of `insights.items` gains `continuity`, and `insights` gains `previous`. It is computed per request from the stored `story_ids` of this Brief's insights and of the previous Brief's (the generation each Brief shows). No model call; nothing is stored; `ci/insights.py` is unchanged.
+
+```json
+"continuity": {"status": "strengthened", "since": "2026-10-31", "new_stories": 1, "matched": ["ins_2026-10-31_1"]},
+"previous":   {"date": "2026-10-31", "status": "ok", "insights": 4, "unmatched": 0, "unmatched_ids": []}
+```
+
+- **Match:** a previous insight with the same `pattern` that shares at least 2 stories.
+
+  | `status` | When | `since` | `new_stories` |
+  |---|---|---|---|
+  | `new` | no match (sharing stories only with an insight of another pattern is still `new`) | `null` | `null` |
+  | `continuing` | at least one match, no story its matches didn't cite | previous Brief date | `0` |
+  | `strengthened` | at least one match, and it cites stories none of its matches cited | previous Brief date | count of those stories |
+
+- **Several matches:** all are listed in `matched`, and `new_stories` counts against them together.
+- **`since`** is the previous Brief's date, not the first Brief of a longer run of matches.
+- **`previous`:** the previous Brief's `date` (`null` for the first Brief), its generator `status` (`null` when it stored no generation), its number of `insights`, and how many of them (`unmatched`, `unmatched_ids`) no insight of this Brief matches. When the previous Brief has no insights, every insight is `new`.
+- **Story ids** are the generator's own (the id of a story's first, richest item). On 31 Oct → 1 Nov they were stable; a story whose representative item changes between days would count as a different story.
