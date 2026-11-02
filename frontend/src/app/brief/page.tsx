@@ -237,8 +237,6 @@ const AI_LABEL = "AI-generated — check the cited sources";
 const AI_HINT =
   "AI-written summary that connects several stories. Checked on a small sample (1 Nov: 4 insights, 12 claims): facts were well supported (11 of 12 claims), but some conclusions were stronger than the evidence. Open the cited sources before sharing.";
 
-const INSIGHTS_CHECK =
-  "Checked on 1 Nov: 11 of 12 claims supported and 12 of 12 citations correct, but summaries overstated in all 4 insights (n = 4); 0 of 4 expected patterns fully found.";
 
 function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
   date: string; insights: BriefInsights; hl: string | null; setHl: (id: string | null) => void; onRefreshed: () => void;
@@ -281,7 +279,6 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         </Button>
       }
     >
-      <p className="m-0 mb-2 text-xs text-[#44516a]">{INSIGHTS_CHECK}</p>
       {goneLine(insights.previous) ? <p className="m-0 mb-2 text-xs text-ink" data-gone-line>{goneLine(insights.previous)}</p> : null}
       {insights.mock ? <div className="mb-2"><MockTag what="this insights state" /></div> : null}
       {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
