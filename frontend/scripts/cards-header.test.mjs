@@ -19,7 +19,7 @@ test("a clear header above the cards: title, the window, totals; the explanation
   assert.match(page, /Published competitor items <span[^>]*>· found \{fmtDate\(d\.week\.start\)\}–\{fmtDate\(d\.week\.end\)\}/);
   assert.match(page, /\{cardTotals\(d\.items\)\.published\}<\/b> published/);
   assert.match(page, /\{cardTotals\(d\.items\)\.queued\}<\/b> awaiting review/);
-  assert.match(page, /CARDS_EXPLAIN =\s*"All published and awaiting-review items per competitor, found in the last 7 days\. Noise and dismissed items are left out; Industry is market news with no tracked competitor\.";/);
+  assert.match(page, /CARDS_EXPLAIN =\s*"All published and awaiting-review items per competitor, counted by the date they were found, in the last 7 days\. Noise and dismissed items are left out; Industry is market news with no tracked competitor\.";/);
   assert.match(page, /<InfoHint text=\{`\$\{CARDS_EXPLAIN\} Queue level: \$\{label\(LEVEL_LABEL, d\.level\)\}\.`\} label="What the cards count" \/>/);
   assert.doesNotMatch(page, /data-cards-explain/);
   assert.ok(page.indexOf("data-cards-header") < page.indexOf("<CompetitorCardView"), "above the cards");

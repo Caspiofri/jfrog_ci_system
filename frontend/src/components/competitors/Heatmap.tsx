@@ -16,8 +16,7 @@ import { cn } from "@/lib/utils";
 
 export const HEATMAP_CAPTION = "Activity by category, from automatic classification. Last 7 days.";
 /** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
-export const HEATMAP_COUNTS = "Counts items by feed date, published or awaiting review. The competitor cards count published items by the date they were found.";
-export const HEATMAP_DIFF = "So the numbers differ: an article published on 16 Oct but found on 30 Oct (the 14-day import) is in a card's count, not in this grid.";
+export const HEATMAP_COUNTS = "Articles counted by publication date.";
 
 async function getAllRows(url: string): Promise<{ rows: LogRow[]; now: string }> {
   const first = await get<Log>(url);
@@ -43,7 +42,7 @@ export function ActivityHeatmap() {
   const name = (k: string) => comps.find((c) => c.key === k)?.name ?? k;
   const picked = hm && sel ? hm.cells[sel.c]?.[sel.k] : null;
   return (
-    <Panel title="Where competitors are active" info={`${HEATMAP_COUNTS} ${HEATMAP_DIFF}`}>
+    <Panel title="Where competitors are active" info={HEATMAP_COUNTS}>
       <p className="m-0 mb-2 text-xs text-[#44516a]" data-caption>{HEATMAP_CAPTION}</p>
       {q.error ? <ErrorNote error={q.error} onRetry={() => q.mutate()} /> : null}
       {!hm ? (q.error ? null : <div className="py-4 text-xs text-mute" role="status">Counting the last 7 days…</div>) : !hm.total ? (

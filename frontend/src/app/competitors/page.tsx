@@ -12,7 +12,7 @@ const PAGE_INFO =
   "JFrog's tracked competitors and how they compare with JFrog: what each one's public pages state on the 7 JFrog capabilities, where they were active this week, and their published items. It shows what was found, not a verdict.";
 
 const CARDS_EXPLAIN =
-  "All published and awaiting-review items per competitor, found in the last 7 days. Noise and dismissed items are left out; Industry is market news with no tracked competitor.";
+  "All published and awaiting-review items per competitor, counted by the date they were found, in the last 7 days. Noise and dismissed items are left out; Industry is market news with no tracked competitor.";
 
 export default function CompetitorsPage() {
   const q = useApi<Competitors>("/api/v1/competitors");

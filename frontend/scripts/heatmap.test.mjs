@@ -105,11 +105,12 @@ test("the heatmap ends where the competitor cards end (the latest Brief's run), 
   assert.doesNotMatch(comp + readFileSync(new URL("../src/lib/heatmap.ts", import.meta.url), "utf8"), /new Date\(\)|Date\.now\(\)/);
 });
 
-test("each count says what it counts: the heatmap by feed date (published or awaiting review), the cards by the date found", () => {
-  assert.match(comp, /HEATMAP_COUNTS = "Counts items by feed date, published or awaiting review\. The competitor cards count published items by the date they were found\."/);
-  assert.match(comp, /<Panel title="Where competitors are active" info=\{`\$\{HEATMAP_COUNTS\} \$\{HEATMAP_DIFF\}`\}>/);
-  assert.match(comp, /HEATMAP_DIFF = "So the numbers differ: an article published on 16 Oct but found on 30 Oct \(the 14-day import\) is in a card's count, not in this grid\."/);
-  assert.doesNotMatch(comp, /data-counts/);
+test("each count says what it counts: the heatmap by publication date, the cards by the date found", () => {
+  assert.match(comp, /HEATMAP_COUNTS = "Articles counted by publication date\.";/);
+  assert.match(comp, /<Panel title="Where competitors are active" info=\{HEATMAP_COUNTS\}>/);
+  assert.doesNotMatch(comp, /HEATMAP_DIFF|data-counts/);
+  const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /CARDS_EXPLAIN =\s*"All published and awaiting-review items per competitor, counted by the date they were found, in the last 7 days\./);
   const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
   assert.match(parts, /published, found in the last 7 days · \{c\.items_today\} in this Brief/);
 });
