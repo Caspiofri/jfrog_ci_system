@@ -113,6 +113,12 @@ These are design values, not results; the four-way status does not apply.
 | at least 2 stories | Per insight | D37 |
 | 280 characters | Maximum excerpt | D36 |
 | 6,000 characters | Stored text per item | D57 |
+| 1,500 characters | Text the classifier sees per item | `ci/classify.py` (`LLM_TEXT_CHARS`) |
+| 2,500 characters | Text the ranker sees per item | `ci/rank.py` (`LLM_TEXT_CHARS`) |
+| +1, capped at 5 | Mentions JFrog bonus | D14; `ci/rank.py` (`JFROG_BONUS`) |
+| 4 | Snippet cap (was 3 before 30 Oct) | `ci/rank.py` (`SNIPPET_SCORE_CAP`); value not in the PRD (gaps c24) |
+| ×3 | A title mention counts as 3 text mentions when comparing competitors | Tagging rules B3; `ci/classify.py` (`TITLE_WEIGHT`) |
+| under 25 words | Ranker reason length | `ci/rank.py` prompt |
 | 1,500 characters; batches of 10 | Lens input | Lens reference |
 | ≥ 6 characters; 1–200 characters | Lens quote and why checks | Lens reference |
 | ~1 h; ~26 h | Stale and overdue run thresholds | D48 |

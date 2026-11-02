@@ -5,7 +5,8 @@
 > **PROVEN** (measured on data the tuning never saw), **EXPERIMENTAL** (measured, but small n, single labeler, or the
 > tuning data), **PENDING** (planned, not run yet), **FUTURE** (not built). All labels are by one labeler (Ofri).
 > Every sentence that rests on a result not in yet carries a `[PENDING: …]` tag, so one search finds them all.
-> Full list of numbers: `EVIDENCE_TABLE.md`. Open points: `GAPS_AND_QUESTIONS.md`.
+> Full list of numbers: `EVIDENCE_TABLE.md`. Full text of the classify, category and ranking rules: `RULES.md`.
+> Open points: `GAPS_AND_QUESTIONS.md`.
 
 ---
 
@@ -64,11 +65,12 @@ step below names the decision that defines it.
    (`cloudflare_challenge`, `http_403`, `timeout`, `empty`) and the item keeps only its feed teaser (D39).
 4. **Classify: rules first, LLM for the ambiguous** (D24, D25). Rules settle only safe cases: the competitor is the
    subject of the title, or a possessive followed by a listed product word. Everything else goes to Gemini with a hint
-   when one helps. Output: competitor, one of 7 categories (D11), a noise flag and a Mentions JFrog flag.
+   when one helps. Output: competitor, one of 7 categories (D11), a noise flag and a Mentions JFrog flag. Full rule
+   tables, word lists and category definitions: `RULES.md` §2–4.
 5. **Rank on rubric v2** (D29, frozen). Score 1–5 or Noise, by competitive impact on JFrog: 5 a strategic move at
    scale against Artifactory, Xray or Curation; 4 a material change backed by evidence; 3 a relevant development;
    2 content with intelligence value but no event; 1 a routine operational event. Code adds a Mentions JFrog bonus
-   and caps teaser-only items.
+   and caps teaser-only items. Full rubric, anchors and adjustments: `RULES.md` §5.
 6. **Validate.** Every model answer must match a schema: score in range, competitor and category from the config
    lists, item IDs that exist. Anything else is rejected, logged and routed to review (D32).
 7. **JFrog lens** (D42, display per D58). A separate step after ranking; it never changes a score. For each non-noise

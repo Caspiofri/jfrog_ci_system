@@ -197,6 +197,23 @@ was not re-checked against ae8fbb5.
 **c21. The brief's wording.** PRD Problem & context: "It must be good, accurate and scalable." The brief as quoted for
 this draft does not contain that sentence. The Closing plan has rows for "Good and accurate" and "Scalable".
 
+**c22. Rubric text: PRD table vs the file the ranker reads.** `ci/rank.py` reads `config/rubric_v2.md` word for word
+into its prompt. That file has text the PRD's rubric table lacks: "Keywords never raise a score by themselves.
+Uncertainty doesn't raise a score: an unverifiable gap is not a 4."; "GA of an existing preview = 3 by default"; "buyer's
+guide" in row 2; "deprecation of a minor feature, a default/config change" in row 1; and three anchors not in the PRD
+("Cloudsmith Mumbai storage region = 3", "GitHub Enterprise includes Copilot = 3", "GitLab patch release 19.5.3 = 1").
+The PRD's row 4 says "(JFrog capability sheet)", which the file does not. The PRD says the rubric is "frozen 30 Oct",
+so it is not clear which text is the frozen one.
+
+**c23. Event type and gap\_verified (D29).** D29: "the classifier also outputs an event type … The ranker outputs
+gap\_verified and a confidence; an unverifiable gap routes to review rather than being lowered". In the code,
+`event_type` exists only in the coverage check (`ci/coverage.py`), and `gap_verified` appears nowhere in `ci/`. The
+classifier outputs competitor, category, noise and confidence; the ranker outputs score, reason and why\_it\_matters.
+
+**c24. Snippet cap value.** PRD (Item lifecycle, D14): "caps snippet-only items", no value. `ci/rank.py`:
+`SNIPPET_SCORE_CAP = 4  # … (Ofri, Oct 30: was 3)`. The value is a design setting, but the PRD should state it if the
+README cites it.
+
 ---
 
 ## d. Open questions for Ofri
@@ -222,3 +239,5 @@ Ordered by how much they block. Each can be answered in one line.
 14. **"Industry competitor errors (0.63, n=19)" (D41):** an accuracy or an error rate?
 15. **The `capabilities` page (c9):** include it in the screen list and screenshots?
 16. **"Good, accurate and scalable" (c21):** part of the official brief, or the PRD's paraphrase?
+17. **Rubric text (c22):** is `config/rubric_v2.md` the frozen rubric, with the PRD table to be updated to match?
+18. **Event type and gap_verified (c23):** mark D29's outputs as not built (future), or drop them from D29?
