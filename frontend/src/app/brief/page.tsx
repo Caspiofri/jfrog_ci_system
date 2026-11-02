@@ -3,16 +3,18 @@ import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArticleLink, Async, Empty, ErrorNote, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, Empty, ErrorNote, Hint, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { cn } from "@/lib/utils";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
 import { ApiError, path, send, useApi } from "@/lib/api";
-import { LEVEL_LABEL, PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
+import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
-import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Claim, Insight, ItemDetail, Page } from "@/lib/types";
+import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Claim, Insight, ItemDetail, Page, RunMetrics } from "@/lib/types";
+import { todayTiles } from "@/lib/briefNumbers";
 
 const TOP = 5;
 const PAGE = 50;
@@ -116,7 +118,7 @@ function BriefScreen() {
                     : `Everything discovered from ${fmtDateTime(b.window.prev_anchor)} to ${fmtDateTime(b.window.anchor)} Israel time (${b.window.hours} h).`}
                 </div>
 
-                <SummaryBlock date={b.date} s={b.summary} />
+                <SummaryBlock date={b.date} s={b.summary} runId={b.window.anchor_run_id} />
 
                 <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
 
@@ -151,42 +153,35 @@ function BriefScreen() {
   );
 }
 
-function SummaryBlock({ date, s }: { date: string; s: BriefSummary }) {
-  const mock = s.mock ? <MockTag what="this count" /> : null;
-  const level = label(LEVEL_LABEL, s.level);
-  const unscored = s.held_by_preliminary_score?.unscored ?? 0;
+/** "Today in numbers": four tiles, each number straight from the API, each explained on hover. */
+function SummaryBlock({ date, s, runId }: { date: string; s: BriefSummary; runId: string }) {
+  const run = useApi<RunMetrics>(path(`/run-metrics/${encodeURIComponent(runId)}`), { shouldRetryOnError: false });
+  const tiles = todayTiles(s, run.data?.items);
   return (
-    <section className="rounded-md border border-line bg-card px-[18px] py-4" aria-label="Brief summary">
-      <div className="flex flex-wrap items-baseline gap-x-2 text-[15px]">
-        <span><b className="text-xl font-semibold tabular-nums">{s.published}</b> in Brief</span>
-        <span className="text-mute">(<b className="font-semibold tabular-nums text-ink">{s.published_high}</b> rated 4–5)</span>
-        <span className="text-mute">·</span>
-        <Link href="/competitors" className="hover:underline"
-          title={`Published but scored below ${s.brief_min_score}: score 2 is on the competitor profile, score 1 on its timeline`}>
-          <b className="font-semibold tabular-nums">{s.published_below}</b> lower-scored on competitor pages
-        </Link>
-        {mock}
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 text-[15px]">
-        <span><b className="text-xl font-semibold tabular-nums text-[#8a5a00]">{s.held}</b> held for review at {level}</span>
-        <span className="text-mute">·</span>
-        <span><b className="font-semibold tabular-nums">{s.held_high}</b> preliminarily rated 4–5</span>
-        {unscored ? (
-          <span className="text-[#a32d2d]" title="The ranker gave these no score (a model failure), so they aren't counted as low">
-            · <b className="font-semibold tabular-nums">{unscored}</b> not scored
-          </span>
-        ) : null}
-        {mock}
-        {s.held ? (
-          <Link href={`/review?brief=${encodeURIComponent(date)}`} className="inline-flex items-center gap-1 font-semibold text-jgreen-d hover:underline">
-            <ArrowRight className="size-3.5" aria-hidden /> Review these
-          </Link>
-        ) : null}
-      </div>
-      <div className="mt-2 text-xs text-mute">
-        {s.held
-          ? `At ${level}, some items wait for an analyst before they reach the Brief, for example ${s.level === "strict" ? "items from a source that isn't vetted, or " : ""}items about pricing or M&A, or that mention JFrog. Until then they are not verified and not part of it.`
-          : "Nothing from this window is waiting for review."}
+    <section aria-label="Today in numbers">
+      <h2 className="m-0 mb-2 text-sm font-semibold">Today in numbers{s.mock ? <MockTag what="these counts" /> : null}</h2>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {tiles.map((t) => {
+          const body = (
+            <>
+              <span className="block text-xs text-mute">{t.label}</span>
+              <b className={cn("block text-2xl font-semibold tabular-nums", t.key === "review" && t.value ? "text-[#8a5a00]" : "")}>
+                {t.value ?? (t.key === "collected" && run.isLoading ? "…" : "—")}
+              </b>
+              {t.key === "review" && t.value ? (
+                <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d"><ArrowRight className="size-3.5" aria-hidden /> Review these</span>
+              ) : null}
+            </>
+          );
+          const box = "block rounded-md border border-line bg-card px-4 py-3 text-left";
+          return t.key === "review" && t.value ? (
+            <Hint key={t.key} text={<>{t.hint} Click to review them.</>} asChild>
+              <Link href={`/review?brief=${encodeURIComponent(date)}`} data-tile={t.key} className={cn(box, "transition-colors hover:border-jgreen")}>{body}</Link>
+            </Hint>
+          ) : (
+            <Hint key={t.key} text={t.hint} className={box}><span data-tile={t.key}>{body}</span></Hint>
+          );
+        })}
       </div>
     </section>
   );

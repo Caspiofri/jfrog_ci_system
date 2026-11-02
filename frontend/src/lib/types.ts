@@ -522,6 +522,7 @@ export interface RunStep {
 export interface RunMetrics {
   run_id: string;
   status: string;
+  items?: { collected?: number; kept?: number; new?: number; [k: string]: unknown } | null; // contract §11.1
   error?: string | null;
   steps: RunStep[];
   fingerprints?: Record<string, string | null> | null;

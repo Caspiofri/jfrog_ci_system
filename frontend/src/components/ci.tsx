@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, ArrowUpRight, Inbox, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ApiError } from "@/lib/api";
 import { CATEGORY_COLOR, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, label, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -78,6 +79,19 @@ export function CategoryTag({ category }: { category: string | null }) {
       <i className="inline-block size-2 rounded-sm" style={{ background: CATEGORY_COLOR[category] ?? "#9aa5b5" }} />
       {category}
     </span>
+  );
+}
+
+/** An explanation on hover and on keyboard focus. The trigger is focusable; pass asChild when the child already is. */
+export function Hint({ text, children, asChild = false, className }: { text: ReactNode; children: ReactNode; asChild?: boolean; className?: string }) {
+  if (!text) return <>{children}</>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {asChild ? children : <span tabIndex={0} className={cn("cursor-help rounded outline-none focus-visible:ring-2 focus-visible:ring-jgreen", className)}>{children}</span>}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-left">{text}</TooltipContent>
+    </Tooltip>
   );
 }
 

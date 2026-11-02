@@ -1,0 +1,61 @@
+// npm test: the Brief's "Today in numbers" tiles (src/lib/briefNumbers.ts).
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import { todayTiles } from "../src/lib/briefNumbers.ts";
+
+// The live 1 Nov Brief: summary from GET /brief?date=2026-11-01, items from GET /run-metrics/20261101T0400Z-e9cae4.
+const S = { brief_min_score: 3, published: 4, published_high: 1, published_below: 2, held: 11, held_high: 1,
+  held_by_preliminary_score: { "5": 0, "4": 1, "3": 8, "<=2": 2, unscored: 0, noise: 0 }, level: "strict" };
+const RUN = { collected: 239, kept: 26, new: 26 };
+const byKey = (tiles) => Object.fromEntries(tiles.map((t) => [t.key, t]));
+
+test("four tiles with short labels, in order", () => {
+  assert.deepEqual(todayTiles(S, RUN).map((t) => t.label), ["Items collected", "Published", "High score (4+)", "Needs review"]);
+});
+
+test("each number is the API's own field for that Brief", () => {
+  const t = byKey(todayTiles(S, RUN));
+  assert.equal(t.collected.value, RUN.collected);
+  assert.equal(t.published.value, S.published);
+  assert.equal(t.high.value, S.published_high);
+  assert.equal(t.review.value, S.held);
+});
+
+test("no count of low-score items", () => {
+  const tiles = todayTiles(S, RUN);
+  assert.ok(!tiles.some((t) => /low|below|score [12]\b/i.test(t.label)));
+  assert.doesNotMatch(readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8"), /published_below/);
+});
+
+test("every tile explains what it counts on hover", () => {
+  const t = byKey(todayTiles(S, RUN));
+  for (const x of Object.values(t)) assert.ok(x.hint.length > 20, x.key);
+  assert.match(t.collected.hint, /26 of them were new/);
+  assert.match(t.published.hint, /scored 3 or higher/);
+  assert.match(t.review.hint, /held at Strict/);
+  assert.match(t.review.hint, /1 preliminarily scored 4–5/);
+});
+
+test("unscored held items are named in the Needs review hint", () => {
+  const t = byKey(todayTiles({ ...S, held_by_preliminary_score: { ...S.held_by_preliminary_score, unscored: 2 } }, RUN));
+  assert.match(t.review.hint, /2 not scored/);
+});
+
+test("no run record (older data, or a demo snapshot without it): collected is unknown, not zero", () => {
+  for (const run of [null, undefined, {}]) {
+    const t = byKey(todayTiles(S, run));
+    assert.equal(t.collected.value, null);
+    assert.match(t.collected.hint, /isn't known/);
+  }
+});
+
+test("an empty window shows zeros, not blanks", () => {
+  const t = byKey(todayTiles({ ...S, published: 0, published_high: 0, held: 0, held_high: 0 }, { collected: 0 }));
+  assert.deepEqual([t.collected.value, t.published.value, t.high.value, t.review.value], [0, 0, 0, 0]);
+});
+
+test("the tiles are focusable for their hover (keyboard)", () => {
+  const ci = readFileSync(new URL("../src/components/ci.tsx", import.meta.url), "utf8");
+  assert.match(ci, /export function Hint[\s\S]*?tabIndex=\{0\}/);
+});
