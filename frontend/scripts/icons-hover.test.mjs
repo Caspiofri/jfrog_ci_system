@@ -1,4 +1,4 @@
-// npm test: flask next to "Experimental", newspaper next to "Daily Brief", each with its hover (mouse and focus).
+// npm test: one AI label (sparkles) on the insights, newspaper next to "Daily Brief", each with its hover (mouse and focus).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -8,9 +8,16 @@ const brief = read("app/brief/page.tsx");
 const shell = read("components/shell/Shell.tsx");
 const ci = read("components/ci.tsx");
 
-test("Experimental: flask icon and the exact hover text", () => {
-  assert.match(brief, /const EXPERIMENTAL_HINT =\s*"AI-written summaries across several stories\. Facts were checked on 1 Nov \(11 of 12 claims supported\), but conclusions can be overstated\. Check the cited sources before sharing\.";/);
-  assert.match(brief, /function ExperimentalChip[\s\S]*?<Hint text=\{EXPERIMENTAL_HINT\}>[\s\S]*?<FlaskConical[\s\S]*?Experimental/);
+test("insights: one AI label with sparkles, the visible text and the exact hover; no Experimental, no flask", () => {
+  assert.match(brief, /const AI_LABEL = "AI-generated — check the cited sources";/);
+  assert.match(brief, /const AI_HINT =\s*"AI-written summary that connects several stories\. Checked on a small sample \(1 Nov: 4 insights, 12 claims\): facts were well supported \(11 of 12 claims\), but some conclusions were stronger than the evidence\. Open the cited sources before sharing\.";/);
+  assert.match(brief, /function AiLabel[\s\S]*?<Hint text=\{AI_HINT\}>[\s\S]*?<Sparkles[\s\S]*?\{AI_LABEL\}/);
+  assert.equal((brief.match(/<Sparkles\b/g) ?? []).length, 1, "one AI icon");
+  assert.equal((brief.match(/<AiLabel \/>/g) ?? []).length, 1, "one AI label");
+  for (const f of ["app/brief/page.tsx", "components/health/parts.tsx", "components/ci.tsx"]) {
+    const s = read(f).replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "");
+    assert.doesNotMatch(s, /Experimental|FlaskConical/, f);
+  }
 });
 
 test("Daily Brief: newspaper icon, exact hover, name unchanged", () => {
@@ -20,7 +27,7 @@ test("Daily Brief: newspaper icon, exact hover, name unchanged", () => {
 });
 
 test("icons come from the library already in use", () => {
-  assert.match(brief, /import \{[^}]*\bFlaskConical\b[^}]*\bNewspaper\b[^}]*\} from "lucide-react"/);
+  assert.match(brief, /import \{[^}]*\bNewspaper\b[^}]*\bSparkles\b[^}]*\} from "lucide-react"/);
 });
 
 test("the title hover is reachable by keyboard", () => {

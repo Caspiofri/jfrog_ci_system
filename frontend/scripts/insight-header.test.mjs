@@ -20,11 +20,11 @@ test("the evidence dropdown is still there", () => {
 const details = card.slice(card.indexOf("data-insight-details"));
 const collapsed = card.slice(card.indexOf("return ("), card.indexOf("{details ? ("));
 
-test("collapsed by default: only the chips and the title are shown", () => {
+test("collapsed by default: only the chips (pattern, continuity) and the title are shown", () => {
   assert.match(card, /const \[details, setDetails\] = useState\(false\)/);
   assert.match(collapsed, /<Tag>\{label\(PATTERN_LABEL, ins\.pattern\)\}<\/Tag>/);
   assert.match(collapsed, /<ContinuityBadge c=\{ins\.continuity\} \/>/);
-  assert.match(collapsed, /<ExperimentalChip small \/>/);
+  assert.doesNotMatch(collapsed, /Experimental/);
   assert.match(collapsed, /\{ins\.title\}/);
   for (const hidden of ["ins.summary", "ins.why_it_matters", "Show evidence", "ins.max_score"]) {
     assert.ok(!collapsed.includes(hidden), `${hidden} is visible while collapsed`);

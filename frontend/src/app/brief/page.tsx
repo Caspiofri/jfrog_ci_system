@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, FlaskConical, Loader2, Newspaper, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, Newspaper, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArticleLink, Async, ColourLegends, Empty, ErrorNote, Hint, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { cn } from "@/lib/utils";
@@ -231,10 +231,11 @@ function insightState(ins: BriefInsights): string | null {
   }
 }
 
-/** The analyst's manual check of the insights (1 Nov). Insights stay experimental until summaries stop overstating. */
+/** Hover texts for the Brief title and the insights AI label (the analyst check of 1 Nov lives in AI_HINT). */
 const DAILY_BRIEF_HINT = "Everything new since the previous Brief, ranked by importance.";
-const EXPERIMENTAL_HINT =
-  "AI-written summaries across several stories. Facts were checked on 1 Nov (11 of 12 claims supported), but conclusions can be overstated. Check the cited sources before sharing.";
+const AI_LABEL = "AI-generated — check the cited sources";
+const AI_HINT =
+  "AI-written summary that connects several stories. Checked on a small sample (1 Nov: 4 insights, 12 claims): facts were well supported (11 of 12 claims), but some conclusions were stronger than the evidence. Open the cited sources before sharing.";
 
 const INSIGHTS_CHECK =
   "Checked on 1 Nov: 11 of 12 claims supported and 12 of 12 citations correct, but summaries overstated in all 4 insights (n = 4); 0 of 4 expected patterns fully found.";
@@ -268,7 +269,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
       title={
         <span className="inline-flex items-center gap-2">
           {insightsTitle(insights.window)}
-          <ExperimentalChip />
+          <AiLabel />
         </span>
       }
       cap={cap}
@@ -292,9 +293,6 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
         <Empty>{state}</Empty>
       ) : (
         <>
-          <div className="mb-3 flex items-center gap-1.5 rounded border border-[#f59e0b]/60 bg-[#fff7e6] px-2.5 py-1.5 text-xs font-semibold text-[#8a5a00]">
-            <Sparkles className="size-3.5 shrink-0" aria-hidden /> AI-generated — check the cited sources
-          </div>
           {insights.status === "partial" ? <div className="mb-2 text-xs text-mute">Fewer than 3 insights passed the checks this time.</div> : null}
           <div className="flex flex-col gap-3">
             {insights.items.map((x) => (
@@ -343,7 +341,6 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
       <div className="flex flex-wrap items-center gap-1.5" data-insight-header>
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
         <ContinuityBadge c={ins.continuity} />
-        <ExperimentalChip small />
       </div>
       <h3 className="m-0 text-sm font-semibold">
         <button type="button" aria-expanded={details} aria-controls={id} onClick={(e) => { e.stopPropagation(); toggle(); }}
@@ -378,14 +375,14 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
   );
 }
 
-/** The "Experimental" chip, with a flask and its explanation on hover and focus: on the insights title and on every insight. */
-function ExperimentalChip({ small = false }: { small?: boolean }) {
+/** The one AI label of the insights: sparkles and a visible warning; the check of 1 Nov on hover and keyboard focus. */
+function AiLabel() {
   return (
-    <Hint text={EXPERIMENTAL_HINT}>
-      <Tag className={cn("inline-flex items-center gap-1 border border-[#f59e0b]/60 bg-[#fff7e6] font-semibold uppercase tracking-wide text-[#8a5a00]", small ? "text-[9px]" : "text-[10px]")}>
-        <FlaskConical className={small ? "size-2.5" : "size-3"} aria-hidden />
-        Experimental
-      </Tag>
+    <Hint text={AI_HINT}>
+      <span className="inline-flex items-center gap-1 rounded border border-[#f59e0b]/60 bg-[#fff7e6] px-2 py-0.5 text-xs font-semibold text-[#8a5a00]" data-ai-label>
+        <Sparkles className="size-3.5 shrink-0" aria-hidden />
+        {AI_LABEL}
+      </span>
     </Hint>
   );
 }

@@ -2,7 +2,7 @@
 // Health blocks (contract §9). Every eval number carries its n; coverage is counts with n, never a rate.
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, FlaskConical } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, ItemTitle, N, Tag } from "@/components/ci";
 import { SOURCE_LABEL, fmtDateTime, label } from "@/lib/format";
@@ -488,7 +488,6 @@ export function TestEvalBlock({ t }: { t: TestEval | null | undefined }) {
     <div className="flex flex-col gap-3">
       {!ran ? (
         <div className="flex items-center gap-2 rounded border-l-[3px] border-[#8a94a6] bg-page px-3 py-2 text-xs">
-          <FlaskConical className="size-3.5 shrink-0 text-mute" aria-hidden />
           <span>{t?.note ? `${t.note.charAt(0).toUpperCase()}${t.note.slice(1)}.` : "Not run yet."} Until it runs, the accuracy numbers below are development numbers, not the reported ones.</span>
         </div>
       ) : t.test_runs && t.test_runs > 1 ? (

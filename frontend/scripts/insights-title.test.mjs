@@ -17,8 +17,8 @@ test("no window served (older data, or an insights state with none): a plain tit
   for (const w of [undefined, null, {}, { days: 0 }, { days: "x" }]) assert.equal(insightsTitle(w), "Insights");
 });
 
-test("the Brief uses it, and keeps the Experimental chip next to it", () => {
+test("the Brief uses it, with the AI label next to it", () => {
   const src = readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8");
-  assert.match(src, /\{insightsTitle\(insights\.window\)\}\s*<ExperimentalChip \/>/);
+  assert.match(src, /\{insightsTitle\(insights\.window\)\}\s*<AiLabel \/>/);
   assert.doesNotMatch(src, /Key insights/);
 });

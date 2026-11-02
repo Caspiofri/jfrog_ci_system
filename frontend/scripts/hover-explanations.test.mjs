@@ -37,11 +37,9 @@ test("Review: level help is on hover of each level, not a visible line", () => {
   assert.match(review, /<Hint key=\{l\.level\} text=\{LEVEL_HELP\[l\.level\]\} asChild>/);
 });
 
-test("kept visible: Experimental chip, the measured line, the AI warning, Feed date, the sort line, actions", () => {
-  assert.match(brief, /function ExperimentalChip[\s\S]*?Experimental\s*<\/Tag>/);
-  assert.match(brief, /<ExperimentalChip \/>/);
+test("kept visible: the AI label, the measured line, Feed date, the sort line, actions", () => {
+  assert.match(brief, /<AiLabel \/>/);
   assert.match(brief, /<p className="[^"]*">\{INSIGHTS_CHECK\}<\/p>/);
-  assert.match(brief, /AI-generated — check the cited sources/);
   assert.match(read("components/ItemDrawer.tsx") + read("components/competitors/parts.tsx"), /Feed date/);
   assert.match(review, /\{SORT_ORDER_LINE\}/);
   assert.match(brief, /Review these/);
