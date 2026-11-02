@@ -162,7 +162,7 @@ function SummaryBlock({ date, s, runId }: { date: string; s: BriefSummary; runId
             <>
               <span className="block text-xs text-mute">{t.label}</span>
               <b className={cn("block text-2xl font-semibold tabular-nums", t.key === "review" && t.value ? "text-[#8a5a00]" : "")}>
-                {t.value ?? (t.key === "collected" && run.isLoading ? "…" : "—")}
+                {t.value ?? (t.key === "new" && run.isLoading ? "…" : "—")}
               </b>
               {t.key === "review" && t.value ? (
                 <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d"><ArrowRight className="size-3.5" aria-hidden /> Review these</span>

@@ -11,12 +11,13 @@ const RUN = { collected: 239, kept: 26, new: 26 };
 const byKey = (tiles) => Object.fromEntries(tiles.map((t) => [t.key, t]));
 
 test("four tiles with short labels, in order", () => {
-  assert.deepEqual(todayTiles(S, RUN).map((t) => t.label), ["Items collected", "Published", "High score (4+)", "Needs review"]);
+  assert.deepEqual(todayTiles(S, RUN).map((t) => t.label), ["New items", "Published", "High score (4+)", "Needs review"]);
 });
 
 test("each number is the API's own field for that Brief", () => {
   const t = byKey(todayTiles(S, RUN));
-  assert.equal(t.collected.value, RUN.collected);
+  assert.equal(t.new.value, 26); // items.new of the 1 Nov run, not the 239 fetched
+  assert.equal(t.new.value, RUN.new);
   assert.equal(t.published.value, S.published);
   assert.equal(t.high.value, S.published_high);
   assert.equal(t.review.value, S.held);
@@ -31,7 +32,7 @@ test("no count of low-score items", () => {
 test("every tile explains what it counts on hover", () => {
   const t = byKey(todayTiles(S, RUN));
   for (const x of Object.values(t)) assert.ok(x.hint.length > 20, x.key);
-  assert.match(t.collected.hint, /26 of them were new/);
+  assert.equal(t.new.hint, "Collected since the previous Brief.");
   assert.match(t.published.hint, /scored 3 or higher/);
   assert.match(t.review.hint, /held at Strict/);
   assert.match(t.review.hint, /1 preliminarily scored 4–5/);
@@ -42,17 +43,21 @@ test("unscored held items are named in the Needs review hint", () => {
   assert.match(t.review.hint, /2 not scored/);
 });
 
-test("no run record (older data, or a demo snapshot without it): collected is unknown, not zero", () => {
-  for (const run of [null, undefined, {}]) {
+test("no run record (older data, or a demo snapshot without it): new items unknown, not zero", () => {
+  for (const run of [null, undefined, {}, { collected: 239 }]) {
     const t = byKey(todayTiles(S, run));
-    assert.equal(t.collected.value, null);
-    assert.match(t.collected.hint, /isn't known/);
+    assert.equal(t.new.value, null);
+    assert.match(t.new.hint, /isn't known/);
   }
 });
 
+test("the raw fetch count is never shown", () => {
+  assert.ok(!todayTiles(S, RUN).some((t) => t.value === RUN.collected));
+});
+
 test("an empty window shows zeros, not blanks", () => {
-  const t = byKey(todayTiles({ ...S, published: 0, published_high: 0, held: 0, held_high: 0 }, { collected: 0 }));
-  assert.deepEqual([t.collected.value, t.published.value, t.high.value, t.review.value], [0, 0, 0, 0]);
+  const t = byKey(todayTiles({ ...S, published: 0, published_high: 0, held: 0, held_high: 0 }, { new: 0 }));
+  assert.deepEqual([t.new.value, t.published.value, t.high.value, t.review.value], [0, 0, 0, 0]);
 });
 
 test("the tiles are focusable for their hover (keyboard)", () => {

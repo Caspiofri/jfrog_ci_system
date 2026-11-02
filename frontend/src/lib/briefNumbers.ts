@@ -1,12 +1,12 @@
 // The Brief's "Today in numbers" tiles. Every number is a field the API returns for that Brief:
-// collected from the anchor run's metrics row (GET /run-metrics/{anchor_run_id}), the rest from the Brief's summary.
+// "New items" is items.new of the Brief run's metrics row (GET /run-metrics/{anchor_run_id}); the rest is the Brief's summary.
 // No count of low-score items (published_below is left out on purpose). No imports besides types, so `npm test` runs it.
 import type { BriefSummary } from "./types";
 
 export interface RunItemCounts { collected?: number; kept?: number; new?: number }
 
 export interface Tile {
-  key: "collected" | "published" | "high" | "review";
+  key: "new" | "published" | "high" | "review";
   label: string;
   value: number | null; // null: the API has no number for it (shown as "—")
   hint: string;
@@ -15,16 +15,13 @@ export interface Tile {
 const levelName = (l: string) => (l ? l[0].toUpperCase() + l.slice(1) : l);
 
 export function todayTiles(s: BriefSummary, run: RunItemCounts | null | undefined): Tile[] {
-  const collected = run?.collected ?? null;
-  const fresh = run?.new ?? run?.kept;
+  const fresh = typeof run?.new === "number" ? run.new : null;
   const unscored = s.held_by_preliminary_score?.unscored ?? 0;
   const level = levelName(s.level);
   return [
     {
-      key: "collected", label: "Items collected", value: collected,
-      hint: collected == null
-        ? "No run record for this Brief, so the number collected isn't known."
-        : `Articles this Brief's run fetched from the feeds, before duplicates and already-seen items were removed${fresh != null ? `; ${fresh} of them were new` : ""}.`,
+      key: "new", label: "New items", value: fresh,
+      hint: fresh == null ? "No run record for this Brief, so the number of new items isn't known." : "Collected since the previous Brief.",
     },
     {
       key: "published", label: "Published", value: s.published,
