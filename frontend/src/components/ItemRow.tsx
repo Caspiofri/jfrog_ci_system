@@ -1,5 +1,6 @@
 "use client";
 // One item in a list (prototype .row with r5/r4/r3 emphasis). Title opens the drawer; the icon opens the source.
+import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
 import { CategoryTag, ItemTitle, ScoreBadge, Tag } from "@/components/ci";
@@ -46,7 +47,7 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
           {showBadge && item.badge === "late" ? (
             <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after its feed date">Found late</Tag>
           ) : null}
-          {item.mentions_jfrog ? <Tag className="bg-[#eef7f0] font-semibold text-jgreen-d">Mentions JFrog</Tag> : null}
+          {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} /> : null}
           {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
         </div>
         {item.why_it_matters ? <div className="mt-1 text-[#44516a]">{item.why_it_matters}</div> : null}

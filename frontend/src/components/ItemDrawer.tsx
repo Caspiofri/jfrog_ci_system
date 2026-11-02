@@ -1,5 +1,7 @@
 "use client";
 // The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
+import { MentionsJfrog } from "@/components/MentionsJfrog";
+import { showLensBlock } from "@/lib/jfrogMention";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -71,11 +73,11 @@ function DrawerBody({ id }: { id: string }) {
                   <ScoreBadge score={it.score} noise={it.noise} />
                   <StatusDot status={it.status} />
                   <CategoryTag category={it.category} />
-                  {it.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">Mentions JFrog</Tag> : null}
+                  {it.mentions_jfrog ? <MentionsJfrog excerpt={it.excerpt} strong={false} /> : null}
                   {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
                   {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
-                <LensBlock lens={it.lens} status={it.lens_status} />
+                {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
                 {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
                 <div>
                   <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>
