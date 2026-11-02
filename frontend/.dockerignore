@@ -1,0 +1,7 @@
+# Keep local-only files out of any image: env files (could carry NEXT_PUBLIC_CI_MOCK), mock fixtures, build output.
+.env*
+public/mock/
+node_modules/
+.next/
+.next-build/
+.next-mock/
