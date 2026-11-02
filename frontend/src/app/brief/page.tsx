@@ -3,7 +3,7 @@ import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, FlaskConical, Loader2, Newspaper, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArticleLink, Async, Empty, ErrorNote, Hint, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, ColourLegends, Empty, ErrorNote, Hint, ItemTitle, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { cn } from "@/lib/utils";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
@@ -120,6 +120,7 @@ function BriefScreen() {
             ) : (
               <>
                 <SummaryBlock date={b.date} s={b.summary} runId={b.window.anchor_run_id} />
+                <ColourLegends />
 
                 <InsightsPanel date={b.date} insights={b.insights} hl={hl} setHl={setHl} onRefreshed={() => brief.mutate()} />
 

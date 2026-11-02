@@ -3,7 +3,7 @@
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Async, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
+import { Async, ColourLegends, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
@@ -58,6 +58,8 @@ function LogScreen() {
                   ) : <Empty>No items.</Empty>}
                 </Panel>
               </div>
+
+              <ColourLegends unscored />
 
               <Panel>
                 <div className="mb-3 flex flex-wrap items-center gap-2">

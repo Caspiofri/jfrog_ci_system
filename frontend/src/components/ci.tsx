@@ -140,18 +140,25 @@ export function ColorLegend({ title, items, className }: {
   );
 }
 
-/** The score colours, 5 to 1, with the rubric labels. */
-export function ScoreLegend({ title = "Score colours:" }: { title?: ReactNode }) {
-  return (
-    <ColorLegend title={title} items={[5, 4, 3, 2, 1].map((n) => ({
-      color: SCORE_COLOR[n][0], fg: SCORE_COLOR[n][1], text: String(n), label: RUBRIC[n]?.label ?? null,
-    }))} />
-  );
-}
-
 /** The category colours, for the categories shown (or every category). */
 export function CategoryLegend({ categories, title = "Categories:" }: { categories: string[]; title?: ReactNode }) {
   return <ColorLegend title={title} items={categories.map((c) => ({ color: CATEGORY_COLOR[c] ?? "#9aa5b5", label: c }))} />;
+}
+
+/** The two colour legends every item view shows, always visible: Importance (score colours) and Category. */
+export function ColourLegends({ unscored = false, className }: { unscored?: boolean; className?: string }) {
+  const extra = unscored ? [
+    { color: SCORE_COLOR[0][0], fg: SCORE_COLOR[0][1], text: "N", label: "noise" },
+    { color: SCORE_COLOR[0][0], fg: SCORE_COLOR[0][1], text: "–", label: "not scored" },
+  ] : [];
+  return (
+    <div className={cn("flex flex-col gap-1 rounded-md border border-line bg-card px-3 py-2", className)} aria-label="Colour legend" data-legends>
+      <ColorLegend title="Importance (1–5)" items={[5, 4, 3, 2, 1].map((n) => ({
+        color: SCORE_COLOR[n][0], fg: SCORE_COLOR[n][1], text: String(n), label: RUBRIC[n]?.label ?? null,
+      })).concat(extra)} />
+      <CategoryLegend title="Category" categories={Object.keys(CATEGORY_COLOR)} />
+    </div>
+  );
 }
 
 /** "n=12" next to every eval number and every measured count. */

@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArticleLink, Async, Empty, ErrorNote, HBars, Hint, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, ColourLegends, Empty, ErrorNote, HBars, Hint, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ItemRow } from "@/components/ItemRow";
@@ -116,6 +116,8 @@ function ReviewScreen() {
               ) : null}
 
               <TrustedSources />
+
+              <ColourLegends />
 
               <Panel
                 title="What needs my decision?"
