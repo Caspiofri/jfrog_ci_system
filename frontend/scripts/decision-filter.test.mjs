@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { DECIDED_STATUSES, LOG_STATUSES, decidedIds, decisionOptions, flaggedFirst, inQueueScope } from "../src/lib/reviewQueue.ts";
+import { DECIDED_STATUSES, LOG_STATUSES, decidedIds, decisionOptions, flaggedFirst, inQueueScope, isActiveFlag } from "../src/lib/reviewQueue.ts";
 
 const page = readFileSync(new URL("../src/app/review/page.tsx", import.meta.url), "utf8");
 
@@ -55,4 +55,15 @@ test("the page: default is GET /review; decided rows from GET /log show their st
   assert.match(page, /path\("\/log", \{ status: LOG_STATUSES, competitor, limit: 200, offset: 0 \}\)/);
   const decided = page.slice(page.indexOf("function DecidedItem"), page.indexOf("function QueueItem"));
   assert.doesNotMatch(decided, /ItemActions|send\(|Approve|Reopen/);
+});
+
+test("a dismissed item that is still flagged: not counted, not in the Flagged view, not put first", () => {
+  const row = (id, status, flagged) => ({ kind: "item", item: { item_id: id, status, flagged } });
+  assert.equal(isActiveFlag(row("x", "dismissed", true)), false);
+  assert.equal(isActiveFlag(row("y", "awaiting_review", true)), true);
+  assert.equal(isActiveFlag(row("z", "approved", true)), true);
+  assert.equal(isActiveFlag({ kind: "change", change_id: 1 }), false);
+  const out = flaggedFirst([row("a", "awaiting_review", false), row("d", "dismissed", true), row("f", "auto_published", true)]);
+  assert.deepEqual(out.map((r) => r.item.item_id), ["f", "a", "d"]);
+  assert.match(page, /const isFlagged = \(x: ReviewItemRow \| ReviewChangeRow\) => isActiveFlag\(x\);/);
 });

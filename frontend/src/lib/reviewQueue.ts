@@ -165,8 +165,15 @@ export function decisionOptions(n: { needs: number; approved: number; flagged: n
   ];
 }
 
-/** Flagged items first (the analyst marked them important), then the rest in the order given. Stable. */
-export function flaggedFirst<T extends { kind: string; item?: { flagged?: boolean } }>(rows: T[]): T[] {
-  const isFlag = (r: T) => r.kind === "item" && Boolean(r.item?.flagged);
+/** A flag that counts: set, on an item that is not dismissed. Dismiss keeps the flag (BE, after D107), but a dismissed
+ *  item is decided, so it is not counted as flagged, not in the Flagged view and not put first. */
+export function isActiveFlag(r: { kind: string; item?: { flagged?: boolean; status?: string } }): boolean {
+  return r.kind === "item" && Boolean(r.item?.flagged) && r.item?.status !== "dismissed";
+}
+
+/** Flagged items first (the analyst marked them important; dismissed ones excluded), then the rest in the order given.
+ *  Stable. */
+export function flaggedFirst<T extends { kind: string; item?: { flagged?: boolean; status?: string } }>(rows: T[]): T[] {
+  const isFlag = (r: T) => isActiveFlag(r);
   return [...rows.filter(isFlag), ...rows.filter((r) => !isFlag(r))];
 }

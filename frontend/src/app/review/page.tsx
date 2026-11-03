@@ -15,7 +15,7 @@ import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
-import { LOG_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, decisionOptions, filterQueue, flaggedFirst, hasLocalFilters, inQueueScope, queueQuery, remainingOffsets, sortQueue, windowOptions, type DecisionView, type QueueSort } from "@/lib/reviewQueue";
+import { LOG_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, decisionOptions, filterQueue, flaggedFirst, isActiveFlag, hasLocalFilters, inQueueScope, queueQuery, remainingOffsets, sortQueue, windowOptions, type DecisionView, type QueueSort } from "@/lib/reviewQueue";
 import { HOLD_LABEL, LEVEL_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
@@ -104,8 +104,8 @@ function ReviewScreen() {
           // D91: decided items in the same scope as the API's queue (window, competitor, reason at this level)
           const done = (decided.data ?? []).filter((x) => inQueueScope(x.item, { window: r.scope?.window, reason, level: r.level }));
           const byStatus = (st: string) => done.filter((x) => x.item.status === st);
-          const isFlagged = (x: ReviewItemRow | ReviewChangeRow) => x.kind === "item" && x.item.flagged;
-          // D107: flagged = the boolean on any item, held ones included (they stay in Needs decision)
+          const isFlagged = (x: ReviewItemRow | ReviewChangeRow) => isActiveFlag(x);
+          // D107: flagged = the boolean on any item that is not dismissed; held ones included (they stay in Needs decision)
           const flaggedRows = [...r.items.filter(isFlagged), ...done.filter(isFlagged)];
           const needs = r.items.length; // what the default lists: held items, plus changed cells outside a Brief window
           const counts = { needs, approved: byStatus("approved").length, flagged: flaggedRows.length, dismissed: byStatus("dismissed").length, all: needs + done.length };
