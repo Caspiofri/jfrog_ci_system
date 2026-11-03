@@ -272,6 +272,19 @@ def register(app, d) -> None:
                                       "failures", "unconfirmed", "needs_review")} | {
             "age_hours": round((d.now() - started).total_seconds() / 3600, 1) if started else None}
 
+    def with_after_actions(s: svc.Snapshot, row: dict) -> dict:
+        """D74: the row as the run wrote it, plus items_after_actions, read now: the routing status of the items this
+        run classified, at today's level and with analyst decisions (approve, dismiss, flag) applied. The row's own
+        items.published / held stay the values at the end of the run. Null when the run had no routing (a
+        reconstructed row leaves published and held empty), so no today's-rules number stands in for one."""
+        items = row.get("items") or {}
+        if items.get("published") is None:
+            return {**row, "items_after_actions": None}
+        c = Counter(s.status(i) for i, o in s.outputs.items() if o["run_id"] == row["run_id"])
+        return {**row, "items_after_actions": {
+            "published": sum(c[k] for k in svc.PUBLISHED), "held": c["awaiting_review"], "by_status": dict(c),
+            "n": sum(c.values()), "level": s.level, "as_of": d.now().isoformat()}}
+
     @app.get("/api/v1/health")
     def get_health(run_id: str | None = None):
         store, s = d.snap()
@@ -289,26 +302,27 @@ def register(app, d) -> None:
                         "all": extraction_block([i["raw"] for i in s.items.values()])}}
             metrics = store.run_metrics(run["run_id"])
         body |= {"liveness": liveness(s.runs, d.now()),
-                 "run_metrics": metrics[0] if metrics else None, "eval": eval_block(), "test_eval": test_eval_block(),
+                 "run_metrics": with_after_actions(s, metrics[0]) if metrics else None, "eval": eval_block(),
+                 "test_eval": test_eval_block(),
                  "coverage": coverage_block(), "change_detection": change_block()}
         return d.ok(body)
 
     @app.get("/api/v1/run-metrics")
     def list_run_metrics(limit: int = 50, offset: int = 0):
         """Per-run quality metrics (ci.run_metrics), newest run first."""
-        store, _ = d.snap()
+        store, s = d.snap()
         with store:
             rows = store.run_metrics()
-        return d.ok(d.page(rows, limit, offset))
+        return d.ok(d.page([with_after_actions(s, r) for r in rows], limit, offset))
 
     @app.get("/api/v1/run-metrics/{run_id}")
     def get_run_metrics(run_id: str):
-        store, _ = d.snap()
+        store, s = d.snap()
         with store:
             rows = store.run_metrics(run_id)
         if not rows:
             raise d.ApiError(404, "not_found", f"no metrics for run {run_id}")
-        return d.ok(rows[0])
+        return d.ok(with_after_actions(s, rows[0]))
 
     @app.get("/api/v1/evals/test")
     def get_test_eval():

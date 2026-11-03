@@ -14,6 +14,7 @@ metrics (the JSON column):
 - validation (D32): rejected outputs and items, by stage, with the reasons
 - steps: per step, seconds, LLM calls and status (ok | degraded | failed | skipped) with the error and item ids
 - metadata (D53): ci.run_meta's record of what ran: fingerprints, sheet_sha, models, call settings, combined, commit
+- reconstructed (D74): null for a row the run wrote; ci.metrics_backfill sets it on a row rebuilt from the item log
 """
 import time
 from collections import Counter
@@ -124,4 +125,5 @@ def build(*, run_id: str, kind: str, status: str, started_at: str, fingerprints:
             "finished_at": datetime.now(UTC).isoformat(), "fingerprints": fingerprints, "model": model,
             "llm_calls": llm_calls, "error": error, "items": items, "extraction": extraction, "lens": lens,
             "insights": insights, "validation": validation, "steps": steps.to_list(),
-            "metadata": metadata}  # ci.run_meta: sheet hash, models, call settings, combined fingerprint, commit
+            "metadata": metadata,  # ci.run_meta: sheet hash, models, call settings, combined fingerprint, commit
+            "reconstructed": None}  # D74: set only on a row rebuilt later from the item log (ci.metrics_backfill)
