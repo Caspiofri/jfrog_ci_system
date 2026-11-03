@@ -1,5 +1,5 @@
 "use client";
-// "Where competitors are active": items per competitor and category in the last 7 days by feed date. Counted from
+// "Where competitors are active": published items per competitor and category, found in the cards' 7 days. Counted from
 // Log rows; click a cell to list its items (the title opens the drawer).
 import { useState } from "react";
 import useSWR from "swr";
@@ -14,7 +14,7 @@ import { remainingOffsets } from "@/lib/reviewQueue";
 import type { Competitors, Log, LogRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export const HEATMAP_CAPTION = "Activity by category, from automatic classification. Last 7 days.";
+export const HEATMAP_CAPTION = "Published items found in the last 7 days, by category.";
 /** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
 export const HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the last 7 days. Items awaiting review are not in this grid; each card shows them.";
 

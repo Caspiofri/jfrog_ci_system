@@ -76,7 +76,7 @@ const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta
 
 test("title, caption, legend with the scale; directly under the matrix", () => {
   assert.match(comp, /<Panel title="Where competitors are active" info=/);
-  assert.match(comp, /HEATMAP_CAPTION = "Activity by category, from automatic classification\. Last 7 days\."/);
+  assert.match(comp, /HEATMAP_CAPTION = "Published items found in the last 7 days, by category\."/);
   assert.match(comp, /legendSteps\(hm\.max\)/);
   assert.match(page, /<CapabilityMatrix \/>\s*<ActivityHeatmap \/>/);
 });
@@ -114,4 +114,9 @@ test("1 Nov demo: every column total equals its card's number", () => {
   // GET /competitors items_7d on the 1 Nov snapshot; checked live against the heatmap: all equal, 127 in all
   const cards = { cloudsmith: 9, sonatype: 5, github: 73, gitlab: 17, snyk: 14, aws: 9 };
   assert.equal(Object.values(cards).reduce((a, b) => a + b, 0), 127);
+});
+
+test("the cards' number uses the heatmap caption's wording", () => {
+  const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
+  assert.match(parts, /\{c\.items_7d\}<\/b>\s*<span className="text-mute">published items found in the last 7 days · /);
 });
