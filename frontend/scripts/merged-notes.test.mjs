@@ -36,6 +36,20 @@ test("Roadmap: a slot appears only when its image loads; labelled; no placeholde
   assert.match(r, /if \(state === "none"\) return null;/);
   assert.match(r, /state !== "ok" && "hidden"/);
   assert.match(r, /onLoad=\{\(\) => setState\("ok"\)\} onError=\{\(\) => setState\("none"\)\}/);
-  assert.match(r, />Concept, sample data</);
-  assert.doesNotMatch(r, /Screenshot to add/);
+  assert.match(r, /const CONCEPT_LABEL = "Concept, sample data";/);
+  assert.match(r, /<figcaption[^>]*data-concept-label>\{CONCEPT_LABEL\}<\/figcaption>\s*<Image /); // against the image, in its frame
+  assert.doesNotMatch(r, /object-cover|Screenshot to add/); // shown whole, never cropped; no placeholder
+  assert.match(r, /loading="eager"/); // a lazy image inside the hidden frame would never load
+  assert.match(r, /className="mx-auto block h-auto w-auto max-w-full"/); // never enlarged past its own size
+});
+
+test("Roadmap (D104): the seven concepts, in Ofri's order and words; the six images are the prototype's, unedited", () => {
+  const r = src("app/roadmap/page.tsx");
+  const slugs = [...r.matchAll(/slug: "([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(slugs, ["strength-radar", "convergence", "topics", "reactions", "pressure", "emerging", "deal-extraction"]);
+  assert.match(r, /shows: "a competitor's strength against JFrog on each of the 7 axes, scored 1 to 5\.",\s*missing: "a strength score per axis, set or checked by a product expert\.",/);
+  assert.match(r, /missing: "extraction of buyer, target and deal type\. The product's real deals block lists items as they are\.",/);
+  for (const f of ["strength-radar", "convergence", "topics", "reactions", "emerging", "deal-extraction"]) {
+    assert.ok(readFileSync(new URL(`../public/roadmap/${f}.png`, import.meta.url)).length > 1000, f);
+  }
 });
