@@ -22,7 +22,7 @@ function Tip({ active, payload }: { active?: boolean; payload?: { payload: Row }
 export function ActivityChart({ series }: { series: Row[] }) {
   return (
     <div>
-      <div className="h-[190px] w-full" role="img" aria-label="Published items per feed date, 30 days">
+      <div className="h-[11.875rem] w-full" role="img" aria-label="Published items per feed date, 30 days">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={series} margin={{ top: 6, right: 4, bottom: 0, left: -18 }} barCategoryGap={2}>
             <CartesianGrid vertical={false} stroke="#eaeef4" />
@@ -35,7 +35,7 @@ export function ActivityChart({ series }: { series: Row[] }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-1.5 flex gap-4 text-[11px] text-mute">
+      <div className="mt-1.5 flex gap-4 text-[0.6875rem] text-mute">
         <span className="inline-flex items-center gap-1"><i className="inline-block size-2 rounded-sm" style={{ background: BASE }} /> items per day</span>
         <span className="inline-flex items-center gap-1"><i className="inline-block size-2 rounded-sm" style={{ background: HOT }} /> a day with an item rated 4 or 5</span>
       </div>

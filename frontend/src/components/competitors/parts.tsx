@@ -32,7 +32,7 @@ export function MixBar({ mix, legend = false }: { mix: CompetitorCard["category_
         ))}
       </div>
       {legend ? (
-        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-mute">
+        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] text-mute">
           {mix.map((m) => (
             <span key={m.category} className="inline-flex items-center gap-1">
               <i className="inline-block size-2 rounded-sm" style={{ background: CATEGORY_COLOR[m.category] ?? "#9aa5b5" }} />
@@ -48,15 +48,15 @@ export function MixBar({ mix, legend = false }: { mix: CompetitorCard["category_
 export function CompetitorCardView({ c }: { c: CompetitorCard }) {
   return (
     <Link href={`/competitors/${encodeURIComponent(c.key)}`}
-      className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[18px] py-4 transition-colors hover:border-jgreen">
-      <div className="flex items-center justify-between text-[15px] font-semibold">
+      className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[1.125rem] py-4 transition-colors hover:border-jgreen">
+      <div className="flex items-center justify-between text-[0.9375rem] font-semibold">
         <span className="inline-flex items-center gap-2"><CompetitorAvatar k={c.key} name={c.name} size="md" />{c.name}</span>
         <span className="flex items-center gap-1.5 text-xs font-normal text-mute">
           Top score this week <ScoreBadge score={c.threat} title="Top score: the highest score of any of this competitor's items this week" />
         </span>
       </div>
       <div className="flex items-baseline gap-2">
-        <b className="text-[28px] font-semibold leading-none tabular-nums">{c.items_7d}</b>
+        <b className="text-[1.75rem] font-semibold leading-none tabular-nums">{c.items_7d}</b>
         <span className="text-mute">published items found in the last 7 days · {c.items_today} in this Brief</span>
       </div>
       <Trend t={c.trend} prev={c.items_prev_7d} />

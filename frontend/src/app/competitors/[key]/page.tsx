@@ -44,7 +44,7 @@ function Profile() {
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h1 className="m-0 flex items-center gap-2 text-[22px] font-semibold"><CompetitorAvatar k={p.key} name={p.name} size="lg" />{p.name}</h1>
+                  <h1 className="m-0 flex items-center gap-2 text-[1.375rem] font-semibold"><CompetitorAvatar k={p.key} name={p.name} size="lg" />{p.name}</h1>
                   <div className="mt-0.5 text-mute">
                     Week to {fmtDate(p.date, true)} · last activity {fmtDate(c.last_activity_at, true)}
                   </div>

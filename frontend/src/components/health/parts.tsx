@@ -110,7 +110,7 @@ export function SilentTable({ s }: { s: NonNullable<Health["silent_sources"]> })
           ))}
         </tbody>
       </table>
-      <div className="mt-2 text-[11px] text-mute">{s.label}. Rule: {s.rule}.</div>
+      <div className="mt-2 text-[0.6875rem] text-mute">{s.label}. Rule: {s.rule}.</div>
     </>
   );
 }
@@ -139,10 +139,10 @@ function FetchReasons({ fetch }: { fetch?: Record<string, number> }) {
   const entries = Object.entries(fetch ?? {}).filter(([, v]) => v);
   if (!entries.length) return null;
   if (entries.length === 1 && entries[0][0] === "not_recorded") {
-    return <div className="text-[11px] text-mute">Why a fetch failed isn&apos;t recorded for these items yet (older runs).</div>;
+    return <div className="text-[0.6875rem] text-mute">Why a fetch failed isn&apos;t recorded for these items yet (older runs).</div>;
   }
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+    <div className="flex flex-wrap items-center gap-1.5 text-[0.6875rem]">
       <span className="text-mute">Fetch outcome:</span>
       {entries.sort((a, b) => b[1] - a[1]).map(([k, v]) => <Tag key={k}>{k.replace(/_/g, " ")} {v}</Tag>)}
     </div>
@@ -199,7 +199,7 @@ export function Extraction({ e }: { e: NonNullable<Health["extraction"]> }) {
           </span>
         ) : <span className="text-mute">Not measured for this scope.</span>}
         <span className="flex-1" />
-        <span className="flex flex-wrap gap-x-3 text-[11px] text-mute">
+        <span className="flex flex-wrap gap-x-3 text-[0.6875rem] text-mute">
           {STATUS_PARTS.map(([k, l, c]) => (
             <span key={k} className="inline-flex items-center gap-1"><i className="inline-block size-2 rounded-sm" style={{ background: c }} />{l}</span>
           ))}
@@ -225,7 +225,7 @@ export function Extraction({ e }: { e: NonNullable<Health["extraction"]> }) {
           </div>
         </>
       )}
-      <div className="text-[11px] text-mute">{e.definition}.</div>
+      <div className="text-[0.6875rem] text-mute">{e.definition}.</div>
     </div>
   );
 }
@@ -251,7 +251,7 @@ export function MetricCards({ cards }: { cards: EvalCard[] }) {
     <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
       {cards.map((c) => (
         <div key={c.metric} className={cn("rounded-md border border-line bg-card px-4 py-3", c.untested && "bg-page")}>
-          <div className="text-[26px] font-semibold leading-tight tabular-nums">
+          <div className="text-[1.625rem] font-semibold leading-tight tabular-nums">
             {c.untested ? <span className="text-mute">—</span> : pct(c.value)}
             <N n={c.n} />
           </div>
@@ -260,7 +260,7 @@ export function MetricCards({ cards }: { cards: EvalCard[] }) {
             {c.untested ? <Tag className="bg-track">untested</Tag> : null}
             {c.weak && !c.untested ? <Tag className="bg-[#fff4e0] text-[#8a5a00]" title="n < 10, or an important-item metric">weak evidence</Tag> : null}
           </div>
-          {c.note ? <div className="mt-1.5 text-[11px] text-mute">{c.note}</div> : null}
+          {c.note ? <div className="mt-1.5 text-[0.6875rem] text-mute">{c.note}</div> : null}
         </div>
       ))}
     </div>
@@ -293,7 +293,7 @@ function Count({ l, c }: { l: string; c?: { captured: number; n: number } }) {
   if (!c) return null;
   return (
     <div className="rounded-md border border-line px-4 py-3">
-      <div className="text-[22px] font-semibold tabular-nums">{c.captured} of {c.n}<N n={c.n} /></div>
+      <div className="text-[1.375rem] font-semibold tabular-nums">{c.captured} of {c.n}<N n={c.n} /></div>
       <div className="text-mute">{l}</div>
     </div>
   );
@@ -437,7 +437,7 @@ export function RunHistory({ runs, selected, metrics, onSelect }: {
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse">
+        <table className="w-full min-w-[40rem] border-collapse">
           <thead><tr>{["Started (Israel time)", "Kind", "Status", "Duration", "LLM calls", "Run"].map((h) => <th key={h} className={th}>{h}</th>)}</tr></thead>
           <tbody>
             {runs.map((r) => {
@@ -451,7 +451,7 @@ export function RunHistory({ runs, selected, metrics, onSelect }: {
                   <td className={td}><MarkerTag marker={r.marker ?? r.status} /></td>
                   <td className={cn(td, "tabular-nums text-mute")}>{mins == null ? "—" : `${mins} min`}</td>
                   <td className={cn(td, "tabular-nums text-mute")}>{r.llm_calls ?? "—"}</td>
-                  <td className={cn(td, "font-mono text-[11px] text-mute")}>{r.run_id}{r.error ? <div className="font-sans text-[#a32d2d]">{r.error}</div> : null}</td>
+                  <td className={cn(td, "font-mono text-[0.6875rem] text-mute")}>{r.run_id}{r.error ? <div className="font-sans text-[#a32d2d]">{r.error}</div> : null}</td>
                 </tr>
               );
             })}
@@ -463,7 +463,7 @@ export function RunHistory({ runs, selected, metrics, onSelect }: {
         {metrics?.steps?.length ? (
           <div className="flex flex-wrap items-center gap-1.5">
             {metrics.steps.map((s, i) => <StepChip key={`${s.step}-${i}`} s={s} />)}
-            {metrics.metadata?.commit ? <span className="text-[11px] text-mute">· commit {String(metrics.metadata.commit).slice(0, 7)}</span> : null}
+            {metrics.metadata?.commit ? <span className="text-[0.6875rem] text-mute">· commit {String(metrics.metadata.commit).slice(0, 7)}</span> : null}
           </div>
         ) : (
           <div className="text-xs text-mute">No step record for this run (runs before Oct 31 night have none).</div>
@@ -498,7 +498,7 @@ export function TestEvalBlock({ t, missing }: { t: TestEval | null | undefined; 
         {t.model ? fact("Model", <span className="text-sm">{t.model}</span>) : null}
       </div>
       {t.cards?.length ? <MetricCards cards={t.cards} /> : null}
-      {t.report ? <div className="text-[11px] text-mute">Report {t.report}</div> : null}
+      {t.report ? <div className="text-[0.6875rem] text-mute">Report {t.report}</div> : null}
     </div>
   );
 }

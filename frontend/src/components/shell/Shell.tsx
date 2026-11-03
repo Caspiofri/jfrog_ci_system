@@ -47,7 +47,7 @@ function ReviewCount() {
   if (!n) return null;
   // The whole backlog (every undecided held item), not one Brief's window: say so, so it isn't read as today's count.
   return (
-    <span className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[11px] font-normal text-[#c9d3e4]"
+    <span className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[0.6875rem] font-normal text-[#c9d3e4]"
       title={`${n} held items in the whole backlog, across every Brief`}>
       <span className="rounded-full bg-[#f59e0b] px-1.5 font-semibold text-navy tabular-nums">{n}</span> total backlog
     </span>
@@ -57,7 +57,7 @@ function ReviewCount() {
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   return (
-    <div className="grid min-h-screen grid-cols-1 grid-rows-[56px_auto_1fr] md:grid-cols-[196px_minmax(0,1fr)] md:grid-rows-[56px_1fr]">
+    <div className="grid min-h-screen grid-cols-1 grid-rows-[3.5rem_auto_1fr] md:grid-cols-[12.25rem_minmax(0,1fr)] md:grid-rows-[3.5rem_1fr]">
       <header className="col-span-full flex items-center gap-3.5 bg-navy px-5 text-[#e8edf5]">
         <Link href="/brief" className="flex items-center" aria-label="Jessi home">
           {/* public/brand/jessi-mark.svg: splash + wordmark, viewBox 1332 x 405, transparent; 40px high on navy */}
@@ -73,7 +73,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <nav aria-label="Screens" className="sticky top-2 flex flex-row flex-wrap gap-0.5 md:flex-col">
           {NAV.map((g) => (
             <div key={g.group} className="contents md:block">
-              <span className="mx-2.5 mb-1.5 mt-3.5 hidden text-[11px] uppercase tracking-[.06em] text-[#7f8eac] md:block">{g.group}</span>
+              <span className="mx-2.5 mb-1.5 mt-3.5 hidden text-[0.6875rem] uppercase tracking-[.06em] text-[#7f8eac] md:block">{g.group}</span>
               {g.items.map((it) => {
                 const active = path === it.href || path.startsWith(`${it.href}/`);
                 const Icon = it.icon;
@@ -83,11 +83,11 @@ export function Shell({ children }: { children: ReactNode }) {
                     href={it.href}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "relative flex items-center gap-2.5 rounded-md px-2.5 py-[9px] text-[13px] text-[#b9c5dc] hover:bg-navy2 hover:text-white",
+                      "relative flex items-center gap-2.5 rounded-md px-2.5 py-[0.5625rem] text-[0.8125rem] text-[#b9c5dc] hover:bg-navy2 hover:text-white",
                       active && "bg-navy2 font-semibold text-white before:absolute before:-left-2 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r before:bg-jgreen",
                     )}
                   >
-                    <Icon className="size-[18px] shrink-0" strokeWidth={1.7} />
+                    <Icon className="size-[1.125rem] shrink-0" strokeWidth={1.7} />
                     <span className="flex min-w-0 flex-col">
                       {it.label}
                       {it.badge === "review" ? <ReviewCount /> : null}
@@ -99,7 +99,7 @@ export function Shell({ children }: { children: ReactNode }) {
           ))}
         </nav>
       </aside>
-      <main className="flex min-w-0 flex-col gap-[18px] px-4 pb-10 pt-5 sm:px-6">
+      <main className="mx-auto flex w-full min-w-0 max-w-[110rem] flex-col gap-[1.125rem] px-4 pb-10 pt-5 sm:px-6">
         <ItemDrawerProvider>{children}</ItemDrawerProvider>
       </main>
     </div>

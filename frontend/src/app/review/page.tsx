@@ -134,12 +134,12 @@ function ReviewScreen() {
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-mute" />
                     <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search held items"
                       placeholder="Search by item id, title or publisher"
-                      className="h-8 w-full rounded-md border border-line bg-white pr-2.5 pl-8 text-[13px] outline-none focus:border-jgreen" />
+                      className="h-8 w-full rounded-md border border-line bg-white pr-2.5 pl-8 text-[0.8125rem] outline-none focus:border-jgreen" />
                   </label>
                   <FilterSelect ariaLabel="Sort" allLabel={SORT_OPTIONS[0].label} value={sort} onChange={(v) => set({ sort: v || null, offset: null })}
                     options={SORT_OPTIONS.slice(1)} />
                   <FilterSelect ariaLabel="Window" allLabel="All held items" value={brief} onChange={(v) => set({ brief: v, offset: null })}
-                    options={windows} className="h-8 min-w-[14rem] bg-white text-[13px]" />
+                    options={windows} className="h-8 min-w-[14rem] bg-white text-[0.8125rem]" />
                   <FilterSelect ariaLabel="Score" allLabel="All scores" value={score} onChange={(v) => set({ score: v, offset: null })}
                     options={SCORE_OPTIONS} />
                   <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
@@ -196,11 +196,11 @@ function LevelControl({ levels, current, shown, onPreview }: {
             shown === l.level ? "border-jgreen bg-accent" : "border-line")}>
           <span className="flex flex-1 items-center gap-1.5">
             <span className="font-semibold">{label(LEVEL_LABEL, l.level)}</span>
-            {current === l.level ? <Tag className="bg-jgreen px-1.5 text-[11px] text-white">current</Tag> : null}
+            {current === l.level ? <Tag className="bg-jgreen px-1.5 text-[0.6875rem] text-white">current</Tag> : null}
           </span>
           <span className="text-right">
             <b className="text-lg font-semibold tabular-nums">{l.held}</b>
-            <span className="block text-[11px] text-mute">held</span>
+            <span className="block text-[0.6875rem] text-mute">held</span>
           </span>
         </button>
         </Hint>
@@ -333,7 +333,7 @@ function TrustButton({ host, fromItem, suggest, approved, dismissed, disabled, o
   return (
     <span className="inline-flex items-center gap-1.5">
       <span>· {host}: {approved} approved, {dismissed} dismissed</span>
-      <Button size="sm" variant="outline" className={cn("h-6 px-2 text-[11px]", suggest && "border-jgreen text-jgreen-d")} disabled={disabled || busy} onClick={trust}
+      <Button size="sm" variant="outline" className={cn("h-6 px-2 text-[0.6875rem]", suggest && "border-jgreen text-jgreen-d")} disabled={disabled || busy} onClick={trust}
         title="Add this host to the vetted list in the store; its items stop being held for an unvetted source">
         <ShieldCheck className="size-3" /> Trust this source{suggest ? " (suggested)" : ""}
       </Button>
@@ -394,7 +394,7 @@ function TrustedSources() {
             {(d) => d.items.map((s) => (
               <div key={s.host} className="flex items-center gap-2 border-t border-line py-1.5 first:border-t-0">
                 <span className="flex-1">{s.host} <span className="text-xs text-mute">{s.approved} approved · {s.held} held</span></span>
-                <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => act(() => send("POST", "/api/v1/sources/trust", { host: s.host }))}>
+                <Button size="sm" variant="outline" className="h-6 px-2 text-[0.6875rem]" onClick={() => act(() => send("POST", "/api/v1/sources/trust", { host: s.host }))}>
                   <ShieldCheck className="size-3" /> Trust
                 </Button>
               </div>
@@ -408,7 +408,7 @@ function TrustedSources() {
             {() => trusted.map((s) => (
               <div key={s.host} className="flex items-center gap-2 border-t border-line py-1.5 first:border-t-0">
                 <span className="flex-1">{s.host}</span>
-                <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => act(() => send("DELETE", `/api/v1/sources/trust/${encodeURIComponent(s.host)}`))}>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-[0.6875rem]" onClick={() => act(() => send("DELETE", `/api/v1/sources/trust/${encodeURIComponent(s.host)}`))}>
                   <Undo2 className="size-3" /> Remove
                 </Button>
               </div>

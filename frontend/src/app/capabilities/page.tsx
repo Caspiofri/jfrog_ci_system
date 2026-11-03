@@ -44,7 +44,7 @@ export default function CapabilitiesPage() {
       <Panel title="Capabilities by axis" cap="config/jfrog_capabilities.md · official JFrog pages, as of 30 Oct 2026">
         {verified ? <p className="m-0 mb-3 text-xs text-mute">{verified}</p> : null}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse">
+          <table className="w-full min-w-[45rem] border-collapse">
             <thead>
               <tr>
                 {["Axis", "What JFrog offers", "Tier / add-on"].map((h) => (

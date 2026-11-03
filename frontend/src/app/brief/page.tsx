@@ -372,7 +372,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
               ) : null}
             </div>
           ) : null}
-          {ins.baseline_note ? <div className="text-[11px] text-mute">{ins.baseline_note}</div> : null}
+          {ins.baseline_note ? <div className="text-[0.6875rem] text-mute">{ins.baseline_note}</div> : null}
         </div>
       ) : null}
     </div>
@@ -414,7 +414,7 @@ function TouchesJfrog({ claims }: { claims: Claim[] }) {
   const caps = insightCapabilities(claims, CAPABILITY_ROWS);
   if (!caps.length) return null;
   return (
-    <Tag className="border border-jgreen/40 bg-[#eef7f0] text-[11px] font-semibold text-jgreen-d">
+    <Tag className="border border-jgreen/40 bg-[#eef7f0] text-[0.6875rem] font-semibold text-jgreen-d">
       Touches JFrog: {caps.map((k) => CAPABILITY_NAME[k]).join(" · ")}
     </Tag>
   );
@@ -432,7 +432,7 @@ function ContinuityBadge({ c }: { c: Insight["continuity"] }) {
   if (!b) return null;
   return (
     <Hint text={CONTINUITY_TIP}>
-      <Tag className={cn("border text-[11px] font-semibold", BADGE_STYLE[b.status])}>{b.text}</Tag>
+      <Tag className={cn("border text-[0.6875rem] font-semibold", BADGE_STYLE[b.status])}>{b.text}</Tag>
     </Hint>
   );
 }
@@ -466,7 +466,7 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
         {main.score ?? "–"}
       </span>
       <div className="flex min-w-0 flex-col gap-1">
-        <div className="text-[13px] font-semibold text-ink">{c.text}</div>
+        <div className="text-[0.8125rem] font-semibold text-ink">{c.text}</div>
         {c.quote ? <div className="italic text-mute">&ldquo;{c.quote}&rdquo;</div> : null}
         {c.jfrog_quote ? <JfrogQuote c={c} /> : null}
         {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} n={ids.length > 1 ? k + 1 : null} />)}
@@ -482,17 +482,17 @@ function SourceLine({ id, row, withScore, n }: { id: string; row?: CitedItemRow;
   const it = useCitedItem(id, row);
   const [bg, fg] = SCORE_COLOR[it.score ?? 0] ?? SCORE_COLOR[0];
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-mute" data-source-line={id}>
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.6875rem] text-mute" data-source-line={id}>
       <button type="button" title={`Open the details of: ${it.title}`} onClick={() => drawer.open(id)} data-reinforced-by
         className="rounded border border-line bg-page px-1.5 py-0.5 font-medium text-ink transition-colors hover:border-jgreen hover:text-jgreen-d focus-visible:outline-2 focus-visible:outline-jgreen">
         Reinforced by article{n ? ` ${n}` : ""}
       </button>
       {withScore ? (
-        <span title={SCORE_TIP} className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums"
+        <span title={SCORE_TIP} className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[0.625rem] font-semibold tabular-nums"
           style={{ background: bg, color: fg }}>{it.score ?? "–"}</span>
       ) : null}
       {it.outside ? (
-        <Tag className="text-[10px]"
+        <Tag className="text-[0.625rem]"
           title={it.belowLine ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
           not in this Brief
         </Tag>

@@ -101,10 +101,16 @@
 }
 
 @layer base {
+  /* D89: the root size grows with the viewport, so every rem-based size (text, spacing, the shell) grows on wide
+     screens: 100% up to 1440 px wide, then linearly to 125% at 1920 px and wider (what 125% browser zoom gave on a
+     large screen). Laptops stay at the browser's normal size; the user's own font setting still applies. */
+  html {
+    font-size: clamp(100%, 0.25rem + 0.8333vw, 125%);
+  }
   * {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground text-[13px];
+    @apply bg-background text-foreground text-[0.8125rem];
   }
 }

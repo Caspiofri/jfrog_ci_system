@@ -85,7 +85,7 @@ function Shot({ slug, title }: { slug: string; title: string }) {
           <span className="text-xs">Screenshot to add: public/roadmap/{slug}.png</span>
         </div>
       )}
-      <span className="absolute left-2 top-2 rounded bg-navy/90 px-2 py-0.5 text-[11px] font-semibold text-white">Concept, sample data</span>
+      <span className="absolute left-2 top-2 rounded bg-navy/90 px-2 py-0.5 text-[0.6875rem] font-semibold text-white">Concept, sample data</span>
     </div>
   );
 }
@@ -99,10 +99,10 @@ export default function RoadmapPage() {
       </div>
       <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))]">
         {CONCEPTS.map((c) => (
-          <section key={c.slug} className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[18px] py-4">
+          <section key={c.slug} className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[1.125rem] py-4">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="m-0 text-sm font-semibold">{c.title}</h2>
-              <span className="text-[11px] text-mute">{c.screen}</span>
+              <span className="text-[0.6875rem] text-mute">{c.screen}</span>
             </div>
             <Shot slug={c.slug} title={c.title} />
             <p className="m-0"><span className="text-mute">Would show: </span>{c.shows}</p>

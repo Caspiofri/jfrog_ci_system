@@ -34,7 +34,7 @@ export default function CompetitorsPage() {
             <ColourLegends />
             <Panel title="Who is buying and partnering?" cap={`${d.deals.category} items as collected · ${d.deals.total} items`}>
               {d.deals.items.length ? <DealsTable deals={d.deals.items} /> : <Empty>No funding, M&amp;A or partnership items yet.</Empty>}
-              <div className="mt-2 text-[11px] text-mute">
+              <div className="mt-2 text-[0.6875rem] text-mute">
                 Deal type, buyer and target aren&apos;t extracted yet (Roadmap). M&amp;A items are held at every level, so they show &ldquo;Awaiting review&rdquo; until approved.
               </div>
             </Panel>

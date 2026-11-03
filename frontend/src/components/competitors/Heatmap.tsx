@@ -49,7 +49,7 @@ export function ActivityHeatmap() {
         <Empty>No items from the tracked competitors were published in the last 7 days.</Empty>
       ) : (
         <>
-          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mute" data-legend aria-label="Legend">
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] text-mute" data-legend aria-label="Legend">
             <span className="font-semibold">Items:</span>
             <span className="inline-flex items-center gap-1"><i className="inline-block size-3 rounded-sm ring-1 ring-black/10" style={{ background: ZERO_BG }} aria-hidden />0</span>
             {legendSteps(hm.max).map((n) => (

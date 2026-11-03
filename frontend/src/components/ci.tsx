@@ -31,7 +31,7 @@ export function PageHead({ title, sub, tools, info, icon, titleHint }: {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2.5">
       <div>
-        <h1 className="m-0 flex items-center gap-1.5 text-[22px] font-semibold">
+        <h1 className="m-0 flex items-center gap-1.5 text-[1.375rem] font-semibold">
           {icon}
           {titleHint ? <Hint text={titleHint}>{title}</Hint> : title}
           <InfoHint text={info} />
@@ -58,7 +58,7 @@ export function Panel({ title, cap, children, className, right, big, info }: {
   title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean; info?: ReactNode;
 }) {
   return (
-    <section className={cn("min-w-0 rounded-md border border-line bg-card px-[18px] py-4", className)}>
+    <section className={cn("min-w-0 rounded-md border border-line bg-card px-[1.125rem] py-4", className)}>
       {title || cap || right ? (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           {title ? <h2 className={cn("m-0 flex items-center gap-1.5 font-semibold", big ? "text-lg" : "text-sm")}>{title}<InfoHint text={info} /></h2> : <span />}
@@ -78,7 +78,7 @@ export function ScoreBadge({ score, noise, title }: { score: number | null; nois
   const [bg, fg] = SCORE_COLOR[n] ?? SCORE_COLOR[0];
   return (
     <span
-      className="inline-flex h-6 min-w-[26px] shrink-0 items-center justify-center rounded px-[7px] text-xs font-semibold tabular-nums"
+      className="inline-flex h-6 min-w-[1.625rem] shrink-0 items-center justify-center rounded px-[0.4375rem] text-xs font-semibold tabular-nums"
       style={{ background: bg, color: fg }}
       title={title ?? (noise ? "Noise" : score ? `Importance ${score} of 5` : "No score")}
     >
@@ -133,12 +133,12 @@ export function ColorLegend({ title, items, className }: {
 }) {
   if (!items.length) return null;
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mute", className)} data-legend>
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] text-mute", className)} data-legend>
       {title ? <span className="font-semibold">{title}</span> : null}
       {items.map((it, i) => (
         <span key={i} className="inline-flex items-center gap-1">
           {it.text ? (
-            <i className="inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-[3px] px-0.5 text-[9px] font-semibold not-italic tabular-nums"
+            <i className="inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-[3px] px-0.5 text-[0.5625rem] font-semibold not-italic tabular-nums"
               style={{ background: it.color, color: it.fg }}>{it.text}</i>
           ) : (
             <i className="inline-block size-2.5 rounded-sm ring-1 ring-black/10" style={{ background: it.color }} aria-hidden />
@@ -185,7 +185,7 @@ export function CategoryColours({ className }: { className?: string }) {
 
 /** "n=12" next to every eval number and every measured count. */
 export function N({ n }: { n: number | null | undefined }) {
-  return <span className="ml-1 text-[11px] font-normal text-mute tabular-nums">n={n ?? "?"}</span>;
+  return <span className="ml-1 text-[0.6875rem] font-normal text-mute tabular-nums">n={n ?? "?"}</span>;
 }
 
 /** External links only open http(s) URLs (D32); safeHref turns anything else into no link. */
@@ -201,7 +201,7 @@ export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className,
   return (
     <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={aria} title={iconOnly ? "Source" : aria}
       onClick={(e) => e.stopPropagation()}
-      className={cn("inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[11px] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
+      className={cn("inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[0.6875rem] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
       {iconOnly ? null : "Source"}<ExternalLink className={iconOnly ? "size-3.5" : "size-3"} aria-hidden="true" />
     </a>
   );
@@ -292,7 +292,7 @@ export function HBars({ rows, color = "var(--bar)", max: fixedMax }: { rows: { l
   return (
     <div>
       {rows.map((r) => (
-        <div key={r.label} className="grid grid-cols-[8.5rem_minmax(0,1fr)_2.4rem] items-center gap-2.5 py-[5px]" title={r.title}>
+        <div key={r.label} className="grid grid-cols-[8.5rem_minmax(0,1fr)_2.4rem] items-center gap-2.5 py-[0.3125rem]" title={r.title}>
           <span className="truncate">{r.label}</span>
           <div className="h-2.5 overflow-hidden rounded-sm bg-track">
             <i className="block h-full rounded-sm" style={{ width: `${(100 * r.value) / max}%`, background: r.color ?? color }} />
@@ -307,11 +307,11 @@ export function HBars({ rows, color = "var(--bar)", max: fixedMax }: { rows: { l
 /** The 4 KPI tiles. */
 export function KpiTile({ value, label: l, sub, future = false }: { value: ReactNode; label: string; sub?: ReactNode; future?: boolean }) {
   return (
-    <div className={cn("rounded-md border border-line bg-card px-[18px] py-4", future && "border-dashed opacity-70")} data-future={future ? "1" : undefined}>
-      <div className="text-[30px] font-semibold leading-[1.1] tabular-nums">{value}</div>
+    <div className={cn("rounded-md border border-line bg-card px-[1.125rem] py-4", future && "border-dashed opacity-70")} data-future={future ? "1" : undefined}>
+      <div className="text-[1.875rem] font-semibold leading-[1.1] tabular-nums">{value}</div>
       <div className="mt-1 flex items-center gap-1.5 text-mute">
         {l}
-        {future ? <Tag className="bg-[#e8eefb] text-[10px] font-semibold uppercase tracking-wide text-[#3f5b8f]">Future</Tag> : null}
+        {future ? <Tag className="bg-[#e8eefb] text-[0.625rem] font-semibold uppercase tracking-wide text-[#3f5b8f]">Future</Tag> : null}
       </div>
       {sub ? <div className="mt-1.5 text-xs">{sub}</div> : null}
     </div>

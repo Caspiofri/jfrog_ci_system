@@ -21,7 +21,7 @@ function CellView({ c }: { c: Cell }) {
       ) : (
         <span>{c.value}</span>
       )}
-      <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-mute">
+      <span className="flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-mute">
         {c.state === "stale" ? <Tag className="bg-[#fff4e0] text-[#8a5a00]" title={c.stale_reason}>Stale{c.stale_reason ? `: ${c.stale_reason}` : ""}</Tag> : null}
         {c.needs_review ? <Tag className="bg-[#fffaf0] text-[#8a5a00]" title={c.review_reason}>Needs review</Tag> : null}
         {c.source_url ? <ArticleLink href={c.source_url} label="Open the source page in a new tab" /> : null}
@@ -65,7 +65,7 @@ export function HeadToHead({ competitor, name, axes }: { competitor: string; nam
   return (
     <div className="overflow-x-auto">
       <UnverifiedNote className="mb-3" />
-      <table className="w-full min-w-[720px] border-collapse">
+      <table className="w-full min-w-[45rem] border-collapse">
         <thead>
           <tr>
             {["Axis", "JFrog", name, ""].map((h, i) => (
@@ -79,7 +79,7 @@ export function HeadToHead({ competitor, name, axes }: { competitor: string; nam
               <tr className={cn(a.changed && "bg-[#fff7e6]")}>
                 <td className={`${td} w-[9rem] font-semibold`}>
                   {a.label}
-                  {a.changed ? <div className="text-[11px] font-normal text-[#8a5a00]">changed this week</div> : null}
+                  {a.changed ? <div className="text-[0.6875rem] font-normal text-[#8a5a00]">changed this week</div> : null}
                 </td>
                 <td className={`${td} w-[40%]`}><CellView c={a.jfrog} /></td>
                 <td className={`${td} w-[40%]`}><CellView c={a.competitor} /></td>

@@ -22,7 +22,7 @@ const EMPHASIS: Record<number, string> = {
 /** Dev mock scenarios only (src/lib/mock.ts). */
 export function MockTag({ what }: { what?: string }) {
   return (
-    <span className="ml-1 rounded-[3px] border border-dashed border-[#8b5cf6] px-1 text-[10px] font-semibold uppercase tracking-wide text-[#6d28d9]"
+    <span className="ml-1 rounded-[3px] border border-dashed border-[#8b5cf6] px-1 text-[0.625rem] font-semibold uppercase tracking-wide text-[#6d28d9]"
       title={`Dev mock: ${what ?? "this value"} isn't served by the API yet`}>
       mock
     </span>
@@ -54,7 +54,7 @@ export function ScoreLabel({ score, competitor, reason }: { score: number | null
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
-      <dt className="pt-px text-[11px] font-semibold text-mute">{label}</dt>
+      <dt className="pt-px text-[0.6875rem] font-semibold text-mute">{label}</dt>
       <dd className="m-0 min-w-0">{children}</dd>
     </>
   );

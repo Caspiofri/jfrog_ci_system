@@ -72,7 +72,7 @@ function LogScreen() {
                     options={(meta?.statuses ?? STATUS_ORDER).map((s) => ({ value: s, label: label(STATUS_LABEL, s) }))} />
                   <input type="date" aria-label="Date" min="2000-01-01" max="2099-12-31" value={date}
                     onChange={(e) => e.target.validity.valid && set({ date: e.target.value || null, offset: null })}
-                    className="h-8 rounded border border-input bg-white px-2.5 text-[13px]" />
+                    className="h-8 rounded border border-input bg-white px-2.5 text-[0.8125rem]" />
                   <Button variant="outline" size="sm" className="h-8 text-xs" disabled={!filtered}
                     onClick={() => set({ competitor: null, category: null, status: null, date: null, offset: null })}>Reset</Button>
                   <span className="text-xs text-mute">{d.total} of {collected} items</span>
@@ -112,7 +112,7 @@ function LogScreen() {
 function LogTr({ r }: { r: LogRow }) {
   const drawer = useItemDrawer();
   const dropped = r.status === "dropped";
-  const td = "border-b border-line px-2.5 py-[9px] align-top";
+  const td = "border-b border-line px-2.5 py-[0.5625rem] align-top";
   return (
     <tr>
       <td className={`${td} whitespace-nowrap`}>{fmtDate(r.collected_at)}</td>

@@ -33,7 +33,7 @@ function HealthScreen() {
         title="Health"
         info="Does the system run, and is it correct?"
         tools={runs.data?.items.length ? (
-          <FilterSelect ariaLabel="Run" allLabel="Latest daily run" value={runId} onChange={(v) => set({ run: v })} className="h-8 min-w-[16rem] bg-white text-[13px]"
+          <FilterSelect ariaLabel="Run" allLabel="Latest daily run" value={runId} onChange={(v) => set({ run: v })} className="h-8 min-w-[16rem] bg-white text-[0.8125rem]"
             options={runs.data.items.map((r) => ({ value: r.run_id, label: `${fmtDateTime(r.started_at)} · ${r.kind} · ${MARKER[r.marker ?? r.status]?.label ?? r.status}` }))} />
         ) : null}
       />
