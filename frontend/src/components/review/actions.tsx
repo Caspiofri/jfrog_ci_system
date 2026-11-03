@@ -77,8 +77,9 @@ export function ItemActions({ item, disabled, onError }: { item: Item; disabled?
       <Button size="sm" variant="outline" className={btn} disabled={off} onClick={() => setEditing(true)}>
         <Pencil className="size-3.5" /> Edit
       </Button>
-      {/* D107: Flag only marks the item; it toggles with Unflag, and neither changes the item's status */}
-      {item.flagged ? (
+      {/* D107: Flag only marks the item; it toggles with Unflag, and neither changes the item's status. A dismissed
+          item is never offered Flag (the API answers 409); a dismissed flagged item gets UnflagButton instead */}
+      {item.status === "dismissed" ? null : item.flagged ? (
         <Button size="sm" variant="outline" className={btn} disabled={off} title={UNFLAG_TIP} aria-pressed
           onClick={() => run(() => send("DELETE", `/api/v1/items/${id}/flag`, undefined, item.version))}>
           <Flag className="size-3.5 fill-current" /> Unflag
@@ -160,6 +161,35 @@ function FieldNote({ field, enabled, value, onChange }: { field: string; enabled
     <input type="text" aria-label={`Note for ${field}`} value={enabled ? value : ""} disabled={!enabled} onChange={(e) => onChange(e.target.value)}
       placeholder={enabled ? "Why this change? (optional)" : "Change the value to add a note"}
       className="h-7 rounded border border-line bg-white px-2 text-xs placeholder:text-mute disabled:bg-[#f6f8fa]" />
+  );
+}
+
+/** Unflag only, for a dismissed item that kept its flag (D107: Dismiss leaves the flag; Flag on a dismissed item is a 409,
+ *  so it is never offered). Version is sent when known (If-Match); the Log has none, which the API allows. */
+export function UnflagButton({ itemId, version }: { itemId: string; version?: number }) {
+  const refresh = useRefreshAll();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<ApiError | null>(null);
+  const go = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await send("DELETE", `/api/v1/items/${encodeURIComponent(itemId)}/flag`, undefined, version);
+      await refresh();
+    } catch (e) {
+      setErr(e as ApiError);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className="inline-flex flex-col gap-1">
+      <Button size="sm" variant="outline" className={btn} disabled={busy} title={UNFLAG_TIP} aria-pressed data-unflag-only
+        onClick={(e) => { e.stopPropagation(); void go(); }}>
+        <Flag className="size-3.5 fill-current" /> Unflag
+      </Button>
+      {err ? <ErrorNote error={err} /> : null}
+    </span>
   );
 }
 

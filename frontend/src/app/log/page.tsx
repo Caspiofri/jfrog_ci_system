@@ -7,7 +7,7 @@ import { Async, ColourLegends, Empty, HBars, ItemTitle, Loading, PageHead, Panel
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
-import { ReopenButton } from "@/components/review/actions";
+import { ReopenButton, UnflagButton } from "@/components/review/actions";
 import { path, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
 import { COLLECTED_TIP, DISMISS_LABEL, routeReasonWords, STAGE_LABEL, STATUS_COLOR, STATUS_LABEL, fmtDate, label } from "@/lib/format";
@@ -131,7 +131,9 @@ function LogTr({ r }: { r: LogRow }) {
       <td className={`${td} whitespace-nowrap`}>{label(STAGE_LABEL, r.stage)}</td>
       <td className={`${td} text-mute`}>
         {r.dismiss_reason ? `Dismissed: ${label(DISMISS_LABEL, r.dismiss_reason)}` : routeReasonWords(r.reason) || "—"}
-        {r.status === "dismissed" && r.item_id ? <div className="mt-1"><ReopenButton itemId={r.item_id} title={r.title} /></div> : null}
+        {r.status === "dismissed" && r.item_id ? (
+          <div className="mt-1 flex flex-wrap gap-1.5"><ReopenButton itemId={r.item_id} title={r.title} />{r.flagged ? <UnflagButton itemId={r.item_id} /> : null}</div>
+        ) : null}
       </td>
     </tr>
   );

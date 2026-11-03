@@ -69,9 +69,20 @@ test("demo mode only: the snapshot line under the header, dated from the manifes
 
 test("D107: Flag toggles with Unflag, with the hover as written; one Flagged badge in Review, the drawer and the Log", () => {
   const a = src("components/review/actions.tsx");
-  assert.match(a, /\{item\.flagged \? \([\s\S]*?send\("DELETE", `\/api\/v1\/items\/\$\{id\}\/flag`[\s\S]*?Unflag[\s\S]*?\) : \([\s\S]*?title=\{FLAG_TIP\}[\s\S]*?send\("POST", `\/api\/v1\/items\/\$\{id\}\/flag`/);
+  assert.match(a, /item\.flagged \? \([\s\S]*?send\("DELETE", `\/api\/v1\/items\/\$\{id\}\/flag`[\s\S]*?Unflag[\s\S]*?\) : \([\s\S]*?title=\{FLAG_TIP\}[\s\S]*?send\("POST", `\/api\/v1\/items\/\$\{id\}\/flag`/);
   assert.match(src("components/ci.tsx"), /export const FLAG_TIP = "Marks this item as important\. It does not approve or publish it\.";/);
   assert.match(src("components/ItemRow.tsx"), /\{item\.flagged \? <FlaggedBadge \/> : null\}/);
   assert.match(src("components/ItemDrawer.tsx"), /\{it\.flagged \? <FlaggedBadge \/> : null\}/);
   assert.match(src("app/log/page.tsx"), /\{r\.flagged \? <FlaggedBadge \/> : null\}/);
+});
+
+test("D107: a dismissed flagged item is offered Unflag only; Flag is never offered on a dismissed item", () => {
+  const a = src("components/review/actions.tsx");
+  assert.match(a, /\{item\.status === "dismissed" \? null : item\.flagged \? \(/);
+  assert.match(a, /export function UnflagButton[\s\S]*?send\("DELETE", `\/api\/v1\/items\/\$\{encodeURIComponent\(itemId\)\}\/flag`/);
+  const unflagOnly = a.slice(a.indexOf("export function UnflagButton"), a.indexOf("export function ReopenButton"));
+  assert.doesNotMatch(unflagOnly, /"POST"/);
+  assert.match(src("app/log/page.tsx"), /r\.status === "dismissed" && r\.item_id \? \([\s\S]*?\{r\.flagged \? <UnflagButton itemId=\{r\.item_id\} \/> : null\}/);
+  assert.match(src("components/ItemDrawer.tsx"), /it\.status === "dismissed" \? \([\s\S]*?\{it\.flagged \? <UnflagButton itemId=\{it\.item_id\} version=\{it\.version\} \/> : null\}/);
+  assert.match(src("app/review/page.tsx"), /\{it\.status === "dismissed" && it\.flagged \? <UnflagButton itemId=\{it\.item_id\} version=\{it\.version\} \/> : null\}/);
 });

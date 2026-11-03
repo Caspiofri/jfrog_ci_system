@@ -12,7 +12,7 @@ import { ArticleLink, Async, ColourLegends, Empty, ErrorNote, HBars, Hint, Loadi
 import { Donut } from "@/components/Donut";
 import { FilterChip, SortControl, StatusControl } from "@/components/review/FilterBar";
 import { ItemRow } from "@/components/ItemRow";
-import { ItemActions, useRefreshAll } from "@/components/review/actions";
+import { ItemActions, UnflagButton, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
 import { LOG_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, decisionOptions, filterQueue, flaggedFirst, isActiveFlag, hasLocalFilters, inQueueScope, queueQuery, remainingOffsets, sortQueue, windowOptions, type DecisionView, type QueueSort } from "@/lib/reviewQueue";
@@ -343,7 +343,13 @@ function DecidedItem({ row, level }: { row: ReviewItemRow; level: Level }) {
   const it = row.item;
   return (
     <ItemRow item={it} showBadge={false}
-      actions={<Tag className="text-xs font-semibold" data-decision={it.status}>{label(STATUS_LABEL, it.status)}</Tag>}
+      actions={
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <Tag className="text-xs font-semibold" data-decision={it.status}>{label(STATUS_LABEL, it.status)}</Tag>
+          {/* D107: a dismissed item keeps its flag; Unflag is the only action offered on it here */}
+          {it.status === "dismissed" && it.flagged ? <UnflagButton itemId={it.item_id} version={it.version} /> : null}
+        </span>
+      }
       extra={<ReasonChips reasons={it.hold_reasons} level={level} />} />
   );
 }

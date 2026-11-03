@@ -9,7 +9,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ArticleLink, Async, CategoryTag, FlaggedBadge, Hint, ScoreBadge, StatusDot } from "@/components/ci";
 import { LensView } from "@/components/LensView";
-import { ReopenButton } from "@/components/review/actions";
+import { ReopenButton, UnflagButton } from "@/components/review/actions";
 import { useRecord } from "@/lib/api";
 import { classifiedBy } from "@/lib/classifiedBy";
 import { ARTICLE_DATE_TIP, COLLECTED_TIP, DISMISS_LABEL, HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
@@ -96,7 +96,12 @@ function DrawerBody({ id }: { id: string }) {
                   <CategoryTag category={it.category} />
                   {it.mentions_jfrog ? <MentionsJfrog excerpt={it.excerpt} mention={it.jfrog_mention} /> : null}
                   {it.flagged ? <FlaggedBadge /> : null}
-                  {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
+                  {it.status === "dismissed" ? (
+                    <span className="ml-auto inline-flex gap-1.5">
+                      <ReopenButton itemId={it.item_id} version={it.version} title={it.title} />
+                      {it.flagged ? <UnflagButton itemId={it.item_id} version={it.version} /> : null}
+                    </span>
+                  ) : null}
                 </div>
                 {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
                 <MentionWhy d={d} />
