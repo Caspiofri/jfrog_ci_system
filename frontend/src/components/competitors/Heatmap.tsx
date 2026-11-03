@@ -91,12 +91,6 @@ export function ActivityHeatmap() {
                     })}
                   </tr>
                 ))}
-                <tr data-total-row>
-                  <th scope="row" className="sticky left-0 z-10 border-t-2 border-line bg-card px-2 py-1.5 text-left text-xs font-semibold">Total (as on the card)</th>
-                  {keys.map((k) => (
-                    <td key={k} className="border-t-2 border-l border-line px-2 py-1.5 text-center text-sm font-bold tabular-nums" data-col-total={hm.colTotals[k]}>{hm.colTotals[k]}</td>
-                  ))}
-                </tr>
               </tbody>
             </table>
           </div>

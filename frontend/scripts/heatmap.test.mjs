@@ -104,10 +104,10 @@ test("the heatmap ends where the competitor cards end (the latest Brief's run), 
   assert.doesNotMatch(comp + readFileSync(new URL("../src/lib/heatmap.ts", import.meta.url), "utf8"), /new Date\(\)|Date\.now\(\)/);
 });
 
-test("the heatmap counts as the cards and says so; a Total row per column; the totals line matches the cards' header", () => {
+test("the heatmap counts as the cards and says so; no Total row (D86: the card shows it); the totals line matches the cards' header", () => {
   assert.match(comp, /HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the last 7 days\. Items awaiting review are not in this grid; each card shows them\.";/);
   assert.match(comp, /<Panel title="Where competitors are active" info=\{HEATMAP_COUNTS\}>/);
-  assert.match(comp, /Total \(as on the card\)<\/th>[\s\S]*?\{hm\.colTotals\[k\]\}/);
+  assert.doesNotMatch(comp, /Total \(as on the card\)|data-total-row|hm\.colTotals/);
   assert.match(comp, /\{hm\.published\}<\/b> published[\s\S]*?the same as the cards below/);
 });
 test("1 Nov demo: every column total equals its card's number", () => {
