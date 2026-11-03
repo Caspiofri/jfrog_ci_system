@@ -91,7 +91,7 @@ function BriefScreen() {
             <Button variant="outline" size="icon" className="size-7" disabled={!newer} onClick={() => go(newer)} aria-label="Next Brief">
               <ChevronRight className="size-4" />
             </Button>
-            {backfill ? <Tag className="bg-[#e8eefb] font-semibold text-[#3f5b8f]">Initial import (backfill)</Tag> : null}
+            {backfill ? <Tag className="bg-[#e8eefb] font-semibold text-[#3f5b8f]">Initial import: previous 14 days</Tag> : null}
           </span>
         }
         tools={

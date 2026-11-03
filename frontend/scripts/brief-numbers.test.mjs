@@ -11,7 +11,7 @@ const RUN = { collected: 239, kept: 26, new: 26, noise: 11 };
 const byKey = (tiles) => Object.fromEntries(tiles.map((t) => [t.key, t]));
 
 test("four tiles with short labels, in order", () => {
-  assert.deepEqual(todayTiles(S, RUN).map((t) => t.label), ["New items", "Published", "High score (4+)", "Needs review"]);
+  assert.deepEqual(todayTiles(S, RUN).map((t) => t.label), ["Collected", "Published", "High score (4+)", "Needs review"]);
 });
 
 test("each number is the API's own field for that Brief", () => {
@@ -90,7 +90,7 @@ test("the Brief asks for its own run with keepPreviousData off", () => {
   assert.match(src, /runId=\{b\.window\.anchor_run_id\}/);
 });
 
-test("the New items hover is the run's funnel, every number from the run row or the Brief summary (1 Nov)", () => {
+test("the Collected hover is the run's funnel, every number from the run row or the Brief summary (1 Nov)", () => {
   assert.equal(byKey(todayTiles(S, RUN)).new.hint,
     "239 fetched → 26 new after removing duplicates → 11 removed as noise → 4 published · 11 need review");
 });
@@ -101,4 +101,16 @@ test("a funnel step whose field is empty is left out, never shown as 0", () => {
     "13 new after removing duplicates → 4 published · 11 need review");
   assert.equal(byKey(todayTiles(S, { new: 0, collected: 5, noise: 0 })).new.hint,
     "5 fetched → 0 new after removing duplicates → 0 removed as noise → 4 published · 11 need review");
+});
+
+test("the 30 Oct import Brief is tagged with what it covers", () => {
+  const src = readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8");
+  assert.match(src, />Initial import: previous 14 days<\/Tag>/);
+  assert.doesNotMatch(src, /Initial import \(backfill\)/);
+});
+
+test("no reconstructed note on screen until the API names its field", () => {
+  const lib = readFileSync(new URL("../src/lib/briefNumbers.ts", import.meta.url), "utf8");
+  assert.match(lib, /TODO.*Reconstructed from the item log/);
+  assert.ok(!todayTiles(S, RUN).some((t) => /Reconstructed/.test(t.hint)));
 });

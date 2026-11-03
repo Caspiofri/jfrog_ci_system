@@ -1,5 +1,5 @@
 // The Brief's "Today in numbers" tiles. Every number is a field the API returns for that Brief:
-// "New items" is items.new of the Brief run's metrics row (GET /run-metrics/{anchor_run_id}); its hover is that run's funnel
+// "Collected" is items.new of the Brief run's metrics row (GET /run-metrics/{anchor_run_id}); its hover is that run's funnel
 // (fetched, new, noise from the row; published and need review from the Brief summary). The rest is the Brief's summary.
 // No count of low-score items (published_below is left out on purpose). No imports besides types, so `npm test` runs it.
 import type { BriefSummary } from "./types";
@@ -36,6 +36,8 @@ export function funnelLine(run: RunItemCounts, s: BriefSummary): string {
   return steps.filter(Boolean).join(" → ");
 }
 
+// TODO: add "Reconstructed from the item log" to the Collected hover when the run-metrics row carries BE's
+// reconstructed marker (30 and 31 Oct, D74). The field isn't in the API contract yet, so nothing is shown.
 export const NO_RUN_METRICS = "Run metrics not recorded yet for this run.";
 
 export function todayTiles(s: BriefSummary, run: RunItemCounts | null | undefined): Tile[] {
@@ -44,7 +46,7 @@ export function todayTiles(s: BriefSummary, run: RunItemCounts | null | undefine
   const level = levelName(s.level);
   return [
     {
-      key: "new", label: "New items", value: fresh,
+      key: "new", label: "Collected", value: fresh,
       hint: fresh == null || !run ? NO_RUN_METRICS : funnelLine(run, s),
     },
     {
