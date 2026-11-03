@@ -41,7 +41,7 @@ test("the line under the filters states the order shown", () => {
 
 test("the page sorts after filtering, over the whole queue, and shows the matching line", () => {
   const src = readFileSync(new URL("../src/app/review/page.tsx", import.meta.url), "utf8");
-  assert.match(src, /sortQueue\(filterQueue\(r\.items, local\), sort\)/);
+  assert.match(src, /sortQueue\(filterQueue\(base, local\), sort\)/); // base: the queue, or the decided view (D91)
   assert.match(src, /SORT_LINES\[sort\]/);
   assert.match(src, /ariaLabel="Sort"/);
   assert.match(src, /getWholeQueue/);

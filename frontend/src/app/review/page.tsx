@@ -15,11 +15,11 @@ import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
-import { SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, filterQueue, hasLocalFilters, queueQuery, remainingOffsets, sortQueue, windowOptions, type QueueSort } from "@/lib/reviewQueue";
-import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
+import { DECIDED_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, decisionOptions, filterQueue, hasLocalFilters, inQueueScope, queueQuery, remainingOffsets, sortQueue, windowOptions, type DecisionView, type QueueSort } from "@/lib/reviewQueue";
+import { HOLD_LABEL, LEVEL_LABEL, STATUS_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
-import type { HoldReason, Level, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
+import type { HoldReason, ItemDetail, Level, Log, LogRow, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
 import { alwaysReviewedHint, holdChip } from "@/lib/holdReasons";
 import { HOLD_RULES, HOLD_RULES_INTRO } from "@/lib/holdRulesText";
 import { cn } from "@/lib/utils";
@@ -48,6 +48,17 @@ async function getWholeQueue(url: string): Promise<Review> {
   return { ...first, items: [...first.items, ...pages.flatMap((p) => p.items)] };
 }
 
+/** D91: every decided item (approved, dismissed, flagged) from GET /log, all pages, then each item's record
+ *  (GET /items/{id}, the drawer's own) so the queue's search, filters and sort apply to it unchanged. */
+async function getDecided(url: string): Promise<ReviewItemRow[]> {
+  const first = await get<Log>(url);
+  const rest = remainingOffsets(first.total, first.items.length);
+  const pages = await Promise.all(rest.map((o) => get<Log>(url.replace(/([?&])offset=0\b/, `$1offset=${o}`))));
+  const ids = decidedIds([...first.items, ...pages.flatMap((p) => p.items)] as LogRow[]);
+  const items = await Promise.all(ids.map((id) => get<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`)));
+  return items.map((d) => ({ kind: "item" as const, item: d.item, held_since: d.item.discovered_at, trust_source: null }));
+}
+
 function ReviewScreen() {
   const { get: param, set } = useUrlState();
   const { data: meta } = useMeta();
@@ -57,6 +68,9 @@ function ReviewScreen() {
   const brief = param("brief");
   const score = param("score");
   const category = param("category");
+  const viewParam = param("decision");
+  const view: DecisionView = viewParam === "approved" || viewParam === "dismissed" || viewParam === "all" ? viewParam : "";
+  const VIEW_NAME: Record<DecisionView, string> = { "": "Needs decision", approved: "Approved", dismissed: "Dismissed", all: "All" };
   const sortParam = param("sort");
   const sort: QueueSort = sortParam === "newest" || sortParam === "oldest" ? sortParam : "";
   const offset = Number(param("offset") || 0);
@@ -70,6 +84,8 @@ function ReviewScreen() {
   const q = useSWR<Review, ApiError>(path("/review", queueQuery({ level: preview, reason, competitor, brief })), getWholeQueue,
     { revalidateOnFocus: false, keepPreviousData: true });
   const briefs = useApi<Page<{ date: string }>>(path("/briefs", { limit: 200 }));
+  const decided = useSWR<ReviewItemRow[], ApiError>(path("/log", { status: DECIDED_STATUSES, competitor, limit: 200, offset: 0 }), getDecided,
+    { revalidateOnFocus: false, keepPreviousData: true });
   const current = meta?.level;
   const shown = q.data?.level;
   const previewing = Boolean(preview && current && preview !== current);
@@ -85,7 +101,15 @@ function ReviewScreen() {
       <Async {...q} retry={() => q.mutate()} rows={6}>
         {(r) => {
           const lv = r.levels.find((x) => x.level === r.level);
-          const rows = sortQueue(filterQueue(r.items, local), sort);
+          // D91: decided items in the same scope as the API's queue (window, competitor, reason at this level)
+          const done = (decided.data ?? []).filter((x) => inQueueScope(x.item, { window: r.scope?.window, reason, level: r.level }));
+          const byStatus = (st: string) => done.filter((x) => x.item.status === st);
+          const needs = r.items.length; // what the default lists: held items, plus changed cells outside a Brief window
+          const counts = { needs, approved: byStatus("approved").length, dismissed: byStatus("dismissed").length, all: needs + done.length };
+          // Dismissed is offered when the data carries dismissed items (or the URL asks for it, so the selector is never blank)
+          const viewOptions = decisionOptions(counts, view === "dismissed" || (decided.data ?? []).some((x) => x.item.status === "dismissed"));
+          const base: (ReviewItemRow | ReviewChangeRow)[] = view === "" ? r.items : view === "all" ? [...r.items, ...done] : byStatus(view);
+          const rows = sortQueue(filterQueue(base, local), sort);
           const filtered = hasLocalFilters(local) || reason || competitor || brief;
           const pageRows = rows.slice(offset, offset + PAGE);
           return (
@@ -127,9 +151,12 @@ function ReviewScreen() {
               <Panel
                 title="What needs my decision?"
                 info={<HoldRulesInfo />}
-                cap={`${rows.length} of ${r.total} held at ${label(LEVEL_LABEL, r.level)}${reason ? ` for ${label(HOLD_LABEL, reason)}` : ""}`}
+                cap={view === "" ? `${rows.length} of ${r.total} held at ${label(LEVEL_LABEL, r.level)}${reason ? ` for ${label(HOLD_LABEL, reason)}` : ""}`
+                  : `${rows.length} of ${base.length} · ${VIEW_NAME[view]}`}
               >
                 <div className="mb-2.5 flex flex-wrap items-center gap-2">
+                  <FilterSelect ariaLabel="Decision" allLabel={viewOptions[0].label} value={view} onChange={(v) => set({ decision: v || null, offset: null })}
+                    options={viewOptions.slice(1)} />
                   <label className="relative min-w-[16rem] flex-1">
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-mute" />
                     <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search held items"
@@ -153,7 +180,9 @@ function ReviewScreen() {
                 {previewing ? <div className="mb-2 text-xs text-mute">Actions are off while previewing another level.</div> : null}
                 {pageRows.length ? (
                   pageRows.map((row) =>
-                    row.kind === "item" ? (
+                    row.kind === "item" && row.item.status !== "awaiting_review" ? (
+                      <DecidedItem key={row.item.item_id} row={row} level={r.level} />
+                    ) : row.kind === "item" ? (
                       <QueueItem key={row.item.item_id} row={row} level={r.level} disabled={previewing} onTrusted={setTrustMsg} />
                     ) : (
                       <ChangeRow key={`c${row.change_id}`} row={row} disabled={previewing} />
@@ -166,7 +195,7 @@ function ReviewScreen() {
                     An item already approved or dismissed is no longer held: find it in the <Link href="/log" className="font-semibold text-jgreen-d hover:underline">Log</Link>.
                   </Empty>
                 ) : (
-                  <Empty>{`The queue is empty at ${label(LEVEL_LABEL, r.level)}.`}</Empty>
+                  <Empty>{view === "approved" || view === "dismissed" ? `No ${VIEW_NAME[view].toLowerCase()} items in this scope.` : `The queue is empty at ${label(LEVEL_LABEL, r.level)}.`}</Empty>
                 )}
                 {rows.length > PAGE ? (
                   <div className="mt-2.5 flex items-center justify-end gap-2">
@@ -281,6 +310,17 @@ function ReasonChips({ reasons, level }: { reasons: HoldReason[]; level: Level }
         );
       })}
     </div>
+  );
+}
+
+/** D91: an approved, dismissed or flagged item under Approved, Dismissed or All: its status, no actions (nothing here
+ *  changes a decision; Reopen stays in the item's side panel). */
+function DecidedItem({ row, level }: { row: ReviewItemRow; level: Level }) {
+  const it = row.item;
+  return (
+    <ItemRow item={it} showBadge={false}
+      actions={<Tag className="text-xs font-semibold" data-decision={it.status}>{label(STATUS_LABEL, it.status)}</Tag>}
+      extra={<ReasonChips reasons={it.hold_reasons} level={level} />} />
   );
 }
 

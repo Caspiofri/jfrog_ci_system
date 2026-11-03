@@ -121,3 +121,42 @@ export function remainingOffsets(total: number, got: number): number[] {
   for (let o = got; o < total; o += FETCH_LIMIT) out.push(o);
   return out;
 }
+
+// ---- D91: which items the queue lists, by decision ----
+
+/** "" is Needs decision, the default: GET /review, items no analyst approved or dismissed yet. */
+export type DecisionView = "" | "approved" | "dismissed" | "all";
+/** Decided statuses, read from GET /log (the queue endpoint lists only awaiting_review). Flagged is published by an
+ *  analyst's flag; it has no option of its own and shows under All. */
+export const DECIDED_STATUSES = ["approved", "dismissed", "flagged"];
+
+/** Each decided item once (the Log lists an item once per run that saw it), in the Log's order. */
+export function decidedIds(rows: { item_id: string | null; status: string }[]): string[] {
+  const seen = new Set<string>();
+  for (const r of rows) if (r.item_id && DECIDED_STATUSES.includes(r.status)) seen.add(r.item_id);
+  return [...seen];
+}
+
+/** The same scope GET /review applies, for decided items: the Brief window (discovered in (prev_anchor, anchor]) and
+ *  the hold reason at the shown level. Competitor is already a GET /log parameter. */
+export function inQueueScope(
+  it: { discovered_at: string | null; hold_reasons: { code: string; held_at: string[] }[] },
+  s: { window?: { prev_anchor: string; anchor: string } | null; reason?: string; level: string },
+): boolean {
+  if (s.window) {
+    const t = Date.parse(it.discovered_at ?? "");
+    if (!(t > Date.parse(s.window.prev_anchor) && t <= Date.parse(s.window.anchor))) return false;
+  }
+  if (s.reason && !it.hold_reasons.some((h) => h.code === s.reason && h.held_at.includes(s.level))) return false;
+  return true;
+}
+
+/** The filter's options with their counts. Dismissed only when the data carries dismissed items. */
+export function decisionOptions(n: { needs: number; approved: number; dismissed: number; all: number }, hasDismissed: boolean) {
+  return [
+    { value: "" as DecisionView, label: `Needs decision (${n.needs})` },
+    { value: "approved" as DecisionView, label: `Approved (${n.approved})` },
+    ...(hasDismissed ? [{ value: "dismissed" as DecisionView, label: `Dismissed (${n.dismissed})` }] : []),
+    { value: "all" as DecisionView, label: `All (${n.all})` },
+  ];
+}
