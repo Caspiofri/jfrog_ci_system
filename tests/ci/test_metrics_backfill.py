@@ -60,6 +60,29 @@ def test_a_second_run_on_the_same_date_is_listed_not_chosen(store):
         mb.reconstruct(sqlite3.connect(path), RUN1, runs_dir)
 
 
+def test_the_override_must_name_exactly_the_other_runs_and_is_recorded(store):
+    path, runs_dir = store
+    (runs_dir / "20261030T0836Z-cccccc.report.json").write_text("{}")
+    db = sqlite3.connect(path)
+    m = mb.reconstruct(db, RUN1, runs_dir, not_this_run={"20261030T0836Z-cccccc": "never imported"})
+    assert m["reconstructed"]["other_runs_same_date"] == [{"run_id": "20261030T0836Z-cccccc", "note": "never imported"}]
+    with pytest.raises(mb.Refused, match="not on that date"):
+        mb.reconstruct(db, RUN1, runs_dir, not_this_run={"20261030T0836Z-cccccc": "x", "20261029T0400Z-dddddd": "x"})
+    assert mb.reconstruct(sqlite3.connect(path), RUN2, runs_dir)["reconstructed"]["other_runs_same_date"] == []
+
+
+def test_the_cli_writes_under_the_collect_lock(store, tmp_path):
+    from ci.runlock import run_lock
+    path, runs_dir = store
+    lock_dir = tmp_path / "locks"
+    args = ["--store", str(path), "--run", RUN1, "--runs-dir", str(runs_dir), "--lock-dir", str(lock_dir), "--write"]
+    with run_lock("collect", lock_dir):
+        assert mb.main(args) == 1  # a daily run holds the lock: nothing written
+    with Store(path, read_only=True) as s:
+        assert s.run_metrics(RUN1) == []
+    assert mb.main(args) == 0
+
+
 def test_an_existing_row_is_never_overwritten_and_unknown_runs_are_refused(store):
     path, runs_dir = store
     with Store(path) as s:
@@ -91,7 +114,8 @@ def test_cli_prints_without_writing_unless_asked(store, capsys):
     assert json.loads(capsys.readouterr().out)["run_id"] == RUN1
     with Store(path, read_only=True) as s:
         assert s.run_metrics(RUN1) == []
-    assert mb.main(["--store", str(path), "--run", RUN1, "--runs-dir", str(runs_dir), "--write"]) == 0
+    assert mb.main(["--store", str(path), "--run", RUN1, "--runs-dir", str(runs_dir), "--lock-dir",
+                    str(path.parent / "locks"), "--write"]) == 0
     assert mb.main(["--store", str(path), "--run", RUN1, "--runs-dir", str(runs_dir)]) == 1  # now refused
 
 

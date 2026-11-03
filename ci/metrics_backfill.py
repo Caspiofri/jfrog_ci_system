@@ -1,6 +1,6 @@
 """D74: a run-metrics row rebuilt once, from the per-item log, for a run that ended before run_metrics existed.
 
-    python -m ci.metrics_backfill --store PATH --run RUN_ID [--write]
+    python -m ci.metrics_backfill --store PATH --run RUN_ID [--not-this-run OTHER_ID ...] [--write]
 
 Without --write it prints the row and writes nothing. --store has no default, so the live store is only ever named on
 purpose. Each number comes from one named source, recorded in the row's `reconstructed.sources`:
@@ -13,8 +13,11 @@ was added on 31 Oct at 14:32 UTC, after both runs) and the blocks no table keeps
 validation, steps). Nothing is estimated.
 
 Refused: a run that already has a row (never overwritten), a run not in the store, and a run whose Israel date has
-another run in the store or in output/runs (D74: list the run ids, do not choose or merge). The write is one INSERT
-into run_metrics; no other table is touched.
+another run in the store or in output/runs (D74: list the run ids, do not choose or merge). Ofri's override, per run:
+--not-this-run names each other run of the date that gets no row; it must name exactly those runs, and they are
+recorded in `reconstructed.other_runs_same_date`. Decided on 3 Nov: 30 Oct belongs to the import 20261030T1312Z-389e71;
+20261030T0836Z-5d06a9, a labelling collection never imported into the store, gets no row. The write is one INSERT into
+run_metrics, under the collect run lock so no daily run is writing at the same time; no other table is touched.
 """
 import argparse
 import json
@@ -25,6 +28,7 @@ from pathlib import Path
 
 from ci.api import service as svc
 from ci.pipeline import RUNS_DIR
+from ci.runlock import RunLocked, run_lock
 
 DECISION = "D74"
 ITEM_LOG = "item_log"
@@ -57,7 +61,9 @@ def same_day_runs(db: sqlite3.Connection, run: dict, runs_dir: Path) -> list[str
     return sorted(ids)
 
 
-def reconstruct(db: sqlite3.Connection, run_id: str, runs_dir: Path = RUNS_DIR, now: datetime | None = None) -> dict:
+def reconstruct(db: sqlite3.Connection, run_id: str, runs_dir: Path = RUNS_DIR, now: datetime | None = None,
+                not_this_run: dict[str, str] | None = None) -> dict:
+    """not_this_run: {other run id on the same date: why it gets no row}, Ofri's override (D74)."""
     db.row_factory = sqlite3.Row
     row = db.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
     if row is None:
@@ -65,9 +71,12 @@ def reconstruct(db: sqlite3.Connection, run_id: str, runs_dir: Path = RUNS_DIR, 
     run = dict(row)
     if _one(db, "SELECT count(*) FROM run_metrics WHERE run_id = ?", run_id):
         raise Refused(f"run {run_id} already has a metrics row; it is never overwritten")
-    others = same_day_runs(db, run, runs_dir)
-    if others != [run_id]:
-        raise Refused(f"more than one run on that date, not choosing or merging: {others}")
+    not_this_run = not_this_run or {}
+    others = [r for r in same_day_runs(db, run, runs_dir) if r != run_id]
+    if stray := sorted(set(not_this_run) - set(others)):
+        raise Refused(f"--not-this-run names runs that are not on that date: {stray}")
+    if sorted(not_this_run) != others:
+        raise Refused(f"more than one run on that date, not choosing or merging: {sorted([run_id, *others])}")
     report = json.loads(run["report"] or "{}")
     to_model = _one(db, "SELECT count(*) FROM classifications WHERE run_id = ?", run_id)
     noise = _one(db, "SELECT count(*) FROM classifications WHERE run_id = ? AND noise = 1", run_id)
@@ -95,7 +104,8 @@ def reconstruct(db: sqlite3.Connection, run_id: str, runs_dir: Path = RUNS_DIR, 
         "model": run["model"], "llm_calls": None, "error": run["error"], "items": items, "extraction": None,
         "lens": None, "insights": None, "validation": None, "steps": [], "metadata": None,
         "reconstructed": {"decision": DECISION, "at": (now or datetime.now(UTC)).isoformat(),
-                          "label": "Reconstructed from the item log", "sources": sources, "empty": empty},
+                          "label": "Reconstructed from the item log", "sources": sources, "empty": empty,
+                          "other_runs_same_date": [{"run_id": r, "note": n} for r, n in sorted(not_this_run.items())]},
     }
 
 
@@ -113,6 +123,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--store", type=Path, required=True)
     ap.add_argument("--run", required=True)
     ap.add_argument("--runs-dir", type=Path, default=RUNS_DIR)
+    ap.add_argument("--not-this-run", action="append", default=[], metavar="RUN_ID",
+                    help="another run on the same date that gets no row (Ofri's override, D74)")
+    ap.add_argument("--note", default="never imported into the store; gets no metrics row (Ofri, 3 Nov, D74)",
+                    help="why the --not-this-run runs get no row")
+    ap.add_argument("--lock-dir", type=Path, default=None, help="where the collect run lock lives (default: data/ci)")
     ap.add_argument("--write", action="store_true")
     args = ap.parse_args(argv)
     if not args.store.exists():
@@ -120,12 +135,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     db = sqlite3.connect(args.store)
     try:
-        m = reconstruct(db, args.run, args.runs_dir)
+        m = reconstruct(db, args.run, args.runs_dir, not_this_run={r: args.note for r in args.not_this_run})
         print(json.dumps(m, indent=1, ensure_ascii=False))
         if args.write:
-            write(db, m)
+            with run_lock("collect", args.lock_dir):
+                write(db, m)
             print(f"written: {args.run}", file=sys.stderr)
-    except Refused as e:
+    except (Refused, RunLocked) as e:
         print(f"refused: {e}", file=sys.stderr)
         return 1
     finally:
