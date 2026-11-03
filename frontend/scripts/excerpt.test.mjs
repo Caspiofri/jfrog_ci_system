@@ -31,6 +31,6 @@ test("the excerpt is shown as served: not stripped, shortened or rewritten", () 
 test("drawer: the 'Why Mentions JFrog' block and the Brief's 'Mentions JFrog' tag", () => {
   assert.match(drawer, /<MentionWhy d=\{d\} \/>/);
   assert.match(drawer, /const m = mentionExplanation\(d\);\s*if \(!m\) return null;/);
-  assert.match(drawer, /\{it\.mentions_jfrog \? <MentionsJfrog excerpt=\{it\.excerpt\} \/> : null\}/);
-  assert.match(card, /<MentionsJfrog excerpt=\{item\.excerpt\} \/>/);
+  assert.match(drawer, /\{it\.mentions_jfrog \? <MentionsJfrog excerpt=\{it\.excerpt\} mention=\{it\.jfrog_mention\} \/> : null\}/);
+  assert.match(card, /<MentionsJfrog excerpt=\{item\.excerpt\} mention=\{item\.jfrog_mention\} \/>/);
 });

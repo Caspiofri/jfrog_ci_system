@@ -77,7 +77,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         {showLate && item.badge === "late" ? (
           <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after its feed date">Found late</Tag>
         ) : null}
-        {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} /> : null}
+        {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} mention={item.jfrog_mention} /> : null}
         {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
         <ReviewedMark item={item} />
       </div>

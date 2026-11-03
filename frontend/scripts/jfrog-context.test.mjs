@@ -36,10 +36,10 @@ test("the drawer and the Review rows use them; no new API call", () => {
   const drawer = read("components/ItemDrawer.tsx");
   assert.match(drawer, /\{showLensBlock\(it\.lens, it\.lens_status\) \? <LensBlock/);
   assert.match(drawer, /<MentionsJfrog excerpt=\{it\.excerpt\}/);
-  assert.match(read("components/ItemRow.tsx"), /<MentionsJfrog excerpt=\{item\.excerpt\} \/>/);
+  assert.match(read("components/ItemRow.tsx"), /<MentionsJfrog excerpt=\{item\.excerpt\} mention=\{item\.jfrog_mention\} \/>/);
   const comp = read("components/MentionsJfrog.tsx") + read("lib/jfrogMention.ts");
   assert.doesNotMatch(comp, /useApi|fetch\(|\/api\/v1/);
-  assert.match(read("components/MentionsJfrog.tsx"), /<Hint text=\{mentionHint\(excerpt\)\}>/);
+  assert.match(read("components/MentionsJfrog.tsx"), /<Hint text=\{mentionHint\(excerpt, mention\)\}>/);
 });
 
 import { mentionExplanation } from "../src/lib/jfrogMention.ts";

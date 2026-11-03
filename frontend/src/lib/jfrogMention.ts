@@ -11,7 +11,25 @@ export function jfrogSentence(excerpt: string | null | undefined): string | null
   return hit ? hit.trim() : null;
 }
 
-export function mentionHint(excerpt: string | null | undefined): string {
+// "Where JFrog is mentioned" (D77): Item.jfrog_mention, a read-only API field. A mention, not a comparison.
+export const MENTION_TITLE = "Where JFrog is mentioned";
+export const MENTION_NOTE = "A mention of JFrog in the article, not a comparison.";
+export const NOT_IN_STORED_TEXT =
+  "JFrog is named on the article page, but not in the part of the article we store, so no passage can be shown.";
+
+export interface JfrogMentionLike { status?: string; snippet?: string | null; found_in?: string | null }
+export type MentionSection = { kind: "found"; snippet: string; inTitle: boolean } | { kind: "not_in_stored_text" };
+
+/** What the section shows; null when the API sent no mention (an older snapshot) or a status it doesn't know. */
+export function mentionSection(m: JfrogMentionLike | null | undefined): MentionSection | null {
+  if (m?.status === "found" && m.snippet?.trim()) return { kind: "found", snippet: m.snippet, inTitle: m.found_in === "title" };
+  if (m?.status === "not_in_stored_text") return { kind: "not_in_stored_text" };
+  return null;
+}
+
+export function mentionHint(excerpt: string | null | undefined, mention?: JfrogMentionLike | null): string {
+  const sec = mentionSection(mention);
+  if (sec?.kind === "found") return `Mentioned: “${sec.snippet}”`;
   const s = jfrogSentence(excerpt);
   return s ? `In the excerpt: “${s}”` : MENTION_FALLBACK;
 }

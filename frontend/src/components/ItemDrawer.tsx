@@ -1,6 +1,7 @@
 "use client";
 // The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
 import { ArticleExcerpt } from "@/components/ArticleExcerpt";
+import { JfrogMentionSection } from "@/components/JfrogMentionSection";
 import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { mentionExplanation, showLensBlock } from "@/lib/jfrogMention";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
@@ -93,13 +94,14 @@ function DrawerBody({ id }: { id: string }) {
                   <ScoreBadge score={it.score} noise={it.noise} />
                   <StatusDot status={it.status} />
                   <CategoryTag category={it.category} />
-                  {it.mentions_jfrog ? <MentionsJfrog excerpt={it.excerpt} /> : null}
+                  {it.mentions_jfrog ? <MentionsJfrog excerpt={it.excerpt} mention={it.jfrog_mention} /> : null}
                   {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
                   {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
                 {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
                 <MentionWhy d={d} />
                 <ArticleExcerpt excerpt={it.excerpt} url={it.url} />
+                <JfrogMentionSection mention={it.jfrog_mention} />
                 <div>
                   <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>

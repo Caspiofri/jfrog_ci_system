@@ -81,6 +81,7 @@ export interface Item {
   urgency: string | null;
   confidence: number | null;
   mentions_jfrog: boolean;
+  jfrog_mention?: JfrogMention | null; // D77: where JFrog is mentioned; null when mentions_jfrog is false
   reason: string;
   why_it_matters: string;
   published_at: string | null;
@@ -645,4 +646,11 @@ export interface Health {
     age_hours?: number;
   } | null;
   meta: ApiMeta;
+}
+
+/** Contract (3 Nov, D77): read-only, a mention and not a comparison. */
+export interface JfrogMention {
+  status: "found" | "not_in_stored_text";
+  snippet: string | null; // at most 280 characters around the first match; null when not in the stored text
+  found_in: "text" | "title" | null;
 }
