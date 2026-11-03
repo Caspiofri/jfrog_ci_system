@@ -620,6 +620,7 @@ A run that stops before it writes its own row (another run held the lock, the sp
 - `GET /api/v1/health` adds `liveness` (D48): `{state, latest_run_id, latest_status, hours_since_latest, stale_run_ids, stale_after_hours: 1, overdue_after_hours: 26}`. `state` is `overdue` when the latest daily run started more than 26 h ago (a run that never started leaves no row, so this is how it shows), otherwise the latest daily run's marker; `none` when no daily run exists.
 - `GET /api/v1/runs` rows add `marker`: `ok | degraded | failed | running | stale`. `stale` is a row still `running` more than 1 h after it started processing (killed or hung).
 - The API's log is also appended to `output/logs/ci_api.log` (no rotation).
+- **`/health` in demo mode (D83):** `eval`, `test_eval`, `coverage` and `change_detection` come only from saved summaries in the snapshot (`demo/snapshot/health/<block>.json`, written by `python -m ci.health_summary`); nothing is read from `output/` or recomputed. Each block keeps its live shape and adds `measured_on` (live too). A block with no file is `{"status": "not_in_snapshot", "note": "<block>: not included in this snapshot", "measured_on": null}`. Coverage takes its `list` label from the file, so a held-out result is never labelled dev. `change_detection.age_hours` is computed on the demo clock and can be negative. Summaries pass a field allowlist: no local paths, `matches`, article text, golden labels or per-item test predictions (`metrics.extraction_detector.misses` is dropped).
 
 ### 11.3 The test-split eval (D23)
 

@@ -737,7 +737,8 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                            changes_path=changes_path, store_path=store_path, runs_dir=runs_dir,
                            store=open_store, evals_dir=evals_dir, coverage_dir=coverage_dir,
                            events_path=events_path, changes_out_dir=changes_out_dir, labels_path=labels_path,
-                           read_only=read_only)
+                           read_only=read_only,
+                           demo_dir=None if demo is None else Path(demo["store_path"]).parent)  # D83: Health summaries
     competitors_api.register(app, deps)
     health_api.register(app, deps)
     return app
