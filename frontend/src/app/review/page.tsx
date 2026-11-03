@@ -10,13 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArticleLink, Async, ColourLegends, Empty, ErrorNote, HBars, Hint, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
 import { Donut } from "@/components/Donut";
-import { FilterSelect } from "@/components/FilterSelect";
+import { FilterChip, SortControl, StatusControl } from "@/components/review/FilterBar";
 import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
 import { DECIDED_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, decisionOptions, filterQueue, hasLocalFilters, inQueueScope, queueQuery, remainingOffsets, sortQueue, windowOptions, type DecisionView, type QueueSort } from "@/lib/reviewQueue";
-import { HOLD_LABEL, LEVEL_LABEL, STATUS_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
+import { HOLD_LABEL, LEVEL_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { HoldReason, ItemDetail, Level, Log, LogRow, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
@@ -111,6 +111,13 @@ function ReviewScreen() {
           const base: (ReviewItemRow | ReviewChangeRow)[] = view === "" ? r.items : view === "all" ? [...r.items, ...done] : byStatus(view);
           const rows = sortQueue(filterQueue(base, local), sort);
           const filtered = hasLocalFilters(local) || reason || competitor || brief;
+          const anyFilter = Boolean(brief || score || category || competitor || reason);
+          // the header count: "110 of 110 held at Strict", or "Showing 14 of 110 held at Strict" with a filter or search;
+          // the whole is the unfiltered queue at this level (backlog_total), never a typed number
+          const lvName = label(LEVEL_LABEL, r.level);
+          const whole = view === "" ? (filtered ? r.backlog_total ?? r.total : r.total) : (filtered ? counts[view === "all" ? "all" : view] : base.length);
+          const what = view === "" ? `held at ${lvName}` : `· ${VIEW_NAME[view]}`;
+          const countLine = `${filtered ? "Showing " : ""}${rows.length} of ${whole} ${what}`;
           const pageRows = rows.slice(offset, offset + PAGE);
           return (
             <>
@@ -151,30 +158,37 @@ function ReviewScreen() {
               <Panel
                 title="What needs my decision?"
                 info={<HoldRulesInfo />}
-                cap={view === "" ? `${rows.length} of ${r.total} held at ${label(LEVEL_LABEL, r.level)}${reason ? ` for ${label(HOLD_LABEL, reason)}` : ""}`
-                  : `${rows.length} of ${base.length} · ${VIEW_NAME[view]}`}
+                cap={<span data-queue-count>{countLine}</span>}
               >
-                <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                  <FilterSelect ariaLabel="Decision" allLabel={viewOptions[0].label} value={view} onChange={(v) => set({ decision: v || null, offset: null })}
-                    options={viewOptions.slice(1)} />
-                  <label className="relative min-w-[16rem] flex-1">
+                {/* row 1, what is shown: status, search, sort */}
+                <div className="mb-2 flex flex-wrap items-center gap-2" data-filter-row="shown">
+                  <StatusControl ariaLabel="Decision" value={view} onChange={(v) => set({ decision: v || null, offset: null })} options={viewOptions} />
+                  <label className="relative min-w-[14rem] flex-1">
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-mute" />
                     <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search held items"
-                      placeholder="Search by item id, title or publisher"
+                      placeholder="Search id, title or publisher"
                       className="h-8 w-full rounded-md border border-line bg-white pr-2.5 pl-8 text-[0.8125rem] outline-none focus:border-jgreen" />
                   </label>
-                  <FilterSelect ariaLabel="Sort" allLabel={SORT_OPTIONS[0].label} value={sort} onChange={(v) => set({ sort: v || null, offset: null })}
+                  <SortControl ariaLabel="Sort" allLabel={SORT_OPTIONS[0].label} value={sort} onChange={(v) => set({ sort: v || null, offset: null })}
                     options={SORT_OPTIONS.slice(1)} />
-                  <FilterSelect ariaLabel="Window" allLabel="All held items" value={brief} onChange={(v) => set({ brief: v, offset: null })}
-                    options={windows} className="h-8 min-w-[14rem] bg-white text-[0.8125rem]" />
-                  <FilterSelect ariaLabel="Score" allLabel="All scores" value={score} onChange={(v) => set({ score: v, offset: null })}
-                    options={SCORE_OPTIONS} />
-                  <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
+                </div>
+                {/* row 2, filter: chips that wrap together */}
+                <div className="mb-2.5 flex flex-wrap items-center gap-1.5" data-filter-row="filter">
+                  <span className="mr-0.5 text-xs text-mute">Filter</span>
+                  <FilterChip name="Brief day" ariaLabel="Window" allLabel="All held items" value={brief} onChange={(v) => set({ brief: v, offset: null })}
+                    options={windows} display={(o) => fmtDate(o.value)} />
+                  <FilterChip name="Score" ariaLabel="Score" allLabel="All scores" value={score} onChange={(v) => set({ score: v, offset: null })}
+                    options={SCORE_OPTIONS} display={(o) => o.label.replace(/^Score /, "")} />
+                  <FilterChip name="Category" ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
                     options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
-                  <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
+                  <FilterChip name="Competitor" ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
                     options={competitorFilterOptions(meta)} />
-                  <FilterSelect ariaLabel="Hold reason" allLabel="All reasons" value={reason} onChange={(v) => set({ reason: v, offset: null })}
+                  <FilterChip name="Hold reason" ariaLabel="Hold reason" allLabel="All reasons" value={reason} onChange={(v) => set({ reason: v, offset: null })}
                     options={(meta?.hold_reasons ?? []).map((c) => ({ value: c, label: label(HOLD_LABEL, c) }))} />
+                  {anyFilter ? (
+                    <button type="button" onClick={() => set({ brief: null, score: null, category: null, competitor: null, reason: null, offset: null })}
+                      className="ml-1 text-xs font-semibold text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen" data-clear-all>Clear all</button>
+                  ) : null}
                 </div>
                 <div className="mb-2 text-xs text-mute">{SORT_LINES[sort]}{brief ? " Changed cells belong to no Brief, so a Brief window lists items only." : ""}</div>
                 {previewing ? <div className="mb-2 text-xs text-mute">Actions are off while previewing another level.</div> : null}
