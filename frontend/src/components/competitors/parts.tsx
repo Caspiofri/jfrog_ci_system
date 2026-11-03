@@ -52,7 +52,7 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
       <div className="flex items-center justify-between text-[15px] font-semibold">
         <span className="inline-flex items-center gap-2"><CompetitorAvatar k={c.key} name={c.name} size="md" />{c.name}</span>
         <span className="flex items-center gap-1.5 text-xs font-normal text-mute">
-          top score <ScoreBadge score={c.threat} title="Top score: the highest score of any of this competitor's items this week" />
+          Top score this week <ScoreBadge score={c.threat} title="Top score: the highest score of any of this competitor's items this week" />
         </span>
       </div>
       <div className="flex items-baseline gap-2">
