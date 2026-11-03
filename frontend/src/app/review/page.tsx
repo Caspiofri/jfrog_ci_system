@@ -19,6 +19,7 @@ import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { HoldReason, Level, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
+import { alwaysReviewedHint, holdChip } from "@/lib/holdReasons";
 import { cn } from "@/lib/utils";
 
 const PAGE = 25;
@@ -246,14 +247,15 @@ function ReasonChips({ reasons, level }: { reasons: HoldReason[]; level: Level }
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
       {reasons.map((h) => {
-        const always = h.held_at.length === 3;
+        const chip = holdChip(h, label(HOLD_LABEL, h.code));
+        const always = chip.levels == null;
         const active = h.held_at.includes(level);
         return (
-          <span key={h.code} title={h.detail}
+          <span key={h.code} title={chip.hint || undefined}
             className={cn("inline-flex items-center gap-1 rounded-[3px] border px-2 py-px text-xs",
               always ? "border-[#e5483b] bg-[#fff5f5] text-[#a32d2d]" : active ? "border-[#f59e0b] bg-[#fffaf0] text-[#8a5a00]" : "border-line text-mute")}>
-            <b className="font-semibold">{label(HOLD_LABEL, h.code)}</b>
-            <span>· {always ? "every level" : h.held_at.map((l) => LEVEL_LABEL[l] ?? l).join(", ")}</span>
+            <b className="font-semibold">{chip.label}</b>
+            {chip.levels ? <span>· {chip.levels}</span> : null}
           </span>
         );
       })}
@@ -443,7 +445,7 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
         <div className="mt-1 flex flex-wrap gap-2 text-xs text-mute">
           {row.held_since ? <span>Detected {fmtDateTime(row.held_since)}</span> : null}
           {row.page_url ? <ArticleLink href={row.page_url} label="Open the tracked page in a new tab" /> : null}
-          <span>Held at every level</span>
+          <span title={alwaysReviewedHint("changed_cell", "")}>Always reviewed: changed head-to-head cell</span>
         </div>
         {editing ? (
           <div className="mt-2 flex flex-col gap-1.5">
