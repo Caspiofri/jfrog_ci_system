@@ -41,6 +41,19 @@ function RunPill() {
   );
 }
 
+/** Demo mode only: a thin line under the header, always visible. The date is the snapshot manifest's (GET /meta
+ *  meta.snapshot.date), never typed; outside demo mode, or without that date, nothing shows. */
+function DemoLine() {
+  const { data } = useMeta();
+  const d = data?.meta.mode === "demo" ? data.meta.snapshot?.date : null;
+  if (!d) return null;
+  return (
+    <div className="border-b border-[#f59e0b]/50 bg-[#fff7e6] px-5 py-1 text-xs text-[#5c4300]" role="note" data-demo-line>
+      Demo snapshot of {fmtDate(d, true)}. The live system keeps running daily at 06:00.
+    </div>
+  );
+}
+
 function ReviewCount() {
   const { data } = useApi<Review>("/api/v1/review?limit=1");
   const n = data?.backlog_total ?? data?.total; // §10.3: the unfiltered backlog
@@ -57,8 +70,9 @@ function ReviewCount() {
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   return (
-    <div className="grid min-h-screen grid-cols-1 grid-rows-[3.5rem_auto_1fr] md:grid-cols-[12.25rem_minmax(0,1fr)] md:grid-rows-[3.5rem_1fr]">
-      <header className="col-span-full flex items-center gap-3.5 bg-navy px-5 text-[#e8edf5]">
+    <div className="grid min-h-screen grid-cols-1 grid-rows-[auto_auto_1fr] md:grid-cols-[12.25rem_minmax(0,1fr)] md:grid-rows-[auto_1fr]">
+      <div className="col-span-full">
+      <header className="flex h-14 items-center gap-3.5 bg-navy px-5 text-[#e8edf5]">
         <Link href="/brief" className="flex items-center" aria-label="Jessi home">
           {/* public/brand/jessi-mark.svg: splash + wordmark, viewBox 1332 x 405, transparent; 40px high on navy */}
           <Image src="/brand/jessi-mark.svg" alt="Jessi" width={132} height={40} priority unoptimized className="h-10 w-auto" />
@@ -69,6 +83,8 @@ export function Shell({ children }: { children: ReactNode }) {
         <span className="flex-1" />
         <RunPill />
       </header>
+      <DemoLine />
+      </div>
       <aside className="border-t border-[#1e2f55] bg-navy px-2 py-2.5">
         <nav aria-label="Screens" className="sticky top-2 flex flex-row flex-wrap gap-0.5 md:flex-col">
           {NAV.map((g) => (

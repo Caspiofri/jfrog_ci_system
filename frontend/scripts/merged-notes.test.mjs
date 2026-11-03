@@ -40,7 +40,8 @@ test("Roadmap: a slot appears only when its image loads; labelled; no placeholde
   assert.match(r, /<figcaption[^>]*data-concept-label>\{CONCEPT_LABEL\}<\/figcaption>\s*<Image /); // against the image, in its frame
   assert.doesNotMatch(r, /object-cover|Screenshot to add/); // shown whole, never cropped; no placeholder
   assert.match(r, /loading="eager"/); // a lazy image inside the hidden frame would never load
-  assert.match(r, /className="mx-auto block h-auto w-auto max-w-full"/); // never enlarged past its own size
+  assert.match(r, /className="mx-auto block h-auto max-h-\[18rem\] w-auto max-w-full"/); // smaller, whole, never enlarged
+  assert.match(r, /className="grid items-start gap-3\.5 md:grid-cols-2" data-roadmap-grid/); // 2 per row, 1 on narrow screens
 });
 
 test("Roadmap (D104): the seven concepts, in Ofri's order and words; the six images are the prototype's, unedited", () => {
@@ -52,4 +53,11 @@ test("Roadmap (D104): the seven concepts, in Ofri's order and words; the six ima
   for (const f of ["strength-radar", "convergence", "topics", "reactions", "emerging", "deal-extraction"]) {
     assert.ok(readFileSync(new URL(`../public/roadmap/${f}.png`, import.meta.url)).length > 1000, f);
   }
+});
+
+test("demo mode only: the snapshot line under the header, dated from the manifest (GET /meta)", () => {
+  const shell = src("components/shell/Shell.tsx");
+  assert.match(shell, /const d = data\?\.meta\.mode === "demo" \? data\.meta\.snapshot\?\.date : null;\s*if \(!d\) return null;/);
+  assert.match(shell, /Demo snapshot of \{fmtDate\(d, true\)\}\. The live system keeps running daily at 06:00\./);
+  assert.match(shell, /<\/header>\s*<DemoLine \/>/);
 });

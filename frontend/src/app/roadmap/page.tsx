@@ -61,8 +61,8 @@ const CONCEPTS: { slug: string; title: string; shows: string; missing: string; s
 ];
 
 /** The concept's screenshot slot (D104): hidden until the image loads, gone if there is none, so never an empty frame.
- *  The image is shown whole (never cropped, never enlarged past its own size), with "Concept, sample data" in its
- *  frame, directly against the image. */
+ *  The image is shown whole (never cropped, never enlarged past its own size, at most 18rem high), with "Concept,
+ *  sample data" in its frame, directly against the image. Two concepts per row from tablet width up. */
 function Shot({ slug, title }: { slug: string; title: string }) {
   const [state, setState] = useState<"loading" | "ok" | "none">("loading");
   const img = useRef<HTMLImageElement | null>(null);
@@ -78,7 +78,7 @@ function Shot({ slug, title }: { slug: string; title: string }) {
       {/* the label is part of the image's frame, directly against it, and covers none of the image */}
       <figcaption className="bg-navy px-2.5 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-white" data-concept-label>{CONCEPT_LABEL}</figcaption>
       <Image ref={img} src={`/roadmap/${slug}.png`} alt={`${title}: concept screenshot with sample data`} width={0} height={0} sizes="100vw" unoptimized loading="eager"
-        className="mx-auto block h-auto w-auto max-w-full" onLoad={() => setState("ok")} onError={() => setState("none")} />
+        className="mx-auto block h-auto max-h-[18rem] w-auto max-w-full" onLoad={() => setState("ok")} onError={() => setState("none")} />
     </figure>
   );
 }
@@ -92,7 +92,7 @@ export default function RoadmapPage() {
       <div className="-mt-2 text-xs text-mute">
         Every image here uses the prototype&apos;s sample data and isn&apos;t connected to the pipeline. The other screens show only real data.
       </div>
-      <div className="flex flex-col gap-3.5">
+      <div className="grid items-start gap-3.5 md:grid-cols-2" data-roadmap-grid>
         {CONCEPTS.map((c) => (
           <section key={c.slug} className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[1.125rem] py-4">
             <div className="flex items-baseline justify-between gap-2">
