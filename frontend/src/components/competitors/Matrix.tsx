@@ -17,6 +17,8 @@ import type { CompetitorProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const CAPTION = "What was found on public pages, not a verdict.";
+/** D95: under the D88 caption, visible without hovering; the date is Ofri's hand check, as written. */
+export const HAND_CHECK_LINE = "Checked once by hand against the live pages on 3 Nov 2026. See the README for results.";
 export const MATRIX_INFO = "A direct comparison of JFrog's capabilities with each competitor's, one capability at a time, from each vendor's public pages.";
 export const NOT_STATED_LINE = "Their page says nothing:";
 export const NOT_TRACKED_LINE = "Not tracked yet:";
@@ -115,7 +117,8 @@ export function CapabilityMatrix() {
           {all ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}{all ? "Show one capability" : "Expand all"}
         </button>
       ) : null}>
-      <UnverifiedNote className="mb-3" />
+      <UnverifiedNote />
+      <p className="m-0 mb-3 mt-1 text-xs text-[#5c4300]" data-hand-check>{HAND_CHECK_LINE}</p>
       {errors.length ? <div className="mb-2"><ErrorNote error={errors[0].error!} onRetry={() => errors.forEach((x) => x.mutate())} /></div> : null}
       {loading ? <div className="py-4 text-xs text-mute" role="status">Loading the head-to-head data…</div> : !rows.length ? (
         <div className="py-3 text-xs text-mute">No head-to-head data yet.</div>
