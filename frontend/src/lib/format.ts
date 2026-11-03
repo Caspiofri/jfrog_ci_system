@@ -129,10 +129,13 @@ export const ARTICLE_DATE_TIP = "The date the publisher put on the article.";
 export const COLLECTED_TIP = "When our pipeline found it.";
 export const CLEARED_TIP = "Passed routing, or approved by an analyst.";
 
-/** D94: the route's reason as the API stores it ("published at strict") reads "cleared at strict" on screen. Any other
- *  reason is shown as stored. Display only. */
+/** The route's reason as the API stores it, in words (display only): "published at strict" reads "cleared at strict"
+ *  (D94), and a list of hold-reason codes ("unvetted_source, mentions_jfrog") reads as the chips' labels ("Unvetted
+ *  source, Mentions JFrog"). Any other reason, such as the classifier's own wording, is shown as stored. */
 export function routeReasonWords(reason: string | null | undefined): string {
   if (!reason) return "";
+  const codes = reason.split(",").map((c) => c.trim());
+  if (codes.length && codes.every((c) => c in HOLD_LABEL)) return codes.map((c) => HOLD_LABEL[c]).join(", ");
   return reason.replace(/^published at\b/, "cleared at");
 }
 

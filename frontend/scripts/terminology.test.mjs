@@ -37,7 +37,7 @@ test("the heatmap is \"Cleared items by category\"", () => {
 
 test("the Log's route reason reads cleared (the API still stores published at <level>)", () => {
   assert.equal(routeReasonWords("published at strict"), "cleared at strict");
-  assert.equal(routeReasonWords("unvetted_source"), "unvetted_source");
+  assert.equal(routeReasonWords("unvetted_source"), "Unvetted source"); // hold codes read as their labels
   assert.equal(routeReasonWords(null), "");
   assert.match(readFileSync(join(root, "app/log/page.tsx"), "utf8"), /routeReasonWords\(r\.reason\)/);
 });
@@ -46,4 +46,16 @@ test("the trusted-sources empty line names no file", () => {
   const review = readFileSync(join(root, "app/review/page.tsx"), "utf8");
   assert.match(review, /empty="None yet\. Vetted sources come from a list maintained by the project\."/);
   assert.doesNotMatch(review, /config\/vetted_sources\.yaml are managed/);
+});
+
+test("last round: readable reason labels in the Log and drawer; plain-English roadmap", () => {
+  assert.equal(routeReasonWords("unvetted_source, mentions_jfrog"), "Unvetted source, Mentions JFrog");
+  assert.equal(routeReasonWords("unvetted_source, teaser_high_score"), "Unvetted source, High score on a teaser");
+  assert.equal(routeReasonWords("junk_extraction"), "Junk extraction");
+  const cls = "ambiguous: prefilled competitor 'industry' has no name rules (industry goes to the LLM)";
+  assert.equal(routeReasonWords(cls), cls); // the classifier's wording stays as stored
+  const drawer = readFileSync(join(root, "components/ItemDrawer.tsx"), "utf8");
+  assert.match(drawer, /a\.action === "dismiss" \? <b>Dismissed\{a\.reason \? `: \$\{label\(DISMISS_LABEL, a\.reason\)\}` : ""\}<\/b>/);
+  const roadmap = readFileSync(join(root, "app/roadmap/page.tsx"), "utf8");
+  assert.doesNotMatch(roadmap, /contract §|jfrog_product/);
 });

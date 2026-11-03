@@ -12,7 +12,7 @@ import { LensView } from "@/components/LensView";
 import { ReopenButton } from "@/components/review/actions";
 import { useRecord } from "@/lib/api";
 import { classifiedBy } from "@/lib/classifiedBy";
-import { ARTICLE_DATE_TIP, COLLECTED_TIP, HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { ARTICLE_DATE_TIP, COLLECTED_TIP, DISMISS_LABEL, HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { FieldChange, ItemAction, ItemDetail, Lens, LensStatus, Meta } from "@/lib/types";
 
@@ -168,7 +168,7 @@ function ActionLine({ a, meta }: { a: ItemAction; meta: Meta | undefined }) {
   const back = a.action === "reopen" && a.payload?.status_before_dismiss ? ` → back to ${label(STATUS_LABEL, a.payload.status_before_dismiss)}` : "";
   return (
     <div className="text-xs">
-      {fmtDateTime(a.at)} · <b>{a.action}</b>{a.reason ? ` (${a.reason})` : ""}{back}{a.note && !changes.length ? `: ${a.note}` : ""}
+      {fmtDateTime(a.at)} · {a.action === "dismiss" ? <b>Dismissed{a.reason ? `: ${label(DISMISS_LABEL, a.reason)}` : ""}</b> : <><b>{a.action}</b>{a.reason ? ` (${a.reason})` : ""}</>}{back}{a.note && !changes.length ? `: ${a.note}` : ""}
       {changes.length ? (
         <ul className="m-0 mt-0.5 list-none pl-3">
           {changes.map((c) => (

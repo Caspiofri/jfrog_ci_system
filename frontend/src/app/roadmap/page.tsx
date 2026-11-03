@@ -33,7 +33,7 @@ const CONCEPTS: { slug: string; title: string; shows: string; missing: string; s
     title: "Who reacts to market events, and how fast?",
     screen: "Brief · Competitors",
     shows: "A market event and the days until each competitor responded.",
-    missing: "The event model: linking a market event to each competitor's response; events aren't built yet (contract §1).",
+    missing: "The event model: linking a market event to each competitor's response. Events are planned in the API design but not built yet.",
   },
   {
     slug: "deal-extraction",
@@ -68,7 +68,7 @@ const CONCEPTS: { slug: string; title: string; shows: string; missing: string; s
     title: "Where is the pressure on JFrog?",
     screen: "Brief",
     shows: "JFrog products (Curation, Xray, Artifactory, AI/MCP) × competitors, each cell the day's top importance.",
-    missing: "jfrog_product per item and the capability baseline; per-competitor profiles replaced the single matrix for now.",
+    missing: "Which JFrog product each item touches, and a baseline of JFrog's own capabilities to compare against; per-competitor profiles replaced the single matrix for now.",
   },
 ];
 
