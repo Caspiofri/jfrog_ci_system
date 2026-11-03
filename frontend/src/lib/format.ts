@@ -228,3 +228,7 @@ export const AXIS_LABEL: Record<string, string> = {
   cicd_integration: "CI/CD integration",
   pricing_model: "Pricing model",
 };
+
+/** D88: shown, never only on hover, wherever head-to-head or change-detection values appear. */
+export const UNVERIFIED_VALUES =
+  "Values are extracted by an AI model from the linked public pages. The system has no verification step for them, and our evaluation does not cover them. Check the source before relying on a value.";

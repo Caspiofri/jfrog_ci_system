@@ -5,7 +5,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronRight, Clock } from "lucide-react";
-import { ArticleLink, ErrorNote, Panel } from "@/components/ci";
+import { ArticleLink, ErrorNote, Panel, UnverifiedNote } from "@/components/ci";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -115,6 +115,7 @@ export function CapabilityMatrix() {
           {all ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}{all ? "Show one capability" : "Expand all"}
         </button>
       ) : null}>
+      <UnverifiedNote className="mb-3" />
       {errors.length ? <div className="mb-2"><ErrorNote error={errors[0].error!} onRetry={() => errors.forEach((x) => x.mutate())} /></div> : null}
       {loading ? <div className="py-4 text-xs text-mute" role="status">Loading the head-to-head data…</div> : !rows.length ? (
         <div className="py-3 text-xs text-mute">No head-to-head data yet.</div>

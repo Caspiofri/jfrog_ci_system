@@ -1,6 +1,6 @@
 "use client";
 import { Suspense } from "react";
-import { Async, Empty, ErrorNote, KpiTile, Loading, PageHead, Panel, Tag } from "@/components/ci";
+import { Async, Empty, ErrorNote, KpiTile, Loading, PageHead, Panel, Tag, UnverifiedNote } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ChangeDetection, Coverage, EvalCards, Extraction, Funnel, LivenessAlert, MARKER, RunHistory, SilentAlert, SilentTable, SourcesTable, TestEvalBlock } from "@/components/health/parts";
 import { path, useApi, useRecord } from "@/lib/api";
@@ -95,6 +95,7 @@ function HealthScreen() {
                 {h.coverage ? <Coverage cv={h.coverage} missing={missing} /> : <Empty>{missing}</Empty>}
               </Panel>
               <Panel title="Did the tracked pages change?" cap="Head-to-head change detection">
+                <UnverifiedNote className="mb-3" />
                 {h.change_detection ? <ChangeDetection c={h.change_detection} missing={missing} /> : <Empty>{missing}</Empty>}
               </Panel>
             </div>

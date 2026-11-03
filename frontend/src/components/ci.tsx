@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ApiError } from "@/lib/api";
-import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, label, safeHref } from "@/lib/format";
+import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, UNVERIFIED_VALUES, label, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** A small (i) that explains on hover and keyboard focus: long explanations live here, not on screen. */
@@ -44,6 +44,16 @@ export function PageHead({ title, sub, tools, info, icon, titleHint }: {
 }
 
 /** A white card with a question as its title (prototype .card / .ct). */
+/** D88: the AI-extracted values are unverified; always visible, never only on hover. */
+export function UnverifiedNote({ className }: { className?: string }) {
+  return (
+    <p className={cn("m-0 flex items-start gap-1.5 rounded border border-[#f3d9a4] bg-[#fffaf0] px-2.5 py-1.5 text-xs text-[#5c4300]", className)} data-unverified>
+      <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+      <span>{UNVERIFIED_VALUES}</span>
+    </p>
+  );
+}
+
 export function Panel({ title, cap, children, className, right, big, info }: {
   title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean; info?: ReactNode;
 }) {

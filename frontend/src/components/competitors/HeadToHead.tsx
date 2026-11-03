@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { History } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArticleLink, Async, ColorLegend, Tag } from "@/components/ci";
+import { ArticleLink, Async, ColorLegend, Tag, UnverifiedNote } from "@/components/ci";
 import { path, useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import type { Cell, CellHistoryRow, H2HAxis, Page } from "@/lib/types";
@@ -64,6 +64,7 @@ export function HeadToHead({ competitor, name, axes }: { competitor: string; nam
   const td = "border-b border-line px-2.5 py-2.5 align-top";
   return (
     <div className="overflow-x-auto">
+      <UnverifiedNote className="mb-3" />
       <table className="w-full min-w-[720px] border-collapse">
         <thead>
           <tr>
