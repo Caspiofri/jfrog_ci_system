@@ -1,0 +1,86 @@
+# Held-out coverage list, 31 Oct-2 Nov 2026 (D84, D101). Ofri's marks: these 4 events, all expected_importance 3.
+# Event 2 replaced by Ofri on 3 Nov: GitHub's 2 Nov notice, after the enforcement date moved to 2 Dec.
+# AWS Step Functions as agent tools removed by Ofri on 3 Nov (D101): the launch was on 29 Oct, before the window;
+# only the 2 Nov weekly roundup fell inside it. No result had been seen.
+# Read only by ci/coverage_heldout.py: an event counts as captured if any of runs 802913, e9cae4, bed018 or d03c41
+# matched it. Measured once, no fix afterwards (D98, D101).
+#
+# Fields as ci/coverage.py loads them. Events, dates, competitors and importance are Ofri's (D101).
+# category is required by the loader; it is a proposal by BE and is not used in recall. event_type is left out.
+# match.urls and match.title_keywords were written by BE from the event text and the linked pages only, without
+# looking at the store or the run files. A title matches a group when it contains ALL of that group's keywords
+# (case-insensitive, word boundaries, trailing * = word prefix).
+
+events:
+  - id: github-risk-assessments-repo-protection
+    competitor: github
+    date: 2026-11-02
+    title: "GitHub: security risk assessments include repository protection status"
+    official_url: https://github.blog/changelog/2026-11-02-security-risk-assessments-include-repository-protection-status/
+    category: Security
+    expected_importance: 3
+    verified: "BE, 3 Nov: page title 'Security risk assessments include repository protection status', dated November 2, 2026"
+    match:
+      urls: []
+      title_keywords:
+        - [risk assessment*, repository protection]
+        - [risk assessment*, protected repositor*]
+
+  - id: github-pull-request-target-blocked-december-2
+    competitor: github
+    date: 2026-11-02
+    title: pull_request_target blocked by default December 2
+    official_url: https://github.blog/changelog/2026-11-02-pull_request_target-blocked-by-default-december-2
+    category: Security
+    expected_importance: 3
+    note: "Ofri, 3 Nov: replaces the earlier event 2 (enforcement 2 Nov), which GitHub moved to 2 Dec"
+    verified: >-
+      BE, 3 Nov: GitHub changelog, dated November 2, 2026, label Retired: from December 2, 2026 pull_request_target is
+      blocked by default in public repositories unless an Actions event policy allows it; enforcement was previously
+      scheduled for November 2
+    match:
+      urls: []
+      title_keywords:
+        - [pull_request_target, block*]
+        - [pull_request_target, default]
+
+  - id: industry-debugbear-polymarket
+    competitor: industry
+    date: 2026-10-31
+    title: DebugBear compromise used to drain Polymarket wallets
+    official_url: https://thehackernews.com/2026/11/hackers-steal-about-27-million-from.html
+    category: Security
+    expected_importance: 3
+    note: "Ofri (D98): date from DebugBear's statement (31 Oct); the incident was reported on 29 Oct"
+    verified: >-
+      BE, 3 Nov: the linked page returned 403 to fetches; event facts confirmed from search results (compromised
+      DebugBear RUM script on Polymarket's domain, about $2.7M from about 710 wallets, 29 Oct)
+    match:
+      urls: []
+      title_keywords:
+        - [DebugBear]
+        - [Polymarket, hack*]
+        - [Polymarket, drain*]
+        - [Polymarket, wallet*]
+        - [Polymarket, steal*]
+        - [Polymarket, stole*]
+
+  - id: industry-volta-infostealer
+    competitor: industry
+    date: 2026-10-31
+    title: VOLTA infostealer takes SSH keys and cloud configs and ranks victims with an LLM
+    official_url: https://agentbeam.com/blog/october-2026-attacks-timeline
+    category: Security
+    expected_importance: 3
+    verified: >-
+      BE, 3 Nov: timeline entry Oct 31 'VOLTA infostealer asks an LLM to rank each victim' (Cisco Talos); its detail
+      post is dated Oct 31, 2026 and cites the Talos report
+    match:
+      urls:
+        - https://agentbeam.com/blog/volta-infostealer-llm-ranks-victims-ssh-keys-cloud-configs-talos
+        - https://blog.talosintelligence.com/appraisal-by-ai-model-driven-victim-prioritization-in-the-volta-infostealer/
+      title_keywords:
+        - [VOLTA, infostealer]
+        - [VOLTA, stealer]
+        - [VOLTA, malware]
+        - [VOLTA, Talos]
