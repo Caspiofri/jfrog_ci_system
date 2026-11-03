@@ -265,8 +265,13 @@ page text the model never saw (D57).
 
 Read from the code at ae8fbb5, not from the PRD, because the code is what runs. The main file is `ci/route.py`. The
 API adds analyst decisions and trusted hosts (`ci/api/service.py`), and the Review screen shows the labels in
-`frontend/src/lib/format.ts`. Line numbers refer to ae8fbb5. Differences from D9 and D34 are listed in §6.6, and no
-side is taken there.
+`frontend/src/lib/format.ts`. Line numbers refer to ae8fbb5, which was `main` until the 3 Nov merges. `main` is 823645d after them;
+`ci/route.py` and `ci/rank.py` are unchanged there, while `ci/api/app.py`, `ci/api/service.py`,
+`frontend/src/lib/format.ts` and `frontend/src/app/review/page.tsx` changed, so their line numbers may differ. Every line reference
+in this section was re-checked against ae8fbb5 on 3 Nov. The PRD used for comparison is the live PRD
+([JFrog CI Tool — PRD & Decision Log](https://claude.ai/artifact/8ESCvx56dgF6LVfoKSKoif), rev 208, newest decision
+D77), not `docs/specs/PRD.md`, which is stale. Differences from D9, D34 and D36 are listed in §6.6, and no side is
+taken there. §6.7 is the short text for the Review screen's info button.
 
 ### 6.1 How routing works
 
@@ -286,6 +291,26 @@ side is taken there.
 
 In the tables below, "score" means the final score, after the +1 Mentions JFrog bonus and the snippet cap
 (`ci/rank.py:75-81`). Noise is left out because it is dropped at every level.
+
+**At a glance: which reasons hold an item at each level** (Held = the item waits for an analyst; — = this reason does
+not hold it at that level)
+
+| Hold reason (internal value) | Strict | Balanced | Relaxed | Source |
+| --- | --- | --- | --- | --- |
+| `unvetted_source` | Held | Held only when score ≥ 4 | — | `ci/route.py:77-80` |
+| `low_confidence` | Held | Held | — | `ci/route.py:81-83` |
+| `teaser_high_score` | Held | Held | — | `ci/route.py:84-86` |
+| `junk_extraction` | Held | Held | — | `ci/route.py:87-88` |
+| `pricing` | Held | Held | Held | `ci/route.py:89-90` |
+| `m_and_a` | Held | Held | Held | `ci/route.py:91-92` |
+| `mentions_jfrog` | Held | Held | Held | `ci/route.py:93-94` |
+| `model_failure` | Held | Held | Held | `ci/route.py:95-97` |
+| `invalid_output` | Held | Held | Held | `ci/route.py:98-99` |
+| `changed_cell` (comparison-table cells, not news items) | Held | Held | Held | `ci/route.py:103-105` |
+
+These ten values are the only ones the code produces: `hold_reasons()` builds nine (`ci/route.py:72-100`) and
+`change_hold_reasons()` builds `changed_cell` (`ci/route.py:103-105`). The levels come from `held_at` on each reason
+(`ci/route.py:32-33`, `ci/route.py:108-111`).
 
 **Strict** (default)
 
@@ -380,10 +405,17 @@ raised by one point (never above 5) so they rank higher once approved."
 The flag can come from page text the ranker never saw, and the bonus raised a score Ofri judged too high in 2 cases
 (n = 2, D62; EXPERIMENTAL; see §5).
 
-### 6.6 Differences between the code and D9 / D34
+### 6.6 Differences from the PRD
 
-Quotes are from `docs/specs/PRD.md` in the clone (D9 at line 263, D34 at line 238). Neither the code nor the PRD is
-judged right here.
+Quotes are from the live PRD (rev 208, read 3 Nov; newest decision D77): the D9, D34 and D36 rows of the Decision log
+and the "Routing (D9)" paragraph under Item lifecycle. In those rows the live text matches what the stale
+`docs/specs/PRD.md` said. No later decision (D37–D77) changes the level rules. Neither the code nor the PRD is judged
+right here.
+
+What matches D36 word for word: low confidence below 0.8 held at Strict and Balanced (`ci/route.py:31`,
+`ci/route.py:81-83`); model failures and D32 rejections held at every level (`ci/route.py:95-99`); teaser-only and
+junk items held at Strict and Balanced and published at Relaxed (`ci/route.py:84-88`); the trust suggestion after 3+
+approvals with 0 dismissals (`ci/api/service.py:31`, `ci/api/service.py:264-269`).
 
 1. **Threshold vs levels.** D9: "Confidence-based routing: each item is auto-published or sent to an analyst review
    queue by one autonomy threshold". Code: three named levels defined by hold reasons, with no threshold number
@@ -403,14 +435,16 @@ judged right here.
    only when score ≥ 4, and not at Relaxed (`ci/route.py:77-80`). This matches D34's level definitions.
 6. **Relaxed holds more than D34 lists.** D34: "Relaxed = only the always-held reasons (Pricing, M&A, Mentions JFrog,
    changed head-to-head cells)". Code: Relaxed also holds `model_failure` and `invalid_output` (`ci/route.py:95-99`).
-   Both come from D36 ("model failures and D32 rejections are held at every level") and the PRD's Routing paragraph
-   (line 110).
+   Both come from D36 ("model failures and D32 rejections are held at every level") and the PRD's Routing (D9)
+   paragraph ("Held at every level: Pricing and M&A items, Mentions JFrog, every changed head-to-head cell, and model
+   failures or validation rejections (D32, D36)").
 7. **Balanced holds more than D34 lists.** D34: "Balanced = unvetted held only at score ≥4". Code: Balanced also holds
    `low_confidence`, `teaser_high_score` and `junk_extraction` (`ci/route.py:81-88`), from D36.
 8. **Strict holds more than D34 lists.** D34: "Strict = every unvetted source + everything D9 always holds". Code:
    Strict also holds `teaser_high_score` and `junk_extraction` (`ci/route.py:84-88`, D36). Neither appears in D9.
 9. **Which score the ≥ 4 checks use.** D34 says "score ≥4" without saying whether this is the model's score or the
-   final one. Code: `x.score` is the final score, after the +1 bonus and the snippet cap (`ci/route.py:65-67`,
+   final one. D36 says "Teaser-only high scores" and gives no number. The code uses 4 for both
+   (`SNIPPET_REVIEW_MIN = 4`, `ci/rank.py:26`; `ci/route.py:78`). Code: `x.score` is the final score, after the +1 bonus and the snippet cap (`ci/route.py:65-67`,
    `ci/rank.py:75-81`).
 10. **Where "Trust this source" writes.** D34: "a "Trust this source" action in the review queue that adds a
     publisher to the vetted list". Code: trusted hosts are stored in the store (`ci/store.py:443`) and combined with
@@ -431,6 +465,27 @@ Notes on the code itself, for the record. These are not differences from the PRD
   (`ci/daily.py:376`).
 - Two constants share the name `LOW_CONFIDENCE`. In `ci/route.py:31` it is the 0.8 hold line. In `ci/classify.py:48`
   it is the 0.2 confidence given to a failed answer, and such an item is also held as `model_failure`.
+
+### 6.7 Short version for the UI (info button next to "What needs my decision?")
+
+Ready to paste. The panel title is "What needs my decision?" (`frontend/src/app/review/page.tsx:93`). The labels are
+the ones the UI already shows (`frontend/src/lib/format.ts:50-61`). The first line follows the queue query
+(`ci/api/app.py:418-433`): items whose status is `awaiting_review` at the current level, plus changed cells awaiting
+review; analyst-decided items and noise are not in it.
+
+> This queue lists the items held for an analyst at the current autonomy level, plus every changed head-to-head
+> cell. Items held at every level come first.
+>
+> - **Unvetted source:** the publisher is not on the vetted list. Held at Strict, and at Balanced only when scored 4 or 5.
+> - **Low confidence:** the classifier's confidence was below 0.8. Held at Strict and Balanced.
+> - **High score on a teaser:** scored 4 or 5 from only a headline or teaser. Held at Strict and Balanced.
+> - **Junk extraction:** scored 4 or 5, but the page text could not be read cleanly. Held at Strict and Balanced.
+> - **Pricing:** pricing or packaging news. Always held.
+> - **M&A / funding:** news about funding, an acquisition or a partnership. Always held.
+> - **Mentions JFrog:** the item names JFrog or one of its products. Always held.
+> - **Model failure:** the AI model gave no usable answer for this item. Always held.
+> - **Invalid model output:** the AI model's answer broke the output rules. Always held.
+> - **Changed head-to-head cell:** a value in the comparison table changed. Always held.
 
 ---
 
