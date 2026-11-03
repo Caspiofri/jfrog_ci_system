@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { ItemTitle, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { useItemDrawer } from "@/components/ItemDrawer";
+import { CardSparkline } from "@/components/competitors/Sparkline";
 import { CATEGORY_COLOR, SOURCE_LABEL, fmtDate, label } from "@/lib/format";
 import type { CompetitorCard, Deal } from "@/lib/types";
 
@@ -61,6 +62,7 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
       </div>
       <Trend t={c.trend} prev={c.items_prev_7d} />
       <MixBar mix={c.category_mix} />
+      <CardSparkline k={c.key} />
       <div className="flex flex-wrap gap-1.5 text-xs">
         {c.pending_review ? (
           <Tag className="bg-[#fffaf0] text-[#8a5a00]">{c.pending_review} awaiting review{c.pending_max_score ? ` (max ${c.pending_max_score})` : ""}</Tag>
