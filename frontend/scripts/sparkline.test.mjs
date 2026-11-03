@@ -27,6 +27,10 @@ test("in every card, from the profile's activity, the Brief date from the API; c
   assert.match(spark, /<Tooltip content=\{<Tip \/>\}/);
   assert.doesNotMatch(spark, /trend|delta|score|percent/i);
   const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
-  assert.match(parts, /<MixBar mix=\{c\.category_mix\} \/>\s*<CardSparkline k=\{c\.key\} \/>/);
+  // order: trend line, then the sparkline, then the category mix bar
+  assert.match(parts, /<Trend t=\{c\.trend\} prev=\{c\.items_prev_7d\} \/>\s*<CardSparkline k=\{c\.key\} \/>\s*<MixBar mix=\{c\.category_mix\} \/>/);
+  // straight segments between days, never a smoothed curve
+  assert.match(spark, /<Line type="linear" dataKey="items"/);
+  assert.doesNotMatch(spark, /monotone|natural|basis|cardinal|step/);
   assert.match(parts, /\{c\.items_7d\}<\/b>/);
 });

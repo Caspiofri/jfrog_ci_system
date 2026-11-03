@@ -31,7 +31,7 @@ export function CardSparkline({ k }: { k: string }) {
               <XAxis dataKey="date" hide />
               <YAxis hide domain={[0, "dataMax"]} />
               <Tooltip content={<Tip />} cursor={{ stroke: "#cbd3df" }} />
-              <Line type="monotone" dataKey="items" stroke="#3f5b8f" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
+              <Line type="linear" dataKey="items" stroke="#3f5b8f" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

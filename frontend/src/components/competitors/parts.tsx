@@ -3,7 +3,9 @@
 import { CompetitorAvatar, CompetitorLabel } from "@/components/CompetitorAvatar";
 import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
-import { ItemTitle, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { Hint, ItemTitle, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+
+export const TOP_SCORE_LABEL = "Top score this week";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { CardSparkline } from "@/components/competitors/Sparkline";
 import { CATEGORY_COLOR, SOURCE_LABEL, fmtDate, label } from "@/lib/format";
@@ -52,17 +54,19 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
       className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[1.125rem] py-4 transition-colors hover:border-jgreen">
       <div className="flex items-center justify-between text-[0.9375rem] font-semibold">
         <span className="inline-flex items-center gap-2"><CompetitorAvatar k={c.key} name={c.name} size="md" />{c.name}</span>
-        <span className="flex items-center gap-1.5 text-xs font-normal text-mute">
-          Top score this week <ScoreBadge score={c.threat} title="Top score: the highest score of any of this competitor's items this week" />
-        </span>
+        {/* the label lives in the hover and on keyboard focus (Hint is focusable); screen readers read it as text */}
+        <Hint text={TOP_SCORE_LABEL} className="inline-flex items-center text-xs font-normal">
+          <span className="sr-only">{TOP_SCORE_LABEL}: </span>
+          <span data-top-score><ScoreBadge score={c.threat} /></span>
+        </Hint>
       </div>
       <div className="flex items-baseline gap-2">
         <b className="text-[1.75rem] font-semibold leading-none tabular-nums">{c.items_7d}</b>
         <span className="text-mute">· {c.items_today} in this Brief</span>
       </div>
       <Trend t={c.trend} prev={c.items_prev_7d} />
-      <MixBar mix={c.category_mix} />
       <CardSparkline k={c.key} />
+      <MixBar mix={c.category_mix} />
       <div className="flex flex-wrap gap-1.5 text-xs">
         {c.pending_review ? (
           <Tag className="bg-[#fffaf0] text-[#8a5a00]">{c.pending_review} awaiting review{c.pending_max_score ? ` (max ${c.pending_max_score})` : ""}</Tag>

@@ -10,6 +10,7 @@ for (const f of ["app/competitors/page.tsx", "app/competitors/[key]/page.tsx", "
   });
 }
 test("cards and profile both say \"Top score this week\"", () => {
-  assert.match(readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8"), />\s*Top score this week <ScoreBadge score=\{c\.threat\} title=/);
+  // the card: the badge stays visible, the words are its hover (and keyboard focus) text
+  assert.match(readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8"), /TOP_SCORE_LABEL = "Top score this week";[\s\S]*?<Hint text=\{TOP_SCORE_LABEL\}/);
   assert.match(readFileSync(new URL("../src/app/competitors/[key]/page.tsx", import.meta.url), "utf8"), /Top score this week <ScoreBadge/);
 });
