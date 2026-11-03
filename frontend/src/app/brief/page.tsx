@@ -19,7 +19,7 @@ import { runCountsFor, todayTiles } from "@/lib/briefNumbers";
 import { CAPABILITY_ROWS } from "@/lib/capabilityRows";
 import { CAPABILITY_NAME, claimCapability, insightCapabilities } from "@/lib/capabilitySheet";
 import { insightsTitle } from "@/lib/insightsTitle";
-import { CONTINUITY_TIP, continuityBadge, goneLine } from "@/lib/continuity";
+import { CONTINUITY_TIP, NEW_SOURCE_TIP, continuityBadge, goneLine, newCitedIds } from "@/lib/continuity";
 
 const TOP = 5;
 const PAGE = 50;
@@ -267,6 +267,11 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
     ? `Generated ${fmtDateTime(insights.generated_at)}${insights.trigger === "refresh" ? " (refreshed)" : ""}${rejected ? ` · ${rejected} rejected by the checks` : ""}`
     : undefined;
   const state = insightState(insights);
+  // the previous Brief's insights, to tell which cited articles are the "+N new source(s)" (D89); only when one matched
+  const since = insights.previous?.date ?? insights.items.find((x) => x.continuity?.status === "strengthened")?.continuity?.since ?? null;
+  const needPrev = insights.items.some((x) => x.continuity?.status === "strengthened");
+  const prev = useApi<Brief>(needPrev && since ? path("/brief", { date: since, limit: 1 }) : null);
+  const prevInsights = prev.data?.date === since ? prev.data?.insights?.items ?? null : null;
   return (
     <Panel
       big
@@ -299,7 +304,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
           {insights.status === "partial" ? <div className="mb-2 text-xs text-mute">Fewer than 3 insights passed the checks this time.</div> : null}
           <div className="flex flex-col gap-3">
             {insights.items.map((x) => (
-              <InsightCard key={x.insight_id} ins={x} selected={hl === x.insight_id} onSelect={() => setHl(hl === x.insight_id ? null : x.insight_id)} />
+              <InsightCard key={x.insight_id} ins={x} prev={prevInsights} selected={hl === x.insight_id} onSelect={() => setHl(hl === x.insight_id ? null : x.insight_id)} />
             ))}
           </div>
         </>
@@ -318,7 +323,7 @@ function windowText(w: BriefInsights["window"]): string | undefined {
 
 /** One insight per row. Always visible: type, top importance, title, summary, why it matters (no story count: the evidence lists them).
  * The claims with their quotes and sources sit behind "Show evidence" (D50: each cited item keeps its score and link). */
-function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: boolean; onSelect: () => void }) {
+function InsightCard({ ins, prev, selected, onSelect }: { ins: Insight; prev: Insight[] | null; selected: boolean; onSelect: () => void }) {
   const top = SCORE_COLOR[ins.max_score ?? 0]?.[0] ?? "#e3e8ef";
   const [details, setDetails] = useState(false); // collapsed by default: title and chips only
   const [open, setOpen] = useState(false); // the claims, inside the details
@@ -327,6 +332,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
     for (const c of ins.cited_items ?? []) if (!m.has(c.item_id)) m.set(c.item_id, c);
     return m;
   }, [ins.cited_items]);
+  const fresh = useMemo(() => newCitedIds(ins, prev), [ins, prev]);
   const n = ins.claims.length;
   const toggle = () => {
     const next = !details;
@@ -367,7 +373,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
               </button>
               {open ? (
                 <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0" onClick={(e) => e.stopPropagation()}>
-                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} />)}
+                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} fresh={fresh} since={ins.continuity?.since ?? null} />)}
                 </ul>
               ) : null}
             </div>
@@ -455,7 +461,7 @@ const SCORE_TIP = "Importance of the cited item";
 
 /** One claim as one block: the quoted item's score down the left side, then the claim, its quote, and one line per
  * cited article. The card itself is not clickable; each article's "Reinforced by article" button opens its side panel. */
-function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }) {
+function ClaimBlock({ c, cited, fresh, since }: { c: Claim; cited: Map<string, CitedItemRow>; fresh: Set<string> | null; since: string | null }) {
   const ids = [...new Set([c.quote_item_id, ...c.item_ids].filter(Boolean))];
   const main = useCitedItem(ids[0] ?? "", ids[0] ? cited.get(ids[0]) : undefined);
   const [bg, fg] = SCORE_COLOR[main.score ?? 0] ?? SCORE_COLOR[0];
@@ -469,7 +475,8 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
         <div className="text-[0.8125rem] font-semibold text-ink">{c.text}</div>
         {c.quote ? <div className="italic text-mute">&ldquo;{c.quote}&rdquo;</div> : null}
         {c.jfrog_quote ? <JfrogQuote c={c} /> : null}
-        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} n={ids.length > 1 ? k + 1 : null} />)}
+        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} n={ids.length > 1 ? k + 1 : null}
+          isNew={Boolean(fresh?.has(id))} since={since} />)}
       </div>
     </li>
   );
@@ -477,7 +484,9 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
 
 /** One cited article's line: "Reinforced by article" (numbered when the claim cites several) opens its side panel,
  *  then its score when it isn't the claim's first item, "not in this Brief" when it applies, and Source to the article. */
-function SourceLine({ id, row, withScore, n }: { id: string; row?: CitedItemRow; withScore: boolean; n: number | null }) {
+function SourceLine({ id, row, withScore, n, isNew = false, since = null }: {
+  id: string; row?: CitedItemRow; withScore: boolean; n: number | null; isNew?: boolean; since?: string | null;
+}) {
   const drawer = useItemDrawer();
   const it = useCitedItem(id, row);
   const [bg, fg] = SCORE_COLOR[it.score ?? 0] ?? SCORE_COLOR[0];
@@ -490,6 +499,9 @@ function SourceLine({ id, row, withScore, n }: { id: string; row?: CitedItemRow;
       {withScore ? (
         <span title={SCORE_TIP} className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[0.625rem] font-semibold tabular-nums"
           style={{ background: bg, color: fg }}>{it.score ?? "–"}</span>
+      ) : null}
+      {isNew ? (
+        <Tag className={cn("border text-[0.625rem] font-semibold", BADGE_STYLE.new)} title={since ? NEW_SOURCE_TIP(fmtDate(since)) : undefined} data-new-source>New</Tag>
       ) : null}
       {it.outside ? (
         <Tag className="text-[0.625rem]"
