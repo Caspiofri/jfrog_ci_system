@@ -5,6 +5,7 @@ import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, Newspaper,
 import { Button } from "@/components/ui/button";
 import { ArticleLink, Async, Empty, ErrorNote, Hint, ImportanceLegend, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { cn } from "@/lib/utils";
+import { competitorFilterOptions } from "@/lib/competitorLabel";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
@@ -97,7 +98,7 @@ function BriefScreen() {
         tools={
           <>
             <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
-              options={(meta?.competitors ?? []).map((c) => ({ value: c.key, label: c.name }))} />
+              options={competitorFilterOptions(meta)} />
             <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
               options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
           </>

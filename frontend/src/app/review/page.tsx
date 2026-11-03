@@ -14,6 +14,7 @@ import { FilterSelect } from "@/components/FilterSelect";
 import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
+import { competitorFilterOptions } from "@/lib/competitorLabel";
 import { SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, filterQueue, hasLocalFilters, queueQuery, remainingOffsets, sortQueue, windowOptions, type QueueSort } from "@/lib/reviewQueue";
 import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
@@ -144,7 +145,7 @@ function ReviewScreen() {
                   <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
                     options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
                   <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
-                    options={(meta?.competitors ?? []).map((c) => ({ value: c.key, label: c.name }))} />
+                    options={competitorFilterOptions(meta)} />
                   <FilterSelect ariaLabel="Hold reason" allLabel="All reasons" value={reason} onChange={(v) => set({ reason: v, offset: null })}
                     options={(meta?.hold_reasons ?? []).map((c) => ({ value: c, label: label(HOLD_LABEL, c) }))} />
                 </div>

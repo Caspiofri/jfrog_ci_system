@@ -1,4 +1,5 @@
 "use client";
+import { competitorDisplayName } from "./competitorLabel";
 import { useApi } from "@/lib/api";
 import type { Meta } from "@/lib/types";
 
@@ -8,8 +9,7 @@ export function useMeta() {
 }
 
 export function competitorName(meta: Meta | undefined, key: string | null | undefined): string {
-  if (!key) return "—";
-  return meta?.competitors.find((c) => c.key === key)?.name ?? key;
+  return competitorDisplayName(meta, key);
 }
 
 /** "20261031T1345Z-802913" → ISO time, for display only. */

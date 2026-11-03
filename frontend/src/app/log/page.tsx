@@ -9,6 +9,7 @@ import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { ReopenButton } from "@/components/review/actions";
 import { path, useApi } from "@/lib/api";
+import { competitorFilterOptions } from "@/lib/competitorLabel";
 import { DISMISS_LABEL, STAGE_LABEL, STATUS_COLOR, STATUS_LABEL, fmtDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
@@ -64,7 +65,7 @@ function LogScreen() {
               <Panel>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
-                    options={(meta?.competitors ?? []).map((c) => ({ value: c.key, label: c.name }))} />
+                    options={competitorFilterOptions(meta)} />
                   <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
                     options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
                   <FilterSelect ariaLabel="Status" allLabel="All statuses" value={status} onChange={(v) => set({ status: v, offset: null })}
