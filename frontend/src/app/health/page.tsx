@@ -7,6 +7,7 @@ import { path, useApi, useRecord } from "@/lib/api";
 import { LEVEL_LABEL, delta, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { briefForRun } from "@/lib/healthBrief";
+import { noDataReason } from "@/lib/healthReasons";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefRow, Health, Page, RunInfo } from "@/lib/types";
 
@@ -24,6 +25,8 @@ function HealthScreen() {
   const runs = useApi<Page<RunInfo>>(path("/runs", { limit: 50 }));
   // a chosen run: shown only when the response is that run; the latest run (no choice) has nothing to match
   const q = useRecord<Health>(path("/health", { run_id: runId || undefined }), runId || "latest", (d) => (runId ? d.run?.run_id : "latest"));
+  const { data: meta } = useMeta();
+  const missing = noDataReason(meta?.meta?.mode);
   return (
     <>
       <PageHead
@@ -76,23 +79,23 @@ function HealthScreen() {
             </Panel>
 
             <Panel title="Do we get the article text?" cap="Full or partial page text, per source and publisher">
-              {h.extraction ? <Extraction e={h.extraction} /> : <Empty>No extraction data.</Empty>}
+              {h.extraction ? <Extraction e={h.extraction} /> : <Empty>{missing}</Empty>}
             </Panel>
 
             <Panel title="What does the held-out test split say?" cap="The reported accuracy · runs once, on a frozen system">
-              <TestEvalBlock t={h.test_eval} />
+              <TestEvalBlock t={h.test_eval} missing={missing} />
             </Panel>
 
             <Panel title="How accurate is the system?" cap="Single labeler · golden set · newest eval of any split">
-              {h.eval ? <EvalCards ev={h.eval} /> : <Empty>No eval report yet.</Empty>}
+              {h.eval ? <EvalCards ev={h.eval} missing={missing} /> : <Empty>{missing}</Empty>}
             </Panel>
 
             <div className="grid items-start gap-3.5 lg:grid-cols-2">
               <Panel title="Do we miss real events?" cap="Coverage check · counts with n, not a rate">
-                {h.coverage ? <Coverage cv={h.coverage} /> : <Empty>No coverage check yet.</Empty>}
+                {h.coverage ? <Coverage cv={h.coverage} missing={missing} /> : <Empty>{missing}</Empty>}
               </Panel>
               <Panel title="Did the tracked pages change?" cap="Head-to-head change detection">
-                {h.change_detection ? <ChangeDetection c={h.change_detection} /> : <Empty>No change-detection run yet.</Empty>}
+                {h.change_detection ? <ChangeDetection c={h.change_detection} missing={missing} /> : <Empty>{missing}</Empty>}
               </Panel>
             </div>
           </>

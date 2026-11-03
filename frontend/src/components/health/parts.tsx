@@ -266,7 +266,8 @@ export function MetricCards({ cards }: { cards: EvalCard[] }) {
   );
 }
 
-export function EvalCards({ ev }: { ev: NonNullable<Health["eval"]> }) {
+export function EvalCards({ ev, missing }: { ev: NonNullable<Health["eval"]>; missing: string }) {
+  if (ev.status !== "ok") return <Empty>{missing}</Empty>;
   return (
     <div className="flex flex-col gap-3">
       <div className="text-xs text-mute">
@@ -301,8 +302,8 @@ function Count({ l, c }: { l: string; c?: { captured: number; n: number } }) {
   );
 }
 
-export function Coverage({ cv }: { cv: NonNullable<Health["coverage"]> }) {
-  if (cv.status !== "ok") return <Empty>No coverage check has run yet.</Empty>;
+export function Coverage({ cv, missing }: { cv: NonNullable<Health["coverage"]>; missing: string }) {
+  if (cv.status !== "ok") return <Empty>{missing}</Empty>;
   return (
     <div className="flex flex-col gap-3">
       <div className="text-xs text-mute">
@@ -330,9 +331,9 @@ export function Coverage({ cv }: { cv: NonNullable<Health["coverage"]> }) {
 
 // ---- change detection ----
 
-export function ChangeDetection({ c }: { c: NonNullable<Health["change_detection"]> }) {
+export function ChangeDetection({ c, missing }: { c: NonNullable<Health["change_detection"]>; missing: string }) {
   const { data: meta } = useMeta();
-  if (c.status === "none") return <Empty>No change-detection run yet.</Empty>;
+  if (c.status === "none") return <Empty>{missing}</Empty>;
   return (
     <div className="flex flex-col gap-2">
       <div>
@@ -476,8 +477,9 @@ export function RunHistory({ runs, selected, metrics, onSelect }: {
 }
 
 /** The test-split eval: the reported numbers. A slot with its three facts (n, date, fingerprint) until it runs. */
-export function TestEvalBlock({ t }: { t: TestEval | null | undefined }) {
+export function TestEvalBlock({ t, missing }: { t: TestEval | null | undefined; missing: string }) {
   const ran = t?.status === "ok";
+  if (!ran) return <Empty>{missing}</Empty>;
   const fact = (k: string, v: React.ReactNode) => (
     <div className="rounded-md border border-line bg-card px-4 py-3">
       <div className={cn("text-lg font-semibold tabular-nums", !ran && "text-mute")}>{v}</div>
