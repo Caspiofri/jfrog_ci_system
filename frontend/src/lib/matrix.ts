@@ -4,6 +4,15 @@
 import type { Cell, H2HAxis } from "./types";
 
 export const NOT_FOUND = "Not found yet";
+
+/** D95: on the Pricing model row, the stored "no price listed" reads "price not captured" (the prices load in the
+ *  browser, so the extractor never saw them). Display only: the stored value is unchanged. */
+export const PRICING_AXIS = "pricing_model";
+export function displayValue(axis: string, v: string): string;
+export function displayValue(axis: string, v: string | null | undefined): string | null | undefined;
+export function displayValue(axis: string, v: string | null | undefined) {
+  return axis === PRICING_AXIS && v ? v.replace(/no price listed/gi, "price not captured") : v;
+}
 export const SHORT_MAX = 90;
 export const SHORT_WORDS = 4;
 
@@ -49,8 +58,8 @@ export function shorten(s: string, max = SHORT_MAX): string {
   return `${(sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,;:.–-]+$/, "")}…`;
 }
 
-export function matrixCell(c: Cell | null | undefined): MatrixCell {
-  const value = c && (c.state === "value" || c.state === "stale") && c.value?.trim() ? c.value.trim() : null;
+export function matrixCell(c: Cell | null | undefined, axis = ""): MatrixCell {
+  const value = c && (c.state === "value" || c.state === "stale") && c.value?.trim() ? displayValue(axis, c.value.trim()) : null;
   const changedAt = c?.change?.detected_at || null;
   const raw = c?.state;
   const state: DataState = raw === "value" || raw === "stale" || raw === "not_stated" || raw === "not_tracked" ? raw : "not_tracked";
@@ -84,9 +93,9 @@ export function buildMatrix(profiles: { key: string; axes: H2HAxis[] | null | un
     for (const p of profiles) {
       const a = (p.axes ?? []).find((x) => x.axis === axis);
       if (!jfrog && a?.jfrog && a.jfrog.state !== "not_tracked") jfrog = a.jfrog;
-      cells[p.key] = matrixCell(a?.competitor);
+      cells[p.key] = matrixCell(a?.competitor, axis);
     }
-    return { axis, label, jfrog: matrixCell(jfrog), cells };
+    return { axis, label, jfrog: matrixCell(jfrog, axis), cells };
   });
 }
 
