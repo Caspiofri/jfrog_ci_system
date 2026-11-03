@@ -22,3 +22,11 @@ test("the page's (i) says what the page is: JFrog's competitors and how they com
   const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
   assert.match(parts, /Top score this week <ScoreBadge score=\{c\.threat\} title="Top score: the highest score of any of this competitor's items this week" \/>/);
 });
+
+test("D96 follow-up: the page's (i) says what the heatmap counts (cleared items by date collected), not \"active\"", () => {
+  assert.match(page, /their cleared items by category, counted by the date collected this week/);
+  assert.doesNotMatch(page, /where they were active/);
+  const profile = readFileSync(new URL("../src/app/competitors/[key]/page.tsx", import.meta.url), "utf8");
+  assert.match(profile, /How active are they\?/); // by article date: kept
+  assert.match(profile, /last activity/);
+});
