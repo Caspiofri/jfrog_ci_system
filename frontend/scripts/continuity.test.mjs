@@ -54,7 +54,7 @@ test("'no longer appear' line only when N > 0", () => {
 
 test("the Brief puts the badge next to the pattern chip and the line under the insights title", () => {
   const src = readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8");
-  assert.match(src, /<Tag>\{label\(PATTERN_LABEL, ins\.pattern\)\}<\/Tag>\s*<ContinuityBadge c=\{ins\.continuity\} \/>/);
+  assert.match(src, /<Tag>\{label\(PATTERN_LABEL, ins\.pattern\)\}<\/Tag>\s*(?:\{ins\.pattern === "competitor_momentum" \? <MomentumCompetitor ins=\{ins\} \/> : null\}\s*)?<ContinuityBadge c=\{ins\.continuity\} \/>/);
   assert.match(src, /\{goneLine\(insights\.previous\) \? <p[^>]*data-gone-line>/);
   assert.match(src, /<Hint text=\{CONTINUITY_TIP\}>/);
 });

@@ -5,11 +5,13 @@ import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, Newspaper,
 import { Button } from "@/components/ui/button";
 import { ArticleLink, Async, Empty, ErrorNote, Hint, ImportanceLegend, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { cn } from "@/lib/utils";
-import { competitorFilterOptions } from "@/lib/competitorLabel";
+import { competitorFilterOptions, soleCompetitor } from "@/lib/competitorLabel";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
-import { ApiError, path, send, useApi, useRecord } from "@/lib/api";
+import { ApiError, get, path, send, useApi, useRecord } from "@/lib/api";
+import useSWR from "swr";
+import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
@@ -349,6 +351,7 @@ function InsightCard({ ins, prev, selected, onSelect }: { ins: Insight; prev: In
     >
       <div className="flex flex-wrap items-center gap-1.5" data-insight-header>
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
+        {ins.pattern === "competitor_momentum" ? <MomentumCompetitor ins={ins} /> : null}
         <ContinuityBadge c={ins.continuity} />
         <TouchesJfrog claims={ins.claims} />
       </div>
@@ -423,6 +426,23 @@ function TouchesJfrog({ claims }: { claims: Claim[] }) {
     <Tag className="border border-jgreen/40 bg-[#eef7f0] text-[0.6875rem] font-semibold text-jgreen-d">
       Touches JFrog: {caps.map((k) => CAPABILITY_NAME[k]).join(" · ")}
     </Tag>
+  );
+}
+
+/** D89: beside "Competitor momentum", the competitor's avatar and name, from the cited items (GET /items/{id}, the
+ *  drawer's own record), only when every one names the same tracked competitor; otherwise nothing. */
+function MomentumCompetitor({ ins }: { ins: Insight }) {
+  const { data: meta } = useMeta();
+  const uniq = [...new Set(ins.item_ids)];
+  const q = useSWR(uniq.length ? ["cited-competitors", ...uniq] : null,
+    () => Promise.all(uniq.map((id) => get<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`))), { revalidateOnFocus: false });
+  const k = q.data ? soleCompetitor(meta, q.data.map((d) => d.item?.competitor)) : null;
+  if (!k) return null;
+  const name = meta?.competitors.find((c) => c.key === k)?.name ?? k;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink" data-momentum-competitor={k}>
+      <CompetitorAvatar k={k} name={name} />{name}
+    </span>
   );
 }
 

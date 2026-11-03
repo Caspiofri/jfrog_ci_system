@@ -18,3 +18,14 @@ export function competitorFilterOptions(meta: MetaLike | undefined): { value: st
   const opts = (meta?.competitors ?? []).filter((c) => c.key !== NONE_KEY).map((c) => ({ value: c.key, label: c.name }));
   return [...opts, { value: NONE_KEY, label: NONE_LABEL }];
 }
+
+/** D89: the one tracked competitor every cited item names, or null (mixed, missing, Industry, No tracked company,
+ *  or a key the API's competitor list doesn't carry). Used beside "Competitor momentum". */
+export function soleCompetitor(meta: { competitors: { key: string; is_industry?: boolean }[] } | undefined, keys: (string | null | undefined)[]): string | null {
+  if (!meta || !keys.length || keys.some((k) => !k)) return null;
+  const set = new Set(keys);
+  if (set.size !== 1) return null;
+  const k = keys[0]!;
+  const c = meta.competitors.find((x) => x.key === k);
+  return c && !c.is_industry && k !== "industry" && k !== NONE_KEY ? k : null;
+}
