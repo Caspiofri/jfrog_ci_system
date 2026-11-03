@@ -90,5 +90,5 @@ test("the Brief marks those cited articles New, from the previous Brief's insigh
   const src = readFileSync(new URL("../src/app/brief/page.tsx", import.meta.url), "utf8");
   assert.match(src, /useApi<Brief>\(needPrev && since \? path\("\/brief", \{ date: since, limit: 1 \}\) : null\)/);
   assert.match(src, /newCitedIds\(ins, prev\)/);
-  assert.match(src, /\{isNew \? \([\s\S]*?>New<\/Tag>/);
+  assert.match(src, /\{isNew \? \([\s\S]*?>New in this insight<\/Tag>/);
 });

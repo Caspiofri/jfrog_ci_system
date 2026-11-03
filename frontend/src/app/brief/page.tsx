@@ -523,7 +523,7 @@ function SourceLine({ id, row, withScore, n, isNew = false, since = null }: {
           style={{ background: bg, color: fg }}>{it.score ?? "–"}</span>
       ) : null}
       {isNew ? (
-        <Tag className={cn("border text-[0.625rem] font-semibold", BADGE_STYLE.new)} title={since ? NEW_SOURCE_TIP(fmtDate(since)) : undefined} data-new-source>New</Tag>
+        <Tag className={cn("border text-[0.625rem] font-semibold", BADGE_STYLE.new)} title={since ? NEW_SOURCE_TIP(fmtDate(since)) : undefined} data-new-source>New in this insight</Tag>
       ) : null}
       {it.outside ? (
         <Tag className="text-[0.625rem]"
