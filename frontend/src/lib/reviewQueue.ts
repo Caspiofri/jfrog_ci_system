@@ -13,6 +13,41 @@ export const FETCH_LIMIT = 200;
 export const SORT_ORDER_LINE =
   "Sorted as the API returns them: changed head-to-head cells first, then items held at every level, then score from high to low, then oldest discovered first.";
 
+export type QueueSort = "" | "newest" | "oldest";
+
+/** The sort selector. "" is Importance, the API's own order (the default). */
+export const SORT_OPTIONS: { value: QueueSort; label: string }[] = [
+  { value: "", label: "Importance" },
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+];
+
+/** The line under the filters, for each sort. */
+export const SORT_LINES: Record<QueueSort, string> = {
+  "": SORT_ORDER_LINE,
+  newest: "Newest feed date first. Changed head-to-head cells first, since they have no feed date; items without a feed date last.",
+  oldest: "Oldest feed date first. Changed head-to-head cells first, since they have no feed date; items without a feed date last.",
+};
+
+/** Sorts the whole queue in the browser (every page is fetched). Changed cells keep the top, in the API's order; items
+ *  sort by feed date (published_at), those without one last; equal dates keep the API's order. Never mutates rows. */
+export function sortQueue<T extends Row>(rows: T[], sort: string): T[] {
+  if (sort !== "newest" && sort !== "oldest") return rows;
+  const dir = sort === "newest" ? -1 : 1;
+  const changes = rows.filter((r) => r.kind === "change");
+  const items = rows.map((r, i) => ({ r, i })).filter((x) => x.r.kind === "item");
+  const t = (r: T) => {
+    const v = r.kind === "item" ? Date.parse(r.item.published_at ?? "") : NaN;
+    return Number.isNaN(v) ? null : v;
+  };
+  items.sort((a, b) => {
+    const ta = t(a.r), tb = t(b.r);
+    if (ta == null || tb == null) return ta == null && tb == null ? a.i - b.i : ta == null ? 1 : -1;
+    return ta === tb ? a.i - b.i : dir * (ta - tb);
+  });
+  return [...changes, ...items.map((x) => x.r)];
+}
+
 export const SCORE_OPTIONS = [
   { value: "4+", label: "Score 4–5" },
   { value: "3", label: "Score 3" },

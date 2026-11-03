@@ -14,7 +14,7 @@ import { FilterSelect } from "@/components/FilterSelect";
 import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
-import { SCORE_OPTIONS, SORT_ORDER_LINE, filterQueue, hasLocalFilters, queueQuery, remainingOffsets, windowOptions } from "@/lib/reviewQueue";
+import { SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, filterQueue, hasLocalFilters, queueQuery, remainingOffsets, sortQueue, windowOptions, type QueueSort } from "@/lib/reviewQueue";
 import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
@@ -55,6 +55,8 @@ function ReviewScreen() {
   const brief = param("brief");
   const score = param("score");
   const category = param("category");
+  const sortParam = param("sort");
+  const sort: QueueSort = sortParam === "newest" || sortParam === "oldest" ? sortParam : "";
   const offset = Number(param("offset") || 0);
   const [search, setSearch] = useState(param("q"));
   const urlQ = param("q");
@@ -81,7 +83,7 @@ function ReviewScreen() {
       <Async {...q} retry={() => q.mutate()} rows={6}>
         {(r) => {
           const lv = r.levels.find((x) => x.level === r.level);
-          const rows = filterQueue(r.items, local);
+          const rows = sortQueue(filterQueue(r.items, local), sort);
           const filtered = hasLocalFilters(local) || reason || competitor || brief;
           const pageRows = rows.slice(offset, offset + PAGE);
           return (
@@ -131,6 +133,8 @@ function ReviewScreen() {
                       placeholder="Search by item id, title or publisher"
                       className="h-8 w-full rounded-md border border-line bg-white pr-2.5 pl-8 text-[13px] outline-none focus:border-jgreen" />
                   </label>
+                  <FilterSelect ariaLabel="Sort" allLabel={SORT_OPTIONS[0].label} value={sort} onChange={(v) => set({ sort: v || null, offset: null })}
+                    options={SORT_OPTIONS.slice(1)} />
                   <FilterSelect ariaLabel="Window" allLabel="All held items" value={brief} onChange={(v) => set({ brief: v, offset: null })}
                     options={windows} className="h-8 min-w-[14rem] bg-white text-[13px]" />
                   <FilterSelect ariaLabel="Score" allLabel="All scores" value={score} onChange={(v) => set({ score: v, offset: null })}
@@ -142,7 +146,7 @@ function ReviewScreen() {
                   <FilterSelect ariaLabel="Hold reason" allLabel="All reasons" value={reason} onChange={(v) => set({ reason: v, offset: null })}
                     options={(meta?.hold_reasons ?? []).map((c) => ({ value: c, label: label(HOLD_LABEL, c) }))} />
                 </div>
-                <div className="mb-2 text-xs text-mute">{SORT_ORDER_LINE}{brief ? " Changed cells belong to no Brief, so a Brief window lists items only." : ""}</div>
+                <div className="mb-2 text-xs text-mute">{SORT_LINES[sort]}{brief ? " Changed cells belong to no Brief, so a Brief window lists items only." : ""}</div>
                 {previewing ? <div className="mb-2 text-xs text-mute">Actions are off while previewing another level.</div> : null}
                 {pageRows.length ? (
                   pageRows.map((row) =>
