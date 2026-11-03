@@ -1,9 +1,10 @@
 // The Brief's "Today in numbers" tiles. Every number is a field the API returns for that Brief:
-// "New items" is items.new of the Brief run's metrics row (GET /run-metrics/{anchor_run_id}); the rest is the Brief's summary.
+// "New items" is items.new of the Brief run's metrics row (GET /run-metrics/{anchor_run_id}); its hover is that run's funnel
+// (fetched, new, noise from the row; published and need review from the Brief summary). The rest is the Brief's summary.
 // No count of low-score items (published_below is left out on purpose). No imports besides types, so `npm test` runs it.
 import type { BriefSummary } from "./types";
 
-export interface RunItemCounts { collected?: number; kept?: number; new?: number }
+export interface RunItemCounts { collected?: number | null; kept?: number | null; new?: number | null; noise?: number | null }
 
 /** The counts of this Brief's own run, or null. A metrics row of another run (an earlier response kept while the
  *  next request is pending or failed with 404) is never used: the tile would show the wrong day's number. */
@@ -21,14 +22,30 @@ export interface Tile {
 
 const levelName = (l: string) => (l ? l[0].toUpperCase() + l.slice(1) : l);
 
+const num = (v: unknown): v is number => typeof v === "number";
+
+/** "239 fetched → 26 new after removing duplicates → 11 removed as noise → 4 published · 11 need review". Every number
+ *  is a field of the run row or the Brief summary, never computed; a step whose field is empty is left out. */
+export function funnelLine(run: RunItemCounts, s: BriefSummary): string {
+  const steps = [
+    num(run.collected) ? `${run.collected} fetched` : null,
+    num(run.new) ? `${run.new} new after removing duplicates` : null,
+    num(run.noise) ? `${run.noise} removed as noise` : null,
+    `${s.published} published · ${s.held} need review`,
+  ];
+  return steps.filter(Boolean).join(" → ");
+}
+
+export const NO_RUN_METRICS = "Run metrics not recorded yet for this run.";
+
 export function todayTiles(s: BriefSummary, run: RunItemCounts | null | undefined): Tile[] {
-  const fresh = typeof run?.new === "number" ? run.new : null;
+  const fresh = num(run?.new) ? run.new : null;
   const unscored = s.held_by_preliminary_score?.unscored ?? 0;
   const level = levelName(s.level);
   return [
     {
       key: "new", label: "New items", value: fresh,
-      hint: fresh == null ? "No run record for this Brief, so the number of new items isn't known." : "Collected since the previous Brief.",
+      hint: fresh == null || !run ? NO_RUN_METRICS : funnelLine(run, s),
     },
     {
       key: "published", label: "Published", value: s.published,

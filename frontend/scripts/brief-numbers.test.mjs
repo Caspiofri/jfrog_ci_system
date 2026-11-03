@@ -7,7 +7,7 @@ import { todayTiles } from "../src/lib/briefNumbers.ts";
 // The live 1 Nov Brief: summary from GET /brief?date=2026-11-01, items from GET /run-metrics/20261101T0400Z-e9cae4.
 const S = { brief_min_score: 3, published: 4, published_high: 1, published_below: 2, held: 11, held_high: 1,
   held_by_preliminary_score: { "5": 0, "4": 1, "3": 8, "<=2": 2, unscored: 0, noise: 0 }, level: "strict" };
-const RUN = { collected: 239, kept: 26, new: 26 };
+const RUN = { collected: 239, kept: 26, new: 26, noise: 11 };
 const byKey = (tiles) => Object.fromEntries(tiles.map((t) => [t.key, t]));
 
 test("four tiles with short labels, in order", () => {
@@ -32,7 +32,6 @@ test("no count of low-score items", () => {
 test("every tile explains what it counts on hover", () => {
   const t = byKey(todayTiles(S, RUN));
   for (const x of Object.values(t)) assert.ok(x.hint.length > 20, x.key);
-  assert.equal(t.new.hint, "Collected since the previous Brief.");
   assert.match(t.published.hint, /scored 3 or higher/);
   assert.match(t.review.hint, /held at Strict/);
   assert.match(t.review.hint, /1 preliminarily scored 4–5/);
@@ -47,7 +46,7 @@ test("no run record (older data, or a demo snapshot without it): new items unkno
   for (const run of [null, undefined, {}, { collected: 239 }]) {
     const t = byKey(todayTiles(S, run));
     assert.equal(t.new.value, null);
-    assert.match(t.new.hint, /isn't known/);
+    assert.equal(t.new.hint, "Run metrics not recorded yet for this run.");
   }
 });
 
@@ -80,7 +79,7 @@ test("another run's metrics (kept from the previous Brief, or the request 404ed)
   assert.equal(runCountsFor("20261031T1345Z-802913", m1), null);
   const t = todayTiles(S, runCountsFor("20261031T1345Z-802913", m1))[0];
   assert.equal(t.value, null);
-  assert.match(t.hint, /isn't known/);
+  assert.equal(t.hint, "Run metrics not recorded yet for this run.");
   assert.equal(runCountsFor("x", undefined), null);
 });
 
@@ -89,4 +88,17 @@ test("the Brief asks for its own run with keepPreviousData off", () => {
   assert.match(src, /\/run-metrics\/\$\{encodeURIComponent\(runId\)\}`\), \{ shouldRetryOnError: false, keepPreviousData: false \}/);
   assert.match(src, /todayTiles\(s, runCountsFor\(runId, run\.data\)\)/);
   assert.match(src, /runId=\{b\.window\.anchor_run_id\}/);
+});
+
+test("the New items hover is the run's funnel, every number from the run row or the Brief summary (1 Nov)", () => {
+  assert.equal(byKey(todayTiles(S, RUN)).new.hint,
+    "239 fetched → 26 new after removing duplicates → 11 removed as noise → 4 published · 11 need review");
+});
+
+test("a funnel step whose field is empty is left out, never shown as 0", () => {
+  assert.equal(byKey(todayTiles(S, { new: 13 })).new.hint, "13 new after removing duplicates → 4 published · 11 need review");
+  assert.equal(byKey(todayTiles(S, { new: 13, collected: null, noise: undefined })).new.hint,
+    "13 new after removing duplicates → 4 published · 11 need review");
+  assert.equal(byKey(todayTiles(S, { new: 0, collected: 5, noise: 0 })).new.hint,
+    "5 fetched → 0 new after removing duplicates → 0 removed as noise → 4 published · 11 need review");
 });
