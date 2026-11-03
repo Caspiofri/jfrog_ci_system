@@ -14,9 +14,9 @@ import { remainingOffsets } from "@/lib/reviewQueue";
 import type { Competitors, Log, LogRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export const HEATMAP_CAPTION = "Published items found in the last 7 days, by category.";
+export const HEATMAP_CAPTION = "By category, in the same week as the cards below.";
 /** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
-export const HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the last 7 days. Items awaiting review are not in this grid; each card shows them.";
+export const HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the same week. Items awaiting review are not in this grid; each card shows them.";
 
 async function getAllRows(url: string): Promise<{ rows: LogRow[]; now: string }> {
   const first = await get<Log>(url);
@@ -45,8 +45,8 @@ export function ActivityHeatmap() {
     <Panel title="Where competitors are active" info={HEATMAP_COUNTS}>
       <p className="m-0 mb-2 text-xs text-[#44516a]" data-caption>{HEATMAP_CAPTION}</p>
       {q.error ? <ErrorNote error={q.error} onRetry={() => q.mutate()} /> : null}
-      {!hm ? (q.error ? null : <div className="py-4 text-xs text-mute" role="status">Counting the last 7 days…</div>) : !hm.total ? (
-        <Empty>No items from the tracked competitors were published in the last 7 days.</Empty>
+      {!hm ? (q.error ? null : <div className="py-4 text-xs text-mute" role="status">Counting…</div>) : !hm.total ? (
+        <Empty>No items from the tracked competitors were published this week.</Empty>
       ) : (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] text-mute" data-legend aria-label="Legend">

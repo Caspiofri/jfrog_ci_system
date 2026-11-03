@@ -6,7 +6,9 @@ import { test } from "node:test";
 const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
 
 test("header above the cards: title and window; no totals line; the (i) says the big number is published only", () => {
-  assert.match(page, /Published competitor items <span[^>]*>· found \{fmtDate\(d\.week\.start\)\}–\{fmtDate\(d\.week\.end\)\}/);
+  // D89: title "Weekly", the API's week on a line under it
+  assert.match(page, /<h2[^>]*>\s*Weekly\s*<InfoHint[^>]*\/>\s*<\/h2>\s*<p[^>]*data-week-range>\{fmtDate\(d\.week\.start\)\}–\{fmtDate\(d\.week\.end\)\}<\/p>/);
+  assert.doesNotMatch(page, /Published competitor items/);
   assert.doesNotMatch(page, /cardTotals|across the six competitors/);
   assert.match(page, /const CARDS_EXPLAIN = "Only published articles\. Click a card for the competitor's full details\.";/);
   assert.match(page, /<InfoHint text=\{CARDS_EXPLAIN\} label="What the cards count" \/>/);
