@@ -107,7 +107,7 @@ export function ActivityHeatmap() {
               {picked.items.map((r) => (
                 <div key={r.item_id} className="flex items-start gap-2 border-t border-line py-1.5 text-xs first:border-t-0">
                   <ScoreBadge score={r.score} />
-                  <span className="min-w-0 flex-1"><ItemTitle title={r.title} url={r.url} onOpen={() => drawer.open(r.item_id!)} /></span>
+                  <span className="min-w-0 flex-1"><ItemTitle title={r.title} url={r.url} publisher={r.publisher} onOpen={() => drawer.open(r.item_id!)} /></span>
                   <span className="shrink-0 text-mute">{fmtDate(r.published_at)}</span>
                 </div>
               ))}

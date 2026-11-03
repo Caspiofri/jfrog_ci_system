@@ -39,7 +39,7 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
       <ScoreBadge score={item.score} noise={item.noise} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-1.5">
-          <ItemTitle title={item.title} url={item.url} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
+          <ItemTitle title={item.title} url={item.url} publisher={item.publisher} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-mute">
           <CompetitorLabel k={item.competitor} className="font-medium text-ink" />

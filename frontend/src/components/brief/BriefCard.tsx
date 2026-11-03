@@ -82,7 +82,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         <ReviewedMark item={item} />
       </div>
       <div className="mt-1.5 flex items-start gap-1.5">
-        <ItemTitle title={item.title} url={item.url} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
+        <ItemTitle title={item.title} url={item.url} publisher={item.publisher} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
       </div>
       <dl className="m-0 mt-2 grid grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)]">
         <Row label="What happened">

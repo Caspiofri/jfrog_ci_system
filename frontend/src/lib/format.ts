@@ -232,3 +232,25 @@ export const AXIS_LABEL: Record<string, string> = {
 /** D88: shown, never only on hover, wherever head-to-head or change-detection values appear. */
 export const UNVERIFIED_VALUES =
   "Values are extracted by an AI model from the linked public pages. The system has no verification step for them, and our evaluation does not cover them. Check the source before relying on a value.";
+
+/** D90: aggregators whose name says nothing about who wrote the article; the article's domain is shown instead. */
+export const AGGREGATORS = ["hacker news", "google news", "news.ycombinator.com", "news.google.com"];
+
+function hostOf(u: string | null | undefined): string | null {
+  if (!u) return null;
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    return h ? h.replace(/^www\./, "") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** D90: the name on an article's external link: the stored publisher; the article's domain when the publisher is
+ *  missing, an aggregator, or itself a URL; null when there is neither (the link then says "Source"). Never invented. */
+export function publisherName(publisher: string | null | undefined, url: string | null | undefined): string | null {
+  const p = (publisher ?? "").trim();
+  const isUrl = /^https?:\/\//i.test(p);
+  if (p && !isUrl && !AGGREGATORS.includes(p.toLowerCase())) return p;
+  return hostOf(url) ?? (isUrl ? hostOf(p) : null);
+}

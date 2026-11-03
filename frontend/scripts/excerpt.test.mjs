@@ -20,7 +20,7 @@ test("drawer: the article dropdown, collapsed by default, holds the excerpt and 
   assert.match(ex, /SHOW_LABEL = "Show article excerpt"/);
   assert.match(ex, /<button type="button" aria-expanded=\{open\}/);
   assert.match(ex, /\{open \? \([\s\S]*?\{excerpt\}[\s\S]*?<ArticleLink href=\{url\}/);
-  assert.match(drawer, /<ArticleExcerpt excerpt=\{it\.excerpt\} url=\{it\.url\} \/>/);
+  assert.match(drawer, /<ArticleExcerpt excerpt=\{it\.excerpt\} url=\{it\.url\} publisher=\{it\.publisher\} \/>/);
 });
 
 test("the excerpt is shown as served: not stripped, shortened or rewritten", () => {

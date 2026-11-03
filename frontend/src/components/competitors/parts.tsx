@@ -100,7 +100,7 @@ export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; sh
             <tr key={d.item_id}>
               <td className={`${td} whitespace-nowrap`}>{fmtDate(d.published_at, true)}</td>
               {showCompetitor ? <td className={`${td} whitespace-nowrap`}><CompetitorLabel k={d.competitor} /></td> : null}
-              <td className={td}><ItemTitle title={d.title} url={d.url} onOpen={() => drawer.open(d.item_id)} /></td>
+              <td className={td}><ItemTitle title={d.title} url={d.url} publisher={d.publisher} onOpen={() => drawer.open(d.item_id)} /></td>
               <td className={`${td} text-mute`}>{d.publisher} · {label(SOURCE_LABEL, d.source)}</td>
               <td className={td}><StatusDot status={d.status} /></td>
             </tr>

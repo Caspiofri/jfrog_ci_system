@@ -463,12 +463,13 @@ function ContinuityBadge({ c }: { c: Insight["continuity"] }) {
   );
 }
 
-/** A cited item's row: served in insights.cited_items, or fetched (same SWR key as the drawer) when it wasn't.
- * A fetched item has no in_brief, so no "not in this Brief" tag is shown for it. */
+/** A cited item's row: served in insights.cited_items, plus the item record (same SWR key as the drawer) for what the
+ * row lacks, such as the publisher (D90). A fetched item has no in_brief, so no "not in this Brief" tag is shown for it. */
 function useCitedItem(id: string, row?: CitedItemRow) {
-  const q = useRecord<ItemDetail>(row || !id ? null : `/api/v1/items/${encodeURIComponent(id)}`, id, (d) => d.item?.item_id);
+  const q = useRecord<ItemDetail>(id ? `/api/v1/items/${encodeURIComponent(id)}` : null, id, (d) => d.item?.item_id);
   const it = row ?? q.data?.item;
   return {
+    publisher: q.data?.item ? q.data.item.publisher : undefined, // undefined until loaded: the link says "Source"
     title: it ? it.title : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`,
     score: it?.score ?? null,
     url: it?.url ?? null,
@@ -529,7 +530,7 @@ function SourceLine({ id, row, withScore, n, isNew = false, since = null }: {
           not in this Brief
         </Tag>
       ) : null}
-      <ArticleLink href={it.url} />
+      <ArticleLink href={it.url} publisher={it.publisher} />
     </div>
   );
 }

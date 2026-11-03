@@ -89,7 +89,7 @@ test("columns: the six tracked competitors with avatars, as the matrix; rows: th
 
 test("a click lists the cell's items; the title opens the drawer", () => {
   assert.match(comp, /onClick=\{\(\) => setSel/);
-  assert.match(comp, /<ItemTitle title=\{r\.title\} url=\{r\.url\} onOpen=\{\(\) => drawer\.open\(r\.item_id!\)\} \/>/);
+  assert.match(comp, /<ItemTitle title=\{r\.title\} url=\{r\.url\} publisher=\{r\.publisher\} onOpen=\{\(\) => drawer\.open\(r\.item_id!\)\} \/>/);
 });
 
 test("no gap, threat, ahead or behind", () => {

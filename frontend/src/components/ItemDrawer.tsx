@@ -79,7 +79,7 @@ function DrawerBody({ id }: { id: string }) {
       <SheetHeader className="px-5 pt-5 pb-0">
         <SheetTitle className="flex items-start gap-1.5 pr-6 text-base leading-snug">
           <span>{q.data?.item.title ?? "Item"}</span>
-          {q.data ? <ArticleLink href={q.data.item.url} className="mt-1" /> : null}
+          {q.data ? <ArticleLink href={q.data.item.url} publisher={q.data.item.publisher} className="mt-1" /> : null}
         </SheetTitle>
         <SheetDescription className="text-xs">Article headline · item {id}</SheetDescription>
       </SheetHeader>
@@ -100,7 +100,7 @@ function DrawerBody({ id }: { id: string }) {
                 </div>
                 {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
                 <MentionWhy d={d} />
-                <ArticleExcerpt excerpt={it.excerpt} url={it.url} />
+                <ArticleExcerpt excerpt={it.excerpt} url={it.url} publisher={it.publisher} />
                 <JfrogMentionSection mention={it.jfrog_mention} />
                 <div>
                   <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>

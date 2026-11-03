@@ -118,7 +118,7 @@ function LogTr({ r }: { r: LogRow }) {
       <td className={`${td} whitespace-nowrap`}>{fmtDate(r.collected_at)}</td>
       <td className={`${td} whitespace-nowrap`}>{r.competitor ? <CompetitorLabel k={r.competitor} /> : "—"}</td>
       <td className={td}>
-        <ItemTitle title={r.title} url={r.url} onOpen={dropped || !r.item_id ? undefined : () => drawer.open(r.item_id!)} />
+        <ItemTitle title={r.title} url={r.url} publisher={r.publisher} onOpen={dropped || !r.item_id ? undefined : () => drawer.open(r.item_id!)} />
         {dropped && r.duplicate_of ? (
           <button type="button" className="ml-1 text-xs text-mute hover:text-jgreen-d" onClick={() => drawer.open(r.duplicate_of!)}>· kept item</button>
         ) : null}

@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ApiError } from "@/lib/api";
-import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, UNVERIFIED_VALUES, label, safeHref } from "@/lib/format";
+import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, UNVERIFIED_VALUES, label, publisherName, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** A small (i) that explains on hover and keyboard focus: long explanations live here, not on screen. */
@@ -191,25 +191,32 @@ export function N({ n }: { n: number | null | undefined }) {
 /** External links only open http(s) URLs (D32); safeHref turns anything else into no link. */
 export const ARTICLE_LINK_LABEL = "Open the original article in a new tab";
 
-/** The one external-link style: "Source" with the external-link icon (box with arrow), opening the original page in
- *  a new tab. Nothing when the URL isn't http(s). */
-export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className, iconOnly = false }: {
-  href: string | null | undefined; label?: string; className?: string; iconOnly?: boolean;
+/** The one external-link style: the publisher's name (D90; the article's domain for an aggregator or a missing
+ *  publisher; "Source" only when there is neither) with the external-link icon (box with arrow), opening the original
+ *  page in a new tab. A long name is cut to one line, the full name on hover. Nothing when the URL isn't http(s).
+ *  `publisher` is only for an article link: a tracked or source page keeps "Source". */
+export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className, iconOnly = false, publisher }: {
+  href: string | null | undefined; label?: string; className?: string; iconOnly?: boolean; publisher?: string | null;
 }) {
   const safe = safeHref(href);
   if (!safe) return null;
+  const name = publisher !== undefined ? publisherName(publisher, safe) : null;
+  const text = name ?? "Source";
   return (
-    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={aria} title={iconOnly ? "Source" : aria}
-      onClick={(e) => e.stopPropagation()}
-      className={cn("inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[0.6875rem] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
-      {iconOnly ? null : "Source"}<ExternalLink className={iconOnly ? "size-3.5" : "size-3"} aria-hidden="true" />
+    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={name ? `${aria}: ${name}` : aria}
+      title={name ? `${name} · ${aria}` : iconOnly ? "Source" : aria}
+      onClick={(e) => e.stopPropagation()} data-publisher={name ?? undefined}
+      className={cn("inline-flex min-w-0 shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[0.6875rem] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
+      {iconOnly ? null : <span className={name ? "max-w-[14rem] truncate" : undefined}>{text}</span>}
+      <ExternalLink className={cn("shrink-0", iconOnly ? "size-3.5" : "size-3")} aria-hidden="true" />
     </a>
   );
 }
 
-/** The one link convention for an item: the title opens the side drawer, "Source" opens the original article. */
-export function ItemTitle({ title, url, onOpen, className }: {
-  title: string; url?: string | null; onOpen?: () => void; className?: string;
+/** The one link convention for an item: the title opens the side drawer, the publisher's name opens the original
+ *  article (D90). */
+export function ItemTitle({ title, url, onOpen, className, publisher }: {
+  title: string; url?: string | null; onOpen?: () => void; className?: string; publisher?: string | null;
 }) {
   const text = title || "(no title)";
   return (
@@ -220,7 +227,7 @@ export function ItemTitle({ title, url, onOpen, className }: {
       ) : (
         <span className={cn("min-w-0", className)}>{text}</span>
       )}
-      <ArticleLink href={url} className="mt-0.5" />
+      <ArticleLink href={url} className="mt-0.5" publisher={publisher} />
     </span>
   );
 }
