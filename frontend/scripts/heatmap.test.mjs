@@ -1,4 +1,4 @@
-// npm test: "Where competitors are active" (src/lib/heatmap.ts, components/competitors/Heatmap.tsx).
+// npm test: "Cleared items by category", formerly "Where competitors are active" (src/lib/heatmap.ts, components/competitors/Heatmap.tsx).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -75,7 +75,7 @@ const comp = readFileSync(new URL("../src/components/competitors/Heatmap.tsx", i
 const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
 
 test("title, caption, legend with the scale; directly under the matrix", () => {
-  assert.match(comp, /<Panel title="Where competitors are active" info=/);
+  assert.match(comp, /<Panel title="Cleared items by category" info=/);
   assert.match(comp, /HEATMAP_CAPTION = "By category, in the same week as the cards below\."/);
   assert.match(comp, /legendSteps\(hm\.max\)/);
   assert.match(page, /<CapabilityMatrix \/>\s*<ActivityHeatmap \/>/);
@@ -105,10 +105,10 @@ test("the heatmap ends where the competitor cards end (the latest Brief's run), 
 });
 
 test("the heatmap counts as the cards and says so; no Total row (D86: the card shows it); the totals line matches the cards' header", () => {
-  assert.match(comp, /HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the same week\. Items awaiting review are not in this grid; each card shows them\.";/);
-  assert.match(comp, /<Panel title="Where competitors are active" info=\{HEATMAP_COUNTS\}>/);
+  assert.match(comp, /HEATMAP_COUNTS = "Cleared items \(passed routing, or approved by an analyst\), counted as on the competitor cards: by the date collected, in the same week\. Items awaiting review are not in this grid; each card shows them\.";/);
+  assert.match(comp, /<Panel title="Cleared items by category" info=\{HEATMAP_COUNTS\}>/);
   assert.doesNotMatch(comp, /Total \(as on the card\)|data-total-row|hm\.colTotals/);
-  assert.match(comp, /\{hm\.published\}<\/b> published[\s\S]*?the same as the cards below/);
+  assert.match(comp, /\{hm\.published\}<\/b> cleared[\s\S]*?the same as the cards below/);
 });
 test("1 Nov demo: every column total equals its card's number", () => {
   // GET /competitors items_7d on the 1 Nov snapshot; checked live against the heatmap: all equal, 127 in all

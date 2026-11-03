@@ -20,7 +20,7 @@ const FUNNEL: [string, string, string][] = [
   ["Collected", "collected", "#3f5b8f"],
   ["After dedupe", "kept", "#5b7bb5"],
   ["Not noise", "scored", "#7fa0d4"],
-  ["Published", "published", "#41be57"],
+  ["Cleared", "published", "#41be57"],
   ["Held for review", "held_for_review", "#f59e0b"],
 ];
 
@@ -43,7 +43,7 @@ export function Funnel({ totals }: { totals: Record<string, number> }) {
 
 const SOURCE_COLS: [string, string][] = [
   ["collected", "Collected"], ["dup_url", "Dup URL"], ["dup_embedding", "Dup similar"], ["kept", "Kept"],
-  ["noise", "Noise"], ["scored", "Scored"], ["published", "Published"], ["held_for_review", "Held"],
+  ["noise", "Noise"], ["scored", "Scored"], ["published", "Cleared"], ["held_for_review", "Held"],
 ];
 
 export function SourcesTable({ sources }: { sources: NonNullable<Health["funnel"]>["sources"] }) {

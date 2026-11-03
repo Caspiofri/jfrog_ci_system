@@ -7,7 +7,7 @@ import { Empty, ErrorNote, ItemTitle, Panel, ScoreBadge } from "@/components/ci"
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { ApiError, get, path, useApi } from "@/lib/api";
-import { CATEGORY_COLOR, fmtDate } from "@/lib/format";
+import { CATEGORY_COLOR, COLLECTED_TIP, fmtDate } from "@/lib/format";
 import { ZERO_BG, buildHeatmap, heatColor, heatmapQuery, legendSteps } from "@/lib/heatmap";
 import { useMeta } from "@/lib/meta";
 import { remainingOffsets } from "@/lib/reviewQueue";
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 export const HEATMAP_CAPTION = "By category, in the same week as the cards below.";
 /** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
-export const HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the same week. Items awaiting review are not in this grid; each card shows them.";
+export const HEATMAP_COUNTS = "Cleared items (passed routing, or approved by an analyst), counted as on the competitor cards: by the date collected, in the same week. Items awaiting review are not in this grid; each card shows them.";
 
 async function getAllRows(url: string): Promise<{ rows: LogRow[]; now: string }> {
   const first = await get<Log>(url);
@@ -42,11 +42,11 @@ export function ActivityHeatmap() {
   const name = (k: string) => comps.find((c) => c.key === k)?.name ?? k;
   const picked = hm && sel ? hm.cells[sel.c]?.[sel.k] : null;
   return (
-    <Panel title="Where competitors are active" info={HEATMAP_COUNTS}>
+    <Panel title="Cleared items by category" info={HEATMAP_COUNTS}>
       <p className="m-0 mb-2 text-xs text-[#44516a]" data-caption>{HEATMAP_CAPTION}</p>
       {q.error ? <ErrorNote error={q.error} onRetry={() => q.mutate()} /> : null}
       {!hm ? (q.error ? null : <div className="py-4 text-xs text-mute" role="status">Counting…</div>) : !hm.total ? (
-        <Empty>No items from the tracked competitors were published this week.</Empty>
+        <Empty>No items from the tracked competitors were cleared this week.</Empty>
       ) : (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] text-mute" data-legend aria-label="Legend">
@@ -55,7 +55,7 @@ export function ActivityHeatmap() {
             {legendSteps(hm.max).map((n) => (
               <span key={n} className="inline-flex items-center gap-1"><i className="inline-block size-3 rounded-sm" style={{ background: heatColor(n, hm.max).bg }} aria-hidden />{n}</span>
             ))}
-            <span>Found {fmtDate(hm.from)}–{fmtDate(hm.to)}</span>
+            <span title={COLLECTED_TIP}>Collected {fmtDate(hm.from)}–{fmtDate(hm.to)}</span>
           </div>
           <div className="overflow-x-auto" data-heatmap>
             <table className="w-full min-w-[44rem] border-collapse">
@@ -95,7 +95,7 @@ export function ActivityHeatmap() {
             </table>
           </div>
           <p className="m-0 mt-2 flex flex-wrap items-baseline gap-x-3 text-sm" data-heat-totals>
-            <span><b className="font-semibold tabular-nums">{hm.published}</b> published</span>
+            <span><b className="font-semibold tabular-nums">{hm.published}</b> cleared</span>
             <span className="text-xs text-mute">across the six competitors, the same as the cards below</span>
           </p>
           {picked && sel ? (

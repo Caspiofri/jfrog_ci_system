@@ -12,7 +12,7 @@ import { BriefCard, MockTag } from "@/components/brief/BriefCard";
 import { ApiError, get, path, send, useApi, useRecord } from "@/lib/api";
 import useSWR from "swr";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
-import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
+import { CLEARED_TIP, COLLECTED_TIP, PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
@@ -88,8 +88,8 @@ function BriefScreen() {
               <ChevronLeft className="size-4" />
             </Button>
             <Hint text={brief.data?.window ? (backfill
-              ? "The 14-day import that started the store. Everything in it was published before the first run, so \"Found late\" badges are hidden here."
-              : `Everything discovered from ${fmtDateTime(brief.data.window.prev_anchor)} to ${fmtDateTime(brief.data.window.anchor)} Israel time (${brief.data.window.hours} h).`) : null}
+              ? "The 14-day import that started the store. Every article in it is dated before the first run, so \"Found late\" badges are hidden here."
+              : `Everything collected from ${fmtDateTime(brief.data.window.prev_anchor)} to ${fmtDateTime(brief.data.window.anchor)} Israel time (${brief.data.window.hours} h).`) : null}
               className="min-w-[13rem] text-center">{date ? fmtLongDate(date) : briefs.isLoading ? "Loading…" : "No Brief yet"}</Hint>
             <Button variant="outline" size="icon" className="size-7" disabled={!newer} onClick={() => go(newer)} aria-label="Next Brief">
               <ChevronRight className="size-4" />
@@ -133,9 +133,9 @@ function BriefScreen() {
 
                 <Panel
                   big
-                  title="What was published in this Brief?"
+                  title="What was cleared in this Brief?"
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
-                  info={`The items found in this Brief's window and rated ${b.brief_min_score ?? 3} or higher on importance, published automatically or approved by an analyst. Items still waiting in the Review queue aren't listed.`}
+                  info={`The items found in this Brief's window and rated ${b.brief_min_score ?? 3} or higher on importance, cleared by routing or approved by an analyst. Items still waiting in the Review queue aren't listed.`}
                 >
                   {b.items.items.length ? (
                     b.items.items.map((it) => <BriefCard key={it.item_id} item={it} showLate={!backfill} highlight={highlighted.has(it.item_id)} />)
@@ -144,8 +144,8 @@ function BriefScreen() {
                       {competitor || category
                         ? "Nothing matches these filters."
                         : b.summary.held
-                          ? "Nothing was published in this window. The held items above aren't verified yet, so they aren't part of the Brief."
-                          : "Nothing was published in this window."}
+                          ? "Nothing was cleared in this window. The held items above aren't cleared yet, so they aren't part of the Brief."
+                          : "Nothing was cleared in this window."}
                     </Empty>
                   )}
                   <FeedFooter total={b.items.total} all={all} offset={offset} set={set} />
@@ -186,7 +186,8 @@ function SummaryBlock({ date, s, runId }: { date: string; s: BriefSummary; runId
               <Link href={`/review?brief=${encodeURIComponent(date)}`} data-tile={t.key} className={cn(box, "transition-colors hover:border-jgreen")}>{body}</Link>
             </Hint>
           ) : (
-            <Hint key={t.key} text={t.hint} className={box}><span data-tile={t.key}>{body}</span></Hint>
+            <Hint key={t.key} text={t.key === "new" ? <><b className="font-semibold">Collected:</b> {COLLECTED_TIP} {t.hint}</> : t.key === "published" ? <><b className="font-semibold">Cleared:</b> {CLEARED_TIP} {t.hint}</> : t.hint}
+              className={box}><span data-tile={t.key}>{body}</span></Hint>
           );
         })}
       </div>
@@ -526,7 +527,7 @@ function SourceLine({ id, row, withScore, n, isNew = false, since = null }: {
       ) : null}
       {it.outside ? (
         <Tag className="text-[0.625rem]"
-          title={it.belowLine ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
+          title={it.belowLine ? "Scored below the Brief's 3+ line; still a cleared item" : "Cleared, but not in this Brief's list (outside its window)"}>
           not in this Brief
         </Tag>
       ) : null}

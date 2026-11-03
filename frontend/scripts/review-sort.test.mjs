@@ -34,8 +34,8 @@ test("sorting never changes the input array", () => {
 
 test("the line under the filters states the order shown", () => {
   assert.match(SORT_LINES[""], /^Sorted as the API returns them/);
-  assert.match(SORT_LINES.newest, /newest feed date first/i);
-  assert.match(SORT_LINES.oldest, /oldest feed date first/i);
+  assert.match(SORT_LINES.newest, /newest article date first/i);
+  assert.match(SORT_LINES.oldest, /oldest article date first/i);
   for (const k of ["newest", "oldest"]) assert.match(SORT_LINES[k], /changed head-to-head cells first/i);
 });
 

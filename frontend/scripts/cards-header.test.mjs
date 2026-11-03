@@ -10,7 +10,7 @@ test("header above the cards: title and window; no totals line; the (i) says the
   assert.match(page, /<h2[^>]*>\s*Weekly\s*<InfoHint[^>]*\/>\s*<\/h2>\s*<p[^>]*data-week-range>\{fmtDate\(d\.week\.start\)\}–\{fmtDate\(d\.week\.end\)\}<\/p>/);
   assert.doesNotMatch(page, /Published competitor items/);
   assert.doesNotMatch(page, /cardTotals|across the six competitors/);
-  assert.match(page, /const CARDS_EXPLAIN = "Only published articles\. Click a card for the competitor's full details\.";/);
+  assert.match(page, /const CARDS_EXPLAIN = "Only cleared items \(passed routing, or approved by an analyst\)\. Click a card for the competitor's full details\.";/);
   assert.match(page, /<InfoHint text=\{CARDS_EXPLAIN\} label="What the cards count" \/>/);
   assert.doesNotMatch(page, /All published and awaiting-review items/);
   assert.ok(page.indexOf("data-cards-header") < page.indexOf("<CompetitorCardView"), "above the cards");

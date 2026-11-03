@@ -53,7 +53,7 @@ function Profile() {
               </div>
 
               <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
-                <KpiTile value={c.items_7d} label="Published in 7 days" sub={<Trend t={c.trend} prev={c.items_prev_7d} />} />
+                <KpiTile value={c.items_7d} label="Cleared in 7 days" sub={<Trend t={c.trend} prev={c.items_prev_7d} />} />
                 <KpiTile value={c.items_today} label="In this Brief" />
                 <KpiTile value={c.pending_review} label="Awaiting review" sub={c.pending_max_score ? <span className="text-mute">highest score {c.pending_max_score}</span> : undefined} />
                 <KpiTile future value={c.head_to_head_changes ?? "—"} label="Head-to-head changes" sub={<span className="text-mute">{c.tracked_changes ?? 0} tracked-page changes</span>} />
@@ -66,10 +66,10 @@ function Profile() {
               </Panel>
 
               <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-                <Panel title="How active are they?" cap={`Published items per day by feed date, ${p.activity.days} days · ${p.activity.total} published in total`}>
-                  {p.activity.series.some((r) => r.items) ? <ActivityChart series={p.activity.series} /> : <Empty>No published items in the last {p.activity.days} days.</Empty>}
+                <Panel title="How active are they?" cap={`Cleared items per day by article date, ${p.activity.days} days · ${p.activity.total} cleared in total`}>
+                  {p.activity.series.some((r) => r.items) ? <ActivityChart series={p.activity.series} /> : <Empty>No cleared items in the last {p.activity.days} days.</Empty>}
                 </Panel>
-                <Panel title="What are they focused on?" cap="Published items this week">
+                <Panel title="What are they focused on?" cap="Cleared items this week">
                   {c.category_mix.length ? (
                     <>
                       <MixBar mix={c.category_mix} legend />
@@ -77,7 +77,7 @@ function Profile() {
                         <HBars rows={c.category_mix.map((m) => ({ label: m.category, value: m.count, color: CATEGORY_COLOR[m.category] }))} />
                       </div>
                     </>
-                  ) : <Empty>No published items this week.</Empty>}
+                  ) : <Empty>No cleared items this week.</Empty>}
                 </Panel>
               </div>
 
@@ -91,8 +91,8 @@ function Profile() {
                 <Panel title="How do they compare with JFrog?"><Empty>{p.name} is a channel, not a vendor: no head-to-head.</Empty></Panel>
               )}
 
-              <Panel title="What did they do lately?" cap={`Newest feed date first · ${p.latest_items.total} published items`}>
-                {p.latest_items.items.length ? p.latest_items.items.map((it) => <ItemRow key={it.item_id} item={it} showBadge={false} />) : <Empty>No published items.</Empty>}
+              <Panel title="What did they do lately?" cap={`Newest article date first · ${p.latest_items.total} cleared items`}>
+                {p.latest_items.items.length ? p.latest_items.items.map((it) => <ItemRow key={it.item_id} item={it} showBadge={false} />) : <Empty>No cleared items.</Empty>}
                 {p.latest_items.total > PAGE ? (
                   <div className="mt-2.5 flex items-center justify-end gap-2">
                     <span className="text-xs text-mute">{offset + 1}–{Math.min(offset + PAGE, p.latest_items.total)} of {p.latest_items.total}</span>

@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ApiError } from "@/lib/api";
-import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, UNVERIFIED_VALUES, label, publisherName, safeHref } from "@/lib/format";
+import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, UNVERIFIED_VALUES, CLEARED_TIP, label, publisherName, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** A small (i) that explains on hover and keyboard focus: long explanations live here, not on screen. */
@@ -89,7 +89,7 @@ export function ScoreBadge({ score, noise, title }: { score: number | null; nois
 
 export function StatusDot({ status }: { status: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs" title={status === "auto_published" || status === "approved" ? CLEARED_TIP : undefined}>
       <i className="inline-block size-2 rounded-full" style={{ background: STATUS_COLOR[status] ?? "#cbd3df" }} />
       {label(STATUS_LABEL, status)}
     </span>

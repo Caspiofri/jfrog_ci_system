@@ -21,7 +21,7 @@ export function Trend({ t, prev }: { t: CompetitorCard["trend"]; prev: number })
 /** The category mix bar (prototype .mix), with a legend under it so color is never the only cue. */
 export function MixBar({ mix, legend = false }: { mix: CompetitorCard["category_mix"]; legend?: boolean }) {
   const total = mix.reduce((a, b) => a + b.count, 0);
-  if (!total) return <div className="h-2 rounded-sm bg-track" title="No published items this week" />;
+  if (!total) return <div className="h-2 rounded-sm bg-track" title="No cleared items this week" />;
   return (
     <div>
       <div className="flex h-2 gap-px overflow-hidden rounded-sm bg-track" role="img"
@@ -76,7 +76,7 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
           {c.top_item.score ? <span className="text-mute"> · {c.top_item.score}</span> : null}
         </div>
       ) : (
-        <div className="border-t border-line pt-2 text-xs text-mute">No published items this week.</div>
+        <div className="border-t border-line pt-2 text-xs text-mute">No cleared items this week.</div>
       )}
     </Link>
   );
@@ -90,7 +90,7 @@ export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; sh
       <table className="w-full border-collapse">
         <thead>
           <tr>
-            {["Feed date", ...(showCompetitor ? ["Competitor"] : []), "Title", "Source", "Status"].map((h) => (
+            {["Article date", ...(showCompetitor ? ["Competitor"] : []), "Title", "Source", "Status"].map((h) => (
               <th key={h} className="border-b border-line px-2.5 py-2 text-left text-xs font-semibold text-mute">{h}</th>
             ))}
           </tr>

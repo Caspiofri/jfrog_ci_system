@@ -8,7 +8,7 @@ import { CategoryTag, ItemTitle, ScoreBadge, Tag, openFromRow } from "@/componen
 import { ReviewedMark } from "@/components/ReviewedMark";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { LensView } from "@/components/LensView";
-import { RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
+import { ARTICLE_DATE_TIP, RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import type { Item, Meta } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -75,7 +75,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         <span className="text-xs font-medium text-ink">·</span><CompetitorLabel k={item.competitor} className="text-xs font-medium text-ink" />
         <CategoryTag category={item.category} />
         {showLate && item.badge === "late" ? (
-          <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after its feed date">Found late</Tag>
+          <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Collected well after its article date">Found late</Tag>
         ) : null}
         {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} mention={item.jfrog_mention} /> : null}
         {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
@@ -91,7 +91,7 @@ export function BriefCard({ item, showLate = true, highlight = false }: { item: 
         <Row label="Why it matters to JFrog"><LensView lens={item.lens} status={item.lens_status} /></Row>
         <Row label="Evidence">
           <span className="text-xs text-mute">
-            {item.publisher} · {itemDateText(item)} ·{" "}
+            {item.publisher} · <span title={ARTICLE_DATE_TIP}>{itemDateText(item)}</span> ·{" "}
             {basis ?? "Text basis not reported"}
           </span>
         </Row>

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { CategoryTag, ItemTitle, ScoreBadge, Tag, openFromRow } from "@/components/ci";
 import { ReviewedMark } from "@/components/ReviewedMark";
 import { useItemDrawer } from "@/components/ItemDrawer";
-import { NO_TEXT, itemDateText } from "@/lib/format";
+import { ARTICLE_DATE_TIP, NO_TEXT, itemDateText } from "@/lib/format";
 import type { Item } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -45,9 +45,9 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
           <CompetitorLabel k={item.competitor} className="font-medium text-ink" />
           <CategoryTag category={item.category} />
           <span>{item.publisher}</span>
-          <span>{itemDateText(item)}</span>
+          <span title={ARTICLE_DATE_TIP}>{itemDateText(item)}</span>
           {showBadge && item.badge === "late" ? (
-            <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after its feed date">Found late</Tag>
+            <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Collected well after its article date">Found late</Tag>
           ) : null}
           {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} mention={item.jfrog_mention} /> : null}
           {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}

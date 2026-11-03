@@ -122,7 +122,7 @@ function ReviewScreen() {
                   {lv ? (
                     <Donut center={lv.held} caption="held" parts={[
                       { label: "Held for review", value: lv.held, color: "#f59e0b" },
-                      { label: "Published", value: lv.published, color: "#41be57" },
+                      { label: "Cleared", value: lv.published, color: "#41be57" },
                     ]} />
                   ) : <Empty>No counts.</Empty>}
                 </Panel>
@@ -265,7 +265,7 @@ function PreviewBar({ preview, current, onBack }: { preview: Level; current: Lev
           <DialogHeader>
             <DialogTitle>Change the autonomy level to {label(LEVEL_LABEL, preview)}?</DialogTitle>
             <DialogDescription>
-              Items held only for reasons that {label(LEVEL_LABEL, preview)} doesn&apos;t hold are published at once. Items an analyst already decided keep their decision.
+              Items held only for reasons that {label(LEVEL_LABEL, preview)} doesn&apos;t hold are cleared at once. Items an analyst already decided keep their decision.
             </DialogDescription>
           </DialogHeader>
           {err ? <ErrorNote error={err} /> : null}

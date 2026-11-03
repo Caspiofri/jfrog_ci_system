@@ -11,7 +11,7 @@ export const FETCH_LIMIT = 200;
 
 /** The order GET /review returns, stated as ci/api/app.py sorts it. */
 export const SORT_ORDER_LINE =
-  "Sorted as the API returns them: changed head-to-head cells first, then items held at every level, then score from high to low, then oldest discovered first.";
+  "Sorted as the API returns them: changed head-to-head cells first, then items held at every level, then score from high to low, then oldest collected first.";
 
 export type QueueSort = "" | "newest" | "oldest";
 
@@ -25,8 +25,8 @@ export const SORT_OPTIONS: { value: QueueSort; label: string }[] = [
 /** The line under the filters, for each sort. */
 export const SORT_LINES: Record<QueueSort, string> = {
   "": SORT_ORDER_LINE,
-  newest: "Newest feed date first. Changed head-to-head cells first, since they have no feed date; items without a feed date last.",
-  oldest: "Oldest feed date first. Changed head-to-head cells first, since they have no feed date; items without a feed date last.",
+  newest: "Newest article date first. Changed head-to-head cells first, since they have no article date; items without an article date last.",
+  oldest: "Oldest article date first. Changed head-to-head cells first, since they have no article date; items without an article date last.",
 };
 
 /** Sorts the whole queue in the browser (every page is fetched). Changed cells keep the top, in the API's order; items

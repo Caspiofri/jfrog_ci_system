@@ -11,7 +11,7 @@ const RUN = { collected: 239, kept: 26, new: 26, noise: 11 };
 const byKey = (tiles) => Object.fromEntries(tiles.map((t) => [t.key, t]));
 
 test("four tiles with short labels, in order", () => {
-  assert.deepEqual(todayTiles(S, RUN).map((t) => t.label), ["Collected", "Published", "High score (4+)", "Needs review"]);
+  assert.deepEqual(todayTiles(S, RUN).map((t) => t.label), ["Collected", "Cleared", "High score (4+)", "Needs review"]);
 });
 
 test("each number is the API's own field for that Brief", () => {
@@ -94,14 +94,14 @@ test("the Collected hover is the run's funnel; 1 Nov shows the run's values besi
   const row = { run_id: "R1", items: { collected: 239, kept: 26, new: 26, test_skip: 0, noise: 11, published: 3, held: 12 },
     items_after_actions: { published: 4, held: 11 }, reconstructed: null };
   assert.equal(byKey(todayTiles(S, runCountsFor("R1", row))).new.hint,
-    "239 fetched → 26 new after removing duplicates → 11 removed as noise → 3 published · 12 need review at the end of the run · now 4 published · 11 need review after analyst actions");
+    "239 fetched → 26 new after removing duplicates → 11 removed as noise → 3 cleared · 12 need review at the end of the run · now 4 cleared · 11 need review after analyst actions");
 });
 
 test("a reconstructed row (30 Oct): test items set aside, empty published and held said as not recorded (never 0), the note", () => {
   const row = { run_id: "R0", items: { collected: 307, kept: 40, new: 40, test_skip: 26, noise: 5, published: null, held: null },
     items_after_actions: null, reconstructed: { decision: "D74", label: "Reconstructed from the item log", empty: { "items.published": "no routing" } } };
   const hint = byKey(todayTiles(S, runCountsFor("R0", row))).new.hint;
-  assert.equal(hint, "307 fetched → 40 new after removing duplicates → 26 test items set aside, not sent to the model → 5 removed as noise → published and need review not recorded for this run · Reconstructed from the item log");
+  assert.equal(hint, "307 fetched → 40 new after removing duplicates → 26 test items set aside, not sent to the model → 5 removed as noise → cleared and need review not recorded for this run · Reconstructed from the item log");
   assert.doesNotMatch(hint, /\b0 published|\b0 need review|4 published/);
 });
 
@@ -111,11 +111,11 @@ test("a reconstructed row without a label still gets the note", () => {
 });
 
 test("a funnel step whose field is empty is left out, never shown as 0", () => {
-  assert.equal(byKey(todayTiles(S, { new: 13 })).new.hint, "13 new after removing duplicates → 4 published · 11 need review");
+  assert.equal(byKey(todayTiles(S, { new: 13 })).new.hint, "13 new after removing duplicates → 4 cleared · 11 need review");
   assert.equal(byKey(todayTiles(S, { new: 13, collected: null, noise: undefined })).new.hint,
-    "13 new after removing duplicates → 4 published · 11 need review");
+    "13 new after removing duplicates → 4 cleared · 11 need review");
   assert.equal(byKey(todayTiles(S, { new: 0, collected: 5, noise: 0 })).new.hint,
-    "5 fetched → 0 new after removing duplicates → 0 removed as noise → 4 published · 11 need review");
+    "5 fetched → 0 new after removing duplicates → 0 removed as noise → 4 cleared · 11 need review");
 });
 
 test("the 30 Oct import Brief is tagged with what it covers", () => {

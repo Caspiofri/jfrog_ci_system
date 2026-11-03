@@ -8,9 +8,9 @@ import { fmtDate } from "@/lib/format";
 import type { Competitors } from "@/lib/types";
 
 const PAGE_INFO =
-  "JFrog's tracked competitors and how they compare with JFrog: what each one's public pages state on the 7 JFrog capabilities, where they were active this week, and their published items. It shows what was found, not a verdict.";
+  "JFrog's tracked competitors and how they compare with JFrog: what each one's public pages state on the 7 JFrog capabilities, where they were active this week, and their cleared items. It shows what was found, not a verdict.";
 
-const CARDS_EXPLAIN = "Only published articles. Click a card for the competitor's full details.";
+const CARDS_EXPLAIN = "Only cleared items (passed routing, or approved by an analyst). Click a card for the competitor's full details.";
 
 export default function CompetitorsPage() {
   const q = useApi<Competitors>("/api/v1/competitors");

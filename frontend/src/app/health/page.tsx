@@ -66,7 +66,7 @@ function HealthScreen() {
             <BriefCounts runId={runId} />
 
             <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-              <Panel title="Where do items drop off?" cap={h.funnel ? `All sources, this run · published and held at ${label(LEVEL_LABEL, h.funnel.level)}` : undefined}>
+              <Panel title="Where do items drop off?" cap={h.funnel ? `All sources, this run · cleared and held at ${label(LEVEL_LABEL, h.funnel.level)}` : undefined}>
                 {h.funnel ? <Funnel totals={h.funnel.totals} /> : <Empty>No funnel for this run.</Empty>}
               </Panel>
               <Panel title="Which sources went quiet?">
@@ -74,7 +74,7 @@ function HealthScreen() {
               </Panel>
             </div>
 
-            <Panel title="Which sources deliver value?" cap="Collected vs published, this run">
+            <Panel title="Which sources deliver value?" cap="Collected vs cleared, this run">
               {h.funnel?.sources.length ? <SourcesTable sources={h.funnel.sources} /> : <Empty>No sources in this run.</Empty>}
             </Panel>
 
@@ -124,10 +124,10 @@ function BriefCounts({ runId }: { runId: string }) {
   const prevIsImport = (prevRow?.anchor_kind ?? (prevRow?.backfill ? "import" : undefined)) === "import";
   const kpi = (k: string) => b?.kpis?.find((x) => x.key === k);
   const tiles: Tile[] = b?.summary ? [
-    { key: "published", label: `Published in the Brief (scored ${b.summary.brief_min_score}+)`, value: b.summary.published, prev: prevRow?.published ?? null },
+    { key: "published", label: `Cleared, in the Brief (scored ${b.summary.brief_min_score}+)`, value: b.summary.published, prev: prevRow?.published ?? null },
     { key: "published_high", label: "Of those, rated 4 or 5", value: b.summary.published_high, prev: prevRow?.published_high ?? null },
-    { key: "found_late", label: "Found late (any published score)", value: kpi("found_late")?.value ?? 0, prev: kpi("found_late")?.prev ?? null },
-    { key: "mentions_jfrog", label: "Mention JFrog (any published score)", value: kpi("mentions_jfrog")?.value ?? 0, prev: kpi("mentions_jfrog")?.prev ?? null },
+    { key: "found_late", label: "Found late (cleared, any score)", value: kpi("found_late")?.value ?? 0, prev: kpi("found_late")?.prev ?? null },
+    { key: "mentions_jfrog", label: "Mention JFrog (cleared, any score)", value: kpi("mentions_jfrog")?.value ?? 0, prev: kpi("mentions_jfrog")?.prev ?? null },
   ] : [];
   const error = q.error ?? briefs.error;
   return (

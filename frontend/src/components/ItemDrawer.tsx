@@ -12,7 +12,7 @@ import { LensView } from "@/components/LensView";
 import { ReopenButton } from "@/components/review/actions";
 import { useRecord } from "@/lib/api";
 import { classifiedBy } from "@/lib/classifiedBy";
-import { HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { ARTICLE_DATE_TIP, COLLECTED_TIP, HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { FieldChange, ItemAction, ItemDetail, Lens, LensStatus, Meta } from "@/lib/types";
 
@@ -35,10 +35,10 @@ export function ItemDrawerProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function Field({ k, children }: { k: string; children: ReactNode }) {
+function Field({ k, children, tip }: { k: string; children: ReactNode; tip?: string }) {
   return (
     <div className="grid grid-cols-[8rem_minmax(0,1fr)] gap-2 border-t border-line py-2 first:border-t-0">
-      <span className="text-mute">{k}</span>
+      <span className="text-mute" title={tip}>{k}</span>
       <span className="min-w-0 break-words">{children}</span>
     </div>
   );
@@ -106,15 +106,15 @@ function DrawerBody({ id }: { id: string }) {
                   <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>
                   {it.scheduled_for ? (
-                    <Field k="Feed date">{fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)</Field>
+                    <Field k="Article date" tip={ARTICLE_DATE_TIP}>{fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)</Field>
                   ) : (
-                    <Field k="Feed date">
+                    <Field k="Article date" tip={ARTICLE_DATE_TIP}>
                       {it.published_at_source ? (
                         <>{fmtDate(it.published_at_source, true)}<span className="text-mute"> · later than when we collected it ({fmtDate(it.published_at, true)})</span></>
                       ) : fmtPublished(it.published_at, it.date_precision)}
                     </Field>
                   )}
-                  <Field k="Discovered">{fmtDateTime(it.discovered_at)}{it.discovery_lag_hours != null ? ` (${Math.round(it.discovery_lag_hours)} h after the feed date)` : ""}</Field>
+                  <Field k="Collected" tip={COLLECTED_TIP}>{fmtDateTime(it.discovered_at)}{it.discovery_lag_hours != null ? ` (${Math.round(it.discovery_lag_hours)} h after the article date)` : ""}</Field>
                   <Field k="Score reason">{it.reason || "—"}</Field>
                   {it.why_it_matters ? <Field k="Ranker's summary">{it.why_it_matters}</Field> : null}
                   {d.ranking?.raw_score != null && d.ranking.raw_score !== it.score ? <Field k="Model score">{d.ranking.raw_score} (adjusted to {it.score ?? "—"})</Field> : null}

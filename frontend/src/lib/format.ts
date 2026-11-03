@@ -26,9 +26,9 @@ export const CATEGORY_COLOR: Record<string, string> = {
 };
 
 export const STATUS_LABEL: Record<string, string> = {
-  auto_published: "Auto-published",
+  auto_published: "Cleared", // D94: passed routing (display only; the stored status is auto_published)
   awaiting_review: "Awaiting review",
-  approved: "Approved",
+  approved: "Cleared by analyst", // D94: cleared, by an analyst's approval
   flagged: "Flagged",
   dismissed: "Dismissed",
   dropped: "Dropped",
@@ -124,13 +124,18 @@ export function fmtPublished(iso: string | null, precision: string): string {
   return precision === "day" ? `${fmtDate(iso, true)} (date only)` : fmtDate(iso, true);
 }
 
-/** The date line for an item, labeled "Feed date": the date comes from the feed, not the article page. A future
- * feed date reads as scheduled (contract §10.6). Once it passes, the API clears scheduled_for. */
+/** D94: the three terms, one name each, with their hover. Display only: API fields and stored statuses are unchanged. */
+export const ARTICLE_DATE_TIP = "The date the publisher put on the article.";
+export const COLLECTED_TIP = "When our pipeline found it.";
+export const CLEARED_TIP = "Passed routing, or approved by an analyst.";
+
+/** The date line for an item, labeled "Article date" (D94; the API's published_at). A future article date reads as
+ * scheduled (contract §10.6). Once it passes, the API clears scheduled_for. */
 export function itemDateText(it: { published_at: string | null; date_precision: string; scheduled_for?: string | null; published_at_source?: string | null }): string {
-  if (it.scheduled_for) return `Feed date ${fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)`;
-  // A feed date later than our collection is stored as the collection time; the feed's own date is published_at_source.
-  if (it.published_at_source) return `Feed date ${fmtDate(it.published_at_source, true)}`;
-  return `Feed date ${fmtPublished(it.published_at, it.date_precision)}`;
+  if (it.scheduled_for) return `Article date ${fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)`;
+  // An article date later than our collection is stored as the collection time; the article's own date is published_at_source.
+  if (it.published_at_source) return `Article date ${fmtDate(it.published_at_source, true)}`;
+  return `Article date ${fmtPublished(it.published_at, it.date_precision)}`;
 }
 
 /** Only http(s) links are clickable; anything else from a collected page is shown as text (D32). */
