@@ -452,7 +452,7 @@ const BADGE_STYLE: Record<string, string> = {
   strengthened: "border-[#1e63a6]/40 bg-[#e3f0fb] text-[#1e63a6]", // sky blue: apart from New (slate blue) and the JFrog greens
 };
 
-/** New / Also in previous Brief (<date>) [· +N new sources], from the API's continuity field; nothing when absent. */
+/** New / prev. Brief (<date>) [· +N new sources], from the API's continuity field; nothing when absent. */
 function ContinuityBadge({ c }: { c: Insight["continuity"] }) {
   const b = continuityBadge(c, (d) => fmtDate(d));
   if (!b) return null;

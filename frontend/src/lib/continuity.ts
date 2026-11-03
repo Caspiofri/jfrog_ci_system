@@ -1,5 +1,5 @@
 // Insight continuity badges (contract §14). The API decides the status; the UI only words it.
-// "since" is the previous Brief's date, not when the pattern started, so the wording says "previous Brief".
+// "since" is the previous Brief's date, not when the pattern started, so the wording says "prev. Brief" (D89).
 // Older data has no continuity field: no badge, no line, no error. No imports besides types, so `npm test` runs it.
 import type { InsightContinuity, PreviousInsights } from "./types";
 
@@ -12,7 +12,7 @@ export function continuityBadge(c: InsightContinuity | null | undefined, fmt: (d
   if (c.status === "new") return { status: "new", text: "New" };
   if (c.status !== "continuing" && c.status !== "strengthened") return null;
   if (!c.since) return null; // a match always names the previous Brief; without it the badge would mislead
-  const base = `Also in previous Brief (${fmt(c.since)})`;
+  const base = `prev. Brief (${fmt(c.since)})`;
   if (c.status === "continuing") return { status: "continuing", text: base };
   const n = Number(c.new_stories ?? 0);
   if (!(n > 0)) return { status: "continuing", text: base };

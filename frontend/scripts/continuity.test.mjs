@@ -12,15 +12,15 @@ test("new", () => {
 
 test("continuing: names the previous Brief's date, not a start date", () => {
   const b = continuityBadge({ status: "continuing", since: "2026-10-31", new_stories: 0, matched: ["ins_2026-10-31_1"] }, fmt);
-  assert.deepEqual(b, { status: "continuing", text: "Also in previous Brief (Oct 31)" });
+  assert.deepEqual(b, { status: "continuing", text: "prev. Brief (Oct 31)" });
   assert.doesNotMatch(b.text, /since|started|continuing/i);
 });
 
 test("strengthened: + N new source(s), singular and plural", () => {
   assert.equal(continuityBadge({ status: "strengthened", since: "2026-10-31", new_stories: 1 }, fmt).text,
-    "Also in previous Brief (Oct 31) · +1 new source");
+    "prev. Brief (Oct 31) · +1 new source");
   assert.equal(continuityBadge({ status: "strengthened", since: "2026-10-31", new_stories: 3 }, fmt).text,
-    "Also in previous Brief (Oct 31) · +3 new sources");
+    "prev. Brief (Oct 31) · +3 new sources");
 });
 
 test("missing field (older data): no badge, no error", () => {
@@ -34,7 +34,7 @@ test("a match with no previous date shows no badge rather than a wrong one", () 
 test("strengthened with 0 or no count reads as continuing, never '+0'", () => {
   for (const n of [0, null, undefined]) {
     const b = continuityBadge({ status: "strengthened", since: "2026-10-31", new_stories: n }, fmt);
-    assert.equal(b.text, "Also in previous Brief (Oct 31)");
+    assert.equal(b.text, "prev. Brief (Oct 31)");
   }
 });
 
