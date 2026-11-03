@@ -60,7 +60,7 @@ function HealthScreen() {
             <Panel title="Did each run finish?" cap="Newest first · pick a run to see its numbers below">
               {runs.data?.items.length ? (
                 <RunHistory runs={runs.data.items} selected={runId || h.run?.run_id || null} metrics={h.run_metrics} onSelect={(v) => set({ run: v })} />
-              ) : runs.error ? null : runs.data ? <Empty>No runs yet.</Empty> : <Loading rows={2} />}
+              ) : runs.error ? <Empty>The run history could not be loaded.</Empty> : runs.data ? <Empty>No runs yet.</Empty> : <Loading rows={2} />}
             </Panel>
 
             <BriefCounts runId={runId} />

@@ -5,7 +5,8 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, ItemTitle, N, Tag } from "@/components/ci";
-import { SOURCE_LABEL, fmtDateTime, label } from "@/lib/format";
+import { SOURCE_LABEL, fmtDate, fmtDateTime, label } from "@/lib/format";
+import { ageLabel, hasCoverageCounts, measuredLabel, missedState } from "@/lib/healthMeasures";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { EvalCard, ExtractionBlock, ExtractionRow, Health, Liveness, RunInfo, RunMetrics, RunStep, TestEval } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -196,7 +197,7 @@ export function Extraction({ e }: { e: NonNullable<Health["extraction"]> }) {
             <b className="text-xl font-semibold tabular-nums">{pct(b.rate)}</b>
             <span className="ml-1.5 text-mute">extracted · {b.extracted} of</span><N n={b.n} />
           </span>
-        ) : null}
+        ) : <span className="text-mute">Not measured for this scope.</span>}
         <span className="flex-1" />
         <span className="flex flex-wrap gap-x-3 text-[11px] text-mute">
           {STATUS_PARTS.map(([k, l, c]) => (
@@ -271,13 +272,9 @@ export function EvalCards({ ev, missing }: { ev: NonNullable<Health["eval"]>; mi
   return (
     <div className="flex flex-col gap-3">
       <div className="text-xs text-mute">
-        {ev.status === "ok" ? (
-          <>
-            Report {ev.report} · {fmtDateTime(ev.created_at)} · split <b className="text-ink">{ev.split}</b> · {ev.live ? "live" : "offline"}
-            {ev.n !== undefined ? <> · items scored<N n={ev.n} /></> : null}
-            {ev.model ? ` · ${ev.model}` : ""}
-          </>
-        ) : "No eval report yet."}
+        {measuredLabel(ev.created_at, fmtDateTime)} · report {ev.report} · split <b className="text-ink">{ev.split}</b> · {ev.live ? "live" : "offline"}
+        {ev.n !== undefined ? <> · items scored<N n={ev.n} /></> : null}
+        {ev.model ? ` · ${ev.model}` : ""}
         {ev.labels ? <> · golden labels<N n={ev.labels.total} /> ({ev.labels.non_noise} non-noise, {ev.labels.important} rated 4–5, {ev.labels.funding_m_and_a} Funding/M&amp;A)</> : null}
       </div>
       {ev.test_eval_run === false ? (
@@ -303,28 +300,29 @@ function Count({ l, c }: { l: string; c?: { captured: number; n: number } }) {
 }
 
 export function Coverage({ cv, missing }: { cv: NonNullable<Health["coverage"]>; missing: string }) {
-  if (cv.status !== "ok") return <Empty>{missing}</Empty>;
+  if (cv.status !== "ok" || !hasCoverageCounts(cv)) return <Empty>{missing}</Empty>;
   return (
     <div className="flex flex-col gap-3">
       <div className="text-xs text-mute">
-        Events {cv.window?.first} to {cv.window?.last} · list: {cv.list} · run {cv.run_id}
+        {measuredLabel(cv.measured_on, (d) => fmtDate(d, true))}
+        {cv.window ? ` · events ${cv.window.first} to ${cv.window.last}` : ""}{cv.list ? ` · list: ${cv.list}` : ""}{cv.run_id ? ` · run ${cv.run_id}` : ""}
       </div>
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr))]">
         <Count l="Events captured" c={cv.overall} />
         <Count l={`Important captured (≥ ${cv.important?.min_score ?? 4})`} c={cv.important} />
         {Object.entries(cv.by_source_kind ?? {}).map(([k, v]) => <Count key={k} l={k === "external" ? "From external sources" : k === "feed" ? "From feeds we collect" : k} c={v} />)}
       </div>
-      {cv.missed?.length ? (
+      {missedState(cv.missed) === "list" ? (
         <div>
           <h3 className="mb-1 text-xs font-semibold text-mute">Missed</h3>
-          {cv.missed.map((m) => (
+          {cv.missed!.map((m) => (
             <div key={m.id} className="border-t border-line py-1.5 text-xs first:border-t-0">
               <ItemTitle title={m.title} url={m.official_url} />
               <span className="text-mute"> · <CompetitorLabel k={m.competitor} /> · expected importance {m.expected_importance}</span>
             </div>
           ))}
         </div>
-      ) : <div className="text-xs text-mute">Nothing on the list was missed.</div>}
+      ) : missedState(cv.missed) === "none" ? <div className="text-xs text-mute">Nothing on the list was missed.</div> : null}
     </div>
   );
 }
@@ -341,7 +339,7 @@ export function ChangeDetection({ c, missing }: { c: NonNullable<Health["change_
         <span className="ml-1.5 text-mute">pages fetched · {c.changes ?? 0} changes</span>
       </div>
       <div className="text-xs text-mute">
-        Run {c.run_id} · {fmtDateTime(c.started_at)} · {c.live ? "live" : "offline"} · {c.age_hours !== undefined ? `${c.age_hours} h ago` : ""}
+        {measuredLabel(c.started_at, fmtDateTime)}{ageLabel(c.age_hours) ? ` (${ageLabel(c.age_hours)})` : ""} · run {c.run_id} · {c.live ? "live" : "offline"}
       </div>
       {c.failures?.length ? (
         <div className="text-xs">
@@ -482,29 +480,25 @@ export function TestEvalBlock({ t, missing }: { t: TestEval | null | undefined; 
   if (!ran) return <Empty>{missing}</Empty>;
   const fact = (k: string, v: React.ReactNode) => (
     <div className="rounded-md border border-line bg-card px-4 py-3">
-      <div className={cn("text-lg font-semibold tabular-nums", !ran && "text-mute")}>{v}</div>
+      <div className="text-lg font-semibold tabular-nums">{v}</div>
       <div className="text-xs text-mute">{k}</div>
     </div>
   );
   return (
     <div className="flex flex-col gap-3">
-      {!ran ? (
-        <div className="flex items-center gap-2 rounded border-l-[3px] border-[#8a94a6] bg-page px-3 py-2 text-xs">
-          <span>{t?.note ? `${t.note.charAt(0).toUpperCase()}${t.note.slice(1)}.` : "Not run yet."} Until it runs, the accuracy numbers below are development numbers, not the reported ones.</span>
-        </div>
-      ) : t.test_runs && t.test_runs > 1 ? (
+      {t.test_runs && t.test_runs > 1 ? (
         <div role="alert" className="rounded border-l-[3px] border-[#d14343] bg-[#fff5f5] px-3 py-2 text-xs">
           The test split has been evaluated {t.test_runs} times; it should run once. The newest report is shown.
         </div>
       ) : null}
       <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
-        {fact("Items scored (n)", ran ? t.n ?? "—" : "—")}
-        {fact("Run on", ran && t.created_at ? fmtDateTime(t.created_at) : "—")}
-        {fact("Fingerprint", ran && t.fingerprint ? <span className="font-mono text-sm">{t.fingerprint}</span> : "—")}
-        {ran && t.model ? fact("Model", <span className="text-sm">{t.model}</span>) : null}
+        {fact("Items scored (n)", t.n ?? "Not recorded")}
+        {fact("Measured on", t.created_at ? fmtDateTime(t.created_at) : "Not recorded")}
+        {fact("Fingerprint", t.fingerprint ? <span className="font-mono text-sm">{t.fingerprint}</span> : "Not recorded")}
+        {t.model ? fact("Model", <span className="text-sm">{t.model}</span>) : null}
       </div>
-      {ran && t.cards?.length ? <MetricCards cards={t.cards} /> : null}
-      {ran && t.report ? <div className="text-[11px] text-mute">Report {t.report}</div> : null}
+      {t.cards?.length ? <MetricCards cards={t.cards} /> : null}
+      {t.report ? <div className="text-[11px] text-mute">Report {t.report}</div> : null}
     </div>
   );
 }

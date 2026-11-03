@@ -17,7 +17,7 @@ test("test split, accuracy, coverage and change detection show the reason when t
   const parts = read("../src/components/health/parts.tsx");
   assert.match(parts, /export function TestEvalBlock\(\{ t, missing \}[\s\S]*?if \(!ran\) return <Empty>\{missing\}<\/Empty>;/);
   assert.match(parts, /export function EvalCards\(\{ ev, missing \}[\s\S]*?if \(ev\.status !== "ok"\) return <Empty>\{missing\}<\/Empty>;/);
-  assert.match(parts, /export function Coverage\(\{ cv, missing \}[\s\S]*?if \(cv\.status !== "ok"\) return <Empty>\{missing\}<\/Empty>;/);
+  assert.match(parts, /export function Coverage\(\{ cv, missing \}[\s\S]*?if \(cv\.status !== "ok" \|\| !hasCoverageCounts\(cv\)\) return <Empty>\{missing\}<\/Empty>;/);
   assert.match(parts, /export function ChangeDetection\(\{ c, missing \}[\s\S]*?if \(c\.status === "none"\) return <Empty>\{missing\}<\/Empty>;/);
 });
 

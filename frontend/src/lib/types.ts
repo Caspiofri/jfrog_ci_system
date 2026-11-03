@@ -622,6 +622,7 @@ export interface Health {
   } | null;
   coverage: {
     status: string;
+    measured_on?: string | null; // when the coverage check was measured (BE, D82)
     run_id?: string;
     list?: string;
     window?: { first: string; last: string };
