@@ -1,5 +1,5 @@
 // The (i) next to "What needs my decision?" in the Review queue: the routing rules in plain words, from DOC's
-// routing-rules document as Ofri gave it (3 Nov). Explanations kept verbatim. Keyed by hold-reason code: the name shown
+// routing-rules document as Ofri gave it (3 Nov); Mentions JFrog reworded by Ofri at review. Explanations kept verbatim. Keyed by hold-reason code: the name shown
 // is the chip's own label (HOLD_LABEL in format.ts), so each reason has one name across the app. No imports, so `npm test` runs it.
 
 export const HOLD_RULES_INTRO =
@@ -13,7 +13,7 @@ export const HOLD_RULES: [string, string][] = [
   ["junk_extraction", "it scored 4+, but the page text we got looked broken."],
   ["pricing", "pricing or packaging news is always checked by a person."],
   ["m_and_a", "funding, acquisitions and partnerships are always checked by a person."],
-  ["mentions_jfrog", "anything that names JFrog is always checked by a person."],
+  ["mentions_jfrog", "anything that names JFrog or one of its products is always checked by a person."],
   ["model_failure", "the AI gave no usable answer for this item."],
   ["invalid_output", "the AI's answer broke our format rules, so it wasn't trusted."],
   ["changed_cell", "a JFrog-vs-competitor comparison value changed and needs confirming."],

@@ -14,7 +14,7 @@ const AS_SHOWN = `These items were held back from the Brief for you to approve, 
 - Junk extraction: it scored 4+, but the page text we got looked broken.
 - Pricing: pricing or packaging news is always checked by a person.
 - M&A / funding: funding, acquisitions and partnerships are always checked by a person.
-- Mentions JFrog: anything that names JFrog is always checked by a person.
+- Mentions JFrog: anything that names JFrog or one of its products is always checked by a person.
 - Model failure: the AI gave no usable answer for this item.
 - Invalid model output: the AI's answer broke our format rules, so it wasn't trusted.
 - Changed head-to-head cell: a JFrog-vs-competitor comparison value changed and needs confirming.`;
