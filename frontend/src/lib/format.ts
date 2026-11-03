@@ -129,6 +129,13 @@ export const ARTICLE_DATE_TIP = "The date the publisher put on the article.";
 export const COLLECTED_TIP = "When our pipeline found it.";
 export const CLEARED_TIP = "Passed routing, or approved by an analyst.";
 
+/** D94: the route's reason as the API stores it ("published at strict") reads "cleared at strict" on screen. Any other
+ *  reason is shown as stored. Display only. */
+export function routeReasonWords(reason: string | null | undefined): string {
+  if (!reason) return "";
+  return reason.replace(/^published at\b/, "cleared at");
+}
+
 /** The date line for an item, labeled "Article date" (D94; the API's published_at). A future article date reads as
  * scheduled (contract §10.6). Once it passes, the API clears scheduled_for. */
 export function itemDateText(it: { published_at: string | null; date_precision: string; scheduled_for?: string | null; published_at_source?: string | null }): string {

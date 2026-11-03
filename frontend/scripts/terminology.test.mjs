@@ -4,12 +4,12 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ARTICLE_DATE_TIP, CLEARED_TIP, COLLECTED_TIP, STATUS_LABEL } from "../src/lib/format.ts";
+import { ARTICLE_DATE_TIP, CLEARED_TIP, COLLECTED_TIP, STATUS_LABEL, routeReasonWords } from "../src/lib/format.ts";
 
 const root = new URL("../src/", import.meta.url).pathname;
 const files = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return statSync(p).isDirectory() ? (p.includes("components/ui") ? [] : files(p)) : /\.(tsx|ts)$/.test(p) && !/mock\.ts$|types\.ts$/.test(p) ? [p] : []; });
 // visible text: string literals and JSX text, with comments removed; identifiers such as auto_published stay out
-const visible = (s) => s.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, "$1");
+const visible = (s) => s.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, "$1").replace("/^published at\\b/", ""); // the one regex that maps the API's reason
 
 test("the three terms and their hovers, as written", () => {
   assert.equal(ARTICLE_DATE_TIP, "The date the publisher put on the article.");
@@ -33,4 +33,11 @@ test("no status or tile is named Verified or Checked, and held items are not cal
 
 test("the heatmap is \"Cleared items by category\"", () => {
   assert.match(readFileSync(join(root, "components/competitors/Heatmap.tsx"), "utf8"), /<Panel title="Cleared items by category"/);
+});
+
+test("the Log's route reason reads cleared (the API still stores published at <level>)", () => {
+  assert.equal(routeReasonWords("published at strict"), "cleared at strict");
+  assert.equal(routeReasonWords("unvetted_source"), "unvetted_source");
+  assert.equal(routeReasonWords(null), "");
+  assert.match(readFileSync(join(root, "app/log/page.tsx"), "utf8"), /routeReasonWords\(r\.reason\)/);
 });
