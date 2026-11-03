@@ -252,6 +252,8 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<ApiError | null>(null);
+  const { data: meta } = useMeta();
+  const demo = meta?.meta?.mode === "demo";
   const enabled = insights.status !== "disabled" && insights.enabled !== false;
   const refresh = async () => {
     setBusy(true);
@@ -286,16 +288,10 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
       }
       cap={cap}
       info={windowText(insights.window)}
-      right={
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={refresh} disabled={busy || !enabled || insights.status === "refreshing"}
-          title={enabled ? "Run pattern analysis again after analyst approvals; the 06:00 version is kept" : "Pattern analysis is not enabled for this Brief"}>
-          <RefreshCw className={busy ? "size-3 animate-spin" : "size-3"} /> Refresh insights
-        </Button>
-      }
     >
       {goneLine(insights.previous) ? <p className="m-0 mb-2 text-xs text-ink" data-gone-line>{goneLine(insights.previous)}</p> : null}
       {insights.mock ? <div className="mb-2"><MockTag what="this insights state" /></div> : null}
-      {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
+      {err && err.code !== "llm_unavailable" ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
       {busy || state === "refreshing" ? (
         <div className="flex items-center gap-2 py-3 text-mute" role="status"><Loader2 className="size-4 animate-spin" aria-hidden /> Refreshing pattern analysis…</div>
       ) : state === "failed" ? (
@@ -312,9 +308,24 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
           </div>
         </>
       )}
+      {/* directly under the insights; never in demo mode, where the API refuses writes */}
+      {demo ? null : (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3" data-refresh>
+          {err?.code === "llm_unavailable" ? (
+            <p className="m-0 text-xs text-mute" data-refresh-unavailable>{REFRESH_UNAVAILABLE}</p>
+          ) : (
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={refresh} disabled={busy || !enabled || insights.status === "refreshing"}
+              title={enabled ? "Run pattern analysis again after analyst approvals; the 06:00 version is kept" : "Pattern analysis is not enabled for this Brief"}>
+              <RefreshCw className={busy ? "size-3 animate-spin" : "size-3"} /> Refresh insights
+            </Button>
+          )}
+        </div>
+      )}
     </Panel>
   );
 }
+
+const REFRESH_UNAVAILABLE = "Refresh needs a configured model, so it is not available here.";
 
 /** Why insights can cite items outside the Brief: they read a wider window. Every value comes from the API's
  * insights.window (the window the generator actually used); nothing when it isn't served. Shown on hover. */
