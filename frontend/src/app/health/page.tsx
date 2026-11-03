@@ -19,6 +19,12 @@ export default function HealthPage() {
   );
 }
 
+/** Both eval blocks read one report (same file, same time): the Health screen shows it once. */
+function sameEvalReport(h: Health): boolean {
+  const e = h.eval, t = h.test_eval;
+  return Boolean(e && t && e.status === "ok" && t.status === "ok" && e.report && e.report === t.report && e.created_at === t.created_at);
+}
+
 function HealthScreen() {
   const { get, set } = useUrlState();
   const runId = get("run");
@@ -82,13 +88,21 @@ function HealthScreen() {
               {h.extraction ? <Extraction e={h.extraction} /> : <Empty>{missing}</Empty>}
             </Panel>
 
-            <Panel title="What does the held-out test split say?" cap="The reported accuracy · runs once, on a frozen system">
-              <TestEvalBlock t={h.test_eval} missing={missing} />
-            </Panel>
-
-            <Panel title="How accurate is the system?" cap="Single labeler · golden set · newest eval of any split">
-              {h.eval ? <EvalCards ev={h.eval} missing={missing} /> : <Empty>{missing}</Empty>}
-            </Panel>
+            {sameEvalReport(h) ? (
+              // one report behind both blocks (the test split's): one panel
+              <Panel title="How accurate is the system? · Held-out test split" cap="The reported accuracy · runs once, on a frozen system · single labeler">
+                <TestEvalBlock t={h.test_eval} missing={missing} />
+              </Panel>
+            ) : (
+              <>
+                <Panel title="How accurate is the system? · Held-out test split" cap="The reported accuracy · runs once, on a frozen system">
+                  <TestEvalBlock t={h.test_eval} missing={missing} />
+                </Panel>
+                <Panel title={`Newest eval run · ${h.eval?.split ?? "unknown"} split`} cap="Not the reported numbers · single labeler · golden set">
+                  {h.eval ? <EvalCards ev={h.eval} missing={missing} /> : <Empty>{missing}</Empty>}
+                </Panel>
+              </>
+            )}
 
             <div className="grid items-start gap-3.5 lg:grid-cols-2">
               <Panel title="Do we miss real events?" cap="Coverage check · counts with n, not a rate">

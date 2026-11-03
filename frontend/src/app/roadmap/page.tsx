@@ -1,10 +1,11 @@
 "use client";
 // Roadmap (D35): concepts from the design prototype that need data the pipeline doesn't produce yet.
-// The only screen with sample data, and only inside the screenshots. Drop each image at public/roadmap/<slug>.png.
+// The only screen with sample data, and only inside the screenshots. Drop each image at
+// frontend/public/roadmap/<slug>.png; a slot appears only once its image loads, so with no image there is no slot.
 import { useState } from "react";
 import Image from "next/image";
-import { ImageIcon } from "lucide-react";
 import { PageHead } from "@/components/ci";
+import { cn } from "@/lib/utils";
 
 const CONCEPTS: { slug: string; title: string; shows: string; missing: string; screen: string }[] = [
   {
@@ -72,19 +73,14 @@ const CONCEPTS: { slug: string; title: string; shows: string; missing: string; s
   },
 ];
 
+/** The concept's screenshot slot: hidden until the image loads, and gone if there is none. Never a placeholder image. */
 function Shot({ slug, title }: { slug: string; title: string }) {
-  const [missing, setMissing] = useState(false);
+  const [state, setState] = useState<"loading" | "ok" | "none">("loading");
+  if (state === "none") return null;
   return (
-    <div className="relative aspect-[16/10] overflow-hidden rounded border border-dashed border-input bg-page">
-      {!missing ? (
-        <Image src={`/roadmap/${slug}.png`} alt={`${title}: concept screenshot with sample data`} fill unoptimized
-          className="object-cover object-top" onError={() => setMissing(true)} />
-      ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-1.5 text-mute">
-          <ImageIcon className="size-6" />
-          <span className="text-xs">Screenshot to add: public/roadmap/{slug}.png</span>
-        </div>
-      )}
+    <div className={cn("relative aspect-[16/10] overflow-hidden rounded border border-line bg-page", state !== "ok" && "hidden")} data-shot={slug}>
+      <Image src={`/roadmap/${slug}.png`} alt={`${title}: concept screenshot with sample data`} fill unoptimized
+        className="object-cover object-top" onLoad={() => setState("ok")} onError={() => setState("none")} />
       <span className="absolute left-2 top-2 rounded bg-navy/90 px-2 py-0.5 text-[0.6875rem] font-semibold text-white">Concept, sample data</span>
     </div>
   );

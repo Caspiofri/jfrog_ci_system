@@ -2,7 +2,7 @@
 // "JFrog vs competitors", capability first (D75): pick a capability on the left; on the right one row per vendor,
 // JFrog first, with what its public page states, the source and the as-of date. Pages that say nothing and vendors
 // not tracked yet fold into two muted lines. No comparison, no verdict: colour only marks the data state.
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronRight, Clock } from "lucide-react";
 import { ArticleLink, ErrorNote, Panel, UnverifiedNote } from "@/components/ci";
@@ -28,10 +28,26 @@ function Emphasized({ text }: { text: string }) {
   return <>{emphasize(text).map((p, i) => (p.bold ? <b key={i} className="font-semibold">{p.text}</b> : <span key={i}>{p.text}</span>))}</>;
 }
 
-/** One vendor's row: bold name; regular value (2 lines, ~70 characters wide, click to expand); as-of date right,
- *  small and muted; Source as an icon; "compare" arrow on row hover (always on touch screens). */
+/** One vendor's row: bold name; regular value (2 lines, ~70 characters wide); as-of date right, small and muted;
+ *  Source as an icon; "compare" arrow on row hover (always on touch screens). The value is a button that expands it
+ *  only when the 2 lines cut it off; a value that fits is plain text, with no hover colour or pointer. */
 function VendorRow({ c, k, name, jfrog = false }: { c: MatrixCell; k: string; name: string; jfrog?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [cut, setCut] = useState(false);
+  const ref = useRef<HTMLElement | null>(null);
+  // measured after every render (a new capability swaps the text in the same row) and on width changes
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && !open) { const v = el.scrollHeight > el.clientHeight + 1; if (v !== cut) setCut(v); } // open: keep it a button
+  }, [open, cut, c.full]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setCut(el.scrollHeight > el.clientHeight + 1));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [cut]);
+  useEffect(() => { setOpen(false); }, [c.full]); // a new value starts collapsed
   return (
     <div className={cn("group flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-start sm:gap-3", jfrog ? "border-l-4 border-jgreen bg-[#eef7f0]" : "border-t border-line first-of-type:border-t-0")}
       data-vendor={k} data-state={c.state}>
@@ -39,10 +55,16 @@ function VendorRow({ c, k, name, jfrog = false }: { c: MatrixCell; k: string; na
         <CompetitorAvatar k={k} name={name} size="md" />
         {name}
       </span>
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} title={open ? "Show less" : "Show all"}
-        className={cn("min-w-0 max-w-[70ch] flex-1 text-left text-[0.8125rem] font-normal text-ink hover:text-jgreen-d", !open && "line-clamp-2")}>
-        <Emphasized text={c.full ?? ""} />
-      </button>
+      {cut || open ? (
+        <button ref={(el) => { ref.current = el; }} type="button" aria-expanded={open} onClick={() => setOpen(!open)} title={open ? "Show less" : "Show all"} data-expandable
+          className={cn("min-w-0 max-w-[70ch] flex-1 cursor-pointer text-left text-[0.8125rem] font-normal text-ink hover:text-jgreen-d", !open && "line-clamp-2")}>
+          <Emphasized text={c.full ?? ""} />
+        </button>
+      ) : (
+        <span ref={(el) => { ref.current = el; }} className="line-clamp-2 min-w-0 max-w-[70ch] flex-1 text-[0.8125rem] font-normal text-ink">
+          <Emphasized text={c.full ?? ""} />
+        </span>
+      )}
       <span className="flex shrink-0 items-center gap-2 text-[0.6875rem] text-mute sm:ml-auto sm:justify-end">
         {c.stale ? (
           <span className="inline-flex items-center gap-1 text-[#8a5a00]" title={c.staleReason ?? undefined}>
