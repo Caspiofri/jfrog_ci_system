@@ -368,7 +368,9 @@ class Store:
         sql, args = "SELECT metrics FROM run_metrics", ()
         if run_id is not None:
             sql, args = sql + " WHERE run_id = ?", (run_id,)
-        return [json.loads(r["metrics"]) for r in self._db.execute(sql + " ORDER BY started_at DESC", args)]
+        # D74: "reconstructed" is null on every row a run wrote itself, including rows written before the field existed
+        return [{"reconstructed": None, **json.loads(r["metrics"])}
+                for r in self._db.execute(sql + " ORDER BY started_at DESC", args)]
 
     # ---- insights ------------------------------------------------------------------------------------------------
 

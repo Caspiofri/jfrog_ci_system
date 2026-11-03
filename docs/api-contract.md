@@ -583,6 +583,20 @@ Every daily or import run writes one row to the store's `run_metrics` table when
 
 On a failed run, the blocks the run never reached are null, and the last step present is the one that failed.
 
+**`reconstructed`** (added 3 Nov, D74): `null` on every row a run wrote itself, including rows written before the field existed. It is set only on a row rebuilt later from the per-item log (`python -m ci.metrics_backfill`), for runs that ended before run metrics existed:
+
+```json
+"reconstructed": {"decision": "D74", "at": "<when it was rebuilt>", "label": "Reconstructed from the item log",
+  "sources": {"items.kept": "item_log", "items.new": "item_log", "items.test_skip": "item_log",
+              "items.to_model": "item_log", "items.noise": "item_log", "items.non_noise": "item_log",
+              "items.collected": "run_report"},
+  "empty": {"items.published": "no routing ran at this run (…)", "items.held": "…", "extraction": "not kept per run by the store", "…": "…"}}
+```
+
+- On a reconstructed row, every field named in `empty` is `null` (`steps` is `[]`). Nothing is estimated.
+- `items.collected` (fetched before deduplication) cannot come from the item log, because duplicates are never stored. It is taken from the run's own report (`runs.report`, written when the run ran), and `sources` says so.
+- `items.test_skip` counts the golden-set test-split items the run stored but never sent to the model, so `new = test_skip + noise + published + held` on a run that routed.
+
 A run that stops before it writes its own row (another run held the lock, the split file is missing, a bad config, a crash before the store opens) gets a failed row too (D48): `runs.status` failed, a `run_metrics` row whose only step is `lock` or `start`, and the report's `failed_stage`. A row the crashed process left `running` is closed as failed instead. The exit code and traceback stay in `output/logs/ci_daily.log`. Every row and report also carries `metadata` (D53: fingerprints, `sheet_sha`, models, call settings, `combined`, `commit`).
 
 ### 11.2 Endpoints
@@ -590,6 +604,7 @@ A run that stops before it writes its own row (another run held the lock, the sp
 - `GET /api/v1/run-metrics?limit=&offset=`: the rows, newest run first, paged like `/runs`.
 - `GET /api/v1/run-metrics/{run_id}`: one row; 404 `not_found` when the run has none.
 - `GET /api/v1/health` adds `run_metrics` for the selected run (`?run_id=`), or null.
+- Every row served (both endpoints and `health.run_metrics`) adds **`items_after_actions`** (D74), read at request time: `{published, held, by_status, n, level, as_of}` over the items the run classified, at today's level, with analyst approvals, dismissals and flags applied. `items.published` / `items.held` stay the values at the end of the run; neither replaces the other (1 Nov: 3 / 12 from the run, 4 / 11 after the 2 Nov approval). `null` when the row has no `items.published`, which includes every reconstructed row: those runs had no routing, so no today's-rules number stands in for one.
 - `GET /api/v1/health` adds `liveness` (D48): `{state, latest_run_id, latest_status, hours_since_latest, stale_run_ids, stale_after_hours: 1, overdue_after_hours: 26}`. `state` is `overdue` when the latest daily run started more than 26 h ago (a run that never started leaves no row, so this is how it shows), otherwise the latest daily run's marker; `none` when no daily run exists.
 - `GET /api/v1/runs` rows add `marker`: `ok | degraded | failed | running | stale`. `stale` is a row still `running` more than 1 h after it started processing (killed or hung).
 - The API's log is also appended to `output/logs/ci_api.log` (no rotation).
