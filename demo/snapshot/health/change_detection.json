@@ -1,0 +1,24 @@
+{
+ "changes": 0,
+ "failures": [],
+ "fetched": 21,
+ "live": true,
+ "measured_on": "2026-11-03T04:05:48.392694+00:00",
+ "needs_review": [],
+ "pages": 21,
+ "run_id": "20261103T0405Z-d3ec53",
+ "started_at": "2026-11-03T04:05:48.392694+00:00",
+ "status": "ok",
+ "unconfirmed": [
+  {
+   "axes": [
+    "package_coverage"
+   ],
+   "competitor": "cloudsmith",
+   "page": "formats",
+   "reasons": {
+    "package_coverage": "numbers not on the page: 33"
+   }
+  }
+ ]
+}

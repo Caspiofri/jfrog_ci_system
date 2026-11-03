@@ -1,0 +1,480 @@
+{
+ "cards": [
+  {
+   "metric": "competitor_accuracy",
+   "n": 24,
+   "note": "",
+   "untested": false,
+   "value": 0.9166666666666666,
+   "weak": false
+  },
+  {
+   "metric": "category_accuracy",
+   "n": 24,
+   "note": "",
+   "untested": false,
+   "value": 0.7083333333333334,
+   "weak": false
+  },
+  {
+   "metric": "noise_precision",
+   "n": 6,
+   "note": "",
+   "untested": false,
+   "value": 0.5,
+   "weak": true
+  },
+  {
+   "metric": "noise_recall",
+   "n": 5,
+   "note": "",
+   "untested": false,
+   "value": 0.6,
+   "weak": true
+  },
+  {
+   "metric": "score_exact",
+   "n": 21,
+   "note": "",
+   "untested": false,
+   "value": 0.7619047619047619,
+   "weak": false
+  },
+  {
+   "metric": "score_within_1",
+   "n": 21,
+   "note": "",
+   "untested": false,
+   "value": 0.9523809523809523,
+   "weak": false
+  },
+  {
+   "metric": "important_precision",
+   "n": 1,
+   "note": "few important labels (3 of 83 non-noise labels score 4-5); the coverage check is the main evidence for not missing important events",
+   "untested": false,
+   "value": 1.0,
+   "weak": true
+  },
+  {
+   "metric": "important_recall",
+   "n": 1,
+   "note": "few important labels (3 of 83 non-noise labels score 4-5); the coverage check is the main evidence for not missing important events",
+   "untested": false,
+   "value": 1.0,
+   "weak": true
+  },
+  {
+   "metric": "mentions_jfrog_precision",
+   "n": 0,
+   "note": "",
+   "untested": true,
+   "value": null,
+   "weak": true
+  },
+  {
+   "metric": "mentions_jfrog_recall",
+   "n": 0,
+   "note": "",
+   "untested": true,
+   "value": null,
+   "weak": true
+  },
+  {
+   "metric": "funding_m_and_a",
+   "n": 0,
+   "note": "untested: no Funding/M&A/Partnerships labels",
+   "untested": true,
+   "value": null,
+   "weak": true
+  }
+ ],
+ "created_at": "2026-11-02T16:45:06.917777+00:00",
+ "fallbacks": {
+  "classify": 0,
+  "rank": 0
+ },
+ "fingerprint": "9c39b7d25f65",
+ "measured_on": "2026-11-02T16:45:06.917777+00:00",
+ "metrics": {
+  "by_bad_extraction": {
+   "false": {
+    "category": {
+     "error_rate": 0.26666666666666666,
+     "errors": 4,
+     "n": 15
+    },
+    "competitor": {
+     "error_rate": 0.13333333333333333,
+     "errors": 2,
+     "n": 15
+    },
+    "n": 20,
+    "noise": {
+     "error_rate": 0.25,
+     "errors": 5,
+     "n": 20
+    },
+    "score": {
+     "error_rate": 0.25,
+     "errors": 3,
+     "missing": 0,
+     "n": 12,
+     "off_by_2_plus": 1,
+     "off_by_2_plus_rate": 0.08333333333333333
+    }
+   },
+   "true": {
+    "category": {
+     "error_rate": 0.3333333333333333,
+     "errors": 3,
+     "n": 9
+    },
+    "competitor": {
+     "error_rate": 0.0,
+     "errors": 0,
+     "n": 9
+    },
+    "n": 9,
+    "noise": {
+     "error_rate": 0.0,
+     "errors": 0,
+     "n": 9
+    },
+    "score": {
+     "error_rate": 0.2222222222222222,
+     "errors": 2,
+     "missing": 0,
+     "n": 9,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": 0.0
+    }
+   },
+   "unknown": {
+    "category": {
+     "error_rate": null,
+     "errors": 0,
+     "n": 0
+    },
+    "competitor": {
+     "error_rate": null,
+     "errors": 0,
+     "n": 0
+    },
+    "n": 0,
+    "noise": {
+     "error_rate": null,
+     "errors": 0,
+     "n": 0
+    },
+    "score": {
+     "error_rate": null,
+     "errors": 0,
+     "missing": 0,
+     "n": 0,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": null
+    }
+   }
+  },
+  "by_basis": {
+   "full": {
+    "category": {
+     "error_rate": 0.4,
+     "errors": 4,
+     "n": 10
+    },
+    "competitor": {
+     "error_rate": 0.0,
+     "errors": 0,
+     "n": 10
+    },
+    "n": 10,
+    "noise": {
+     "error_rate": 0.0,
+     "errors": 0,
+     "n": 10
+    },
+    "score": {
+     "error_rate": 0.2,
+     "errors": 2,
+     "missing": 0,
+     "n": 10,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": 0.0
+    }
+   },
+   "partial": {
+    "category": {
+     "error_rate": 0.21428571428571427,
+     "errors": 3,
+     "n": 14
+    },
+    "competitor": {
+     "error_rate": 0.14285714285714285,
+     "errors": 2,
+     "n": 14
+    },
+    "n": 19,
+    "noise": {
+     "error_rate": 0.2631578947368421,
+     "errors": 5,
+     "n": 19
+    },
+    "score": {
+     "error_rate": 0.2727272727272727,
+     "errors": 3,
+     "missing": 0,
+     "n": 11,
+     "off_by_2_plus": 1,
+     "off_by_2_plus_rate": 0.09090909090909091
+    }
+   },
+   "unknown": {
+    "category": {
+     "error_rate": null,
+     "errors": 0,
+     "n": 0
+    },
+    "competitor": {
+     "error_rate": null,
+     "errors": 0,
+     "n": 0
+    },
+    "n": 0,
+    "noise": {
+     "error_rate": null,
+     "errors": 0,
+     "n": 0
+    },
+    "score": {
+     "error_rate": null,
+     "errors": 0,
+     "missing": 0,
+     "n": 0,
+     "off_by_2_plus": 0,
+     "off_by_2_plus_rate": null
+    }
+   }
+  },
+  "by_method": {
+   "fallback": {
+    "category": {
+     "accuracy": null,
+     "correct": 0,
+     "n": 0
+    },
+    "competitor": {
+     "accuracy": null,
+     "correct": 0,
+     "n": 0
+    },
+    "n": 0,
+    "noise": {
+     "accuracy": null,
+     "correct": 0,
+     "n": 0
+    }
+   },
+   "llm": {
+    "category": {
+     "accuracy": 0.9333333333333333,
+     "correct": 14,
+     "n": 15
+    },
+    "competitor": {
+     "accuracy": 0.8666666666666667,
+     "correct": 13,
+     "n": 15
+    },
+    "n": 20,
+    "noise": {
+     "accuracy": 0.75,
+     "correct": 15,
+     "n": 20
+    }
+   },
+   "prefilter": {
+    "category": {
+     "accuracy": null,
+     "correct": 0,
+     "n": 0
+    },
+    "competitor": {
+     "accuracy": null,
+     "correct": 0,
+     "n": 0
+    },
+    "n": 0,
+    "noise": {
+     "accuracy": null,
+     "correct": 0,
+     "n": 0
+    }
+   },
+   "rules": {
+    "category": {
+     "accuracy": 0.3333333333333333,
+     "correct": 3,
+     "n": 9
+    },
+    "competitor": {
+     "accuracy": 1.0,
+     "correct": 9,
+     "n": 9
+    },
+    "n": 9,
+    "noise": {
+     "accuracy": 1.0,
+     "correct": 9,
+     "n": 9
+    }
+   }
+  },
+  "category": {
+   "accuracy": 0.7083333333333334,
+   "correct": 17,
+   "n": 24
+  },
+  "competitor": {
+   "accuracy": 0.9166666666666666,
+   "correct": 22,
+   "n": 24,
+   "on_noise": {
+    "accuracy": 0.6,
+    "correct": 3,
+    "n": 5
+   },
+   "per_competitor": {
+    "aws": {
+     "accuracy": 0.3333333333333333,
+     "correct": 1,
+     "n": 3
+    },
+    "cloudsmith": {
+     "accuracy": 1.0,
+     "correct": 2,
+     "n": 2
+    },
+    "github": {
+     "accuracy": 1.0,
+     "correct": 5,
+     "n": 5
+    },
+    "gitlab": {
+     "accuracy": 1.0,
+     "correct": 4,
+     "n": 4
+    },
+    "industry": {
+     "accuracy": 1.0,
+     "correct": 5,
+     "n": 5
+    },
+    "sonatype": {
+     "accuracy": 1.0,
+     "correct": 5,
+     "n": 5
+    }
+   }
+  },
+  "confusion": {
+   "category": [
+    {
+     "label": "Security",
+     "n": 4,
+     "pred": "Product & Features"
+    },
+    {
+     "label": "AI & Agents",
+     "n": 3,
+     "pred": "Product & Features"
+    }
+   ],
+   "competitor": [
+    {
+     "label": "aws",
+     "n": 2,
+     "pred": "none"
+    }
+   ],
+   "noise": {
+    "fn": 2,
+    "fp": 3,
+    "tn": 21,
+    "tp": 3
+   }
+  },
+  "extraction_detector": {
+   "fn": 4,
+   "fp": 0,
+   "n": 29,
+   "precision": 1.0,
+   "precision_n": 5,
+   "recall": 0.5555555555555556,
+   "recall_n": 9,
+   "tn": 20,
+   "tp": 5
+  },
+  "important": {
+   "fn": 0,
+   "fp": 0,
+   "min": 4,
+   "missing": 0,
+   "n": 29,
+   "precision": 1.0,
+   "precision_n": 1,
+   "recall": 1.0,
+   "recall_n": 1,
+   "tp": 1
+  },
+  "mentions_jfrog": {
+   "fn": 0,
+   "fp": 0,
+   "precision": null,
+   "precision_n": 0,
+   "recall": null,
+   "recall_n": 0,
+   "tp": 0
+  },
+  "n": 29,
+  "noise": {
+   "fn": 2,
+   "fp": 3,
+   "precision": 0.5,
+   "precision_n": 6,
+   "recall": 0.6,
+   "recall_n": 5,
+   "tn": 21,
+   "tp": 3
+  },
+  "prefilter": {
+   "flagged": 0,
+   "labeled_noise": 5,
+   "noise_caught": 0,
+   "precision": null,
+   "precision_n": 0,
+   "recall": 0.0,
+   "recall_n": 5,
+   "relevant_flagged": []
+  },
+  "score": {
+   "exact": 0.7619047619047619,
+   "excluded_noise": 8,
+   "excluded_noise_n": 29,
+   "missing": 0,
+   "n": 21,
+   "within_1": 0.9523809523809523
+  }
+ },
+ "model": "gemini-3.6-flash",
+ "n": 29,
+ "report": "20261102T164638Z.json",
+ "split": "test",
+ "split_counts": {
+  "test": 29,
+  "train": 78
+ },
+ "status": "ok",
+ "test_runs": 1
+}

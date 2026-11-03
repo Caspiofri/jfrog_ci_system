@@ -1,0 +1,47 @@
+{
+ "date": "2026-11-01",
+ "as_of": "2026-11-01T04:04:04.802518+00:00",
+ "label": "1 Nov 2026 Brief (run 20261101T0400Z-e9cae4), demo day per D69 (cut before 2026-11-02T04:00:02.754754+00:00)",
+ "built_at": "2026-11-03T11:51:54.760498+00:00",
+ "runs": [
+  "20261030T1312Z-389e71",
+  "20261031T1345Z-802913",
+  "20261101T0400Z-e9cae4"
+ ],
+ "items": 351,
+ "commit": "165ecb9edebdf7b2144e3e9cb638e62024055a89",
+ "allowlist": [
+  "id",
+  "run_id",
+  "url",
+  "title",
+  "source",
+  "origin",
+  "competitor",
+  "publisher",
+  "published_at",
+  "published_at_source",
+  "date_precision",
+  "collected_at",
+  "url_resolved",
+  "text_status",
+  "text_source",
+  "fetch_status",
+  "fetch_http_status",
+  "extraction_reasons",
+  "mentions_jfrog"
+ ],
+ "excerpt_chars": 280,
+ "actions_after_brief": [
+  {
+   "item": "d3e44c95ac969e9f",
+   "action": "reopen",
+   "at": "2026-11-02T17:33:32.519617+00:00"
+  },
+  {
+   "item": "3f7d08fbe030f71d",
+   "action": "approve",
+   "at": "2026-11-02T17:40:57.841061+00:00"
+  }
+ ]
+}
