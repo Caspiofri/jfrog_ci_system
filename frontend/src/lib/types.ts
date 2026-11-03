@@ -544,6 +544,8 @@ export interface RunMetrics {
   run_id: string;
   status: string;
   items?: { collected?: number; kept?: number; new?: number; [k: string]: unknown } | null; // contract §11.1
+  items_after_actions?: { published?: number | null; held?: number | null; [k: string]: unknown } | null; // §11.2, D74
+  reconstructed?: { decision?: string; at?: string; label?: string; sources?: Record<string, string>; empty?: Record<string, string> } | null; // D74
   error?: string | null;
   steps: RunStep[];
   fingerprints?: Record<string, string | null> | null;
