@@ -34,14 +34,19 @@ test("Health: one accuracy panel when both blocks read the same report, two labe
 test("Roadmap: a slot appears only when its image loads; labelled; no placeholder or file path on screen", () => {
   const r = src("app/roadmap/page.tsx");
   assert.match(r, /if \(state === "none"\) return null;/);
-  assert.match(r, /state !== "ok" && "hidden"/);
+  assert.match(r, /state !== "ok" && "invisible"/); // keeps its place while loading; gone if the image fails
   assert.match(r, /onLoad=\{\(\) => setState\("ok"\)\} onError=\{\(\) => setState\("none"\)\}/);
   assert.match(r, /const CONCEPT_LABEL = "Concept, sample data";/);
-  assert.match(r, /<figcaption[^>]*data-concept-label>\{CONCEPT_LABEL\}<\/figcaption>\s*<Image /); // against the image, in its frame
+  assert.match(r, /<figcaption[^>]*data-concept-label>\{CONCEPT_LABEL\}<\/figcaption>\s*\{\/\*[^*]*\*\/\}\s*<div [^>]*data-shot-frame>\s*<Image /); // against the image, in its frame
   assert.doesNotMatch(r, /object-cover|Screenshot to add/); // shown whole, never cropped; no placeholder
   assert.match(r, /loading="eager"/); // a lazy image inside the hidden frame would never load
-  assert.match(r, /className="mx-auto block h-auto max-h-\[18rem\] w-auto max-w-full"/); // smaller, whole, never enlarged
-  assert.match(r, /className="grid items-start gap-3\.5 md:grid-cols-2" data-roadmap-grid/); // 2 per row, 1 on narrow screens
+  assert.match(r, /className="flex h-\[18rem\] items-center justify-center p-2" data-shot-frame/); // one fixed frame height
+  assert.match(r, /className="block h-auto max-h-full w-auto max-w-full"/); // whole and centred, never cropped, stretched or enlarged
+  assert.match(r, /className="grid gap-x-3\.5 gap-y-3\.5 md:grid-cols-2" data-roadmap-grid/); // 2 per row, 1 on narrow screens
+  assert.match(r, /"row-span-4 grid grid-rows-subgrid /); // title, image and both lines line up across a row
+  assert.match(r, /c\.wide && "md:col-span-2"/);
+  assert.equal((r.match(/!c\.wide && "md:min-h-\[2lh\]"/g) ?? []).length, 2); // equal half-card heights
+  assert.deepEqual([...r.matchAll(/slug: "([^"]+)",\s*wide: true/g)].map((m) => m[1]), ["topics", "reactions"]);
 });
 
 test("Roadmap (D104): the seven concepts, in Ofri's order and words; the six images are the prototype's, unedited", () => {
@@ -50,7 +55,7 @@ test("Roadmap (D104): the seven concepts, in Ofri's order and words; the six ima
   assert.deepEqual(slugs, ["strength-radar", "convergence", "topics", "reactions", "pressure", "emerging", "deal-extraction"]);
   assert.match(r, /shows: "a competitor's strength against JFrog on each of the 7 axes, scored 1 to 5\.",\s*missing: "a strength score per axis, set or checked by a product expert\.",/);
   assert.match(r, /missing: "extraction of buyer, target and deal type\. The product's real deals block lists items as they are\.",/);
-  for (const f of ["strength-radar", "convergence", "topics", "reactions", "emerging", "deal-extraction"]) {
+  for (const f of ["strength-radar", "convergence", "topics", "reactions", "pressure", "emerging", "deal-extraction"]) {
     assert.ok(readFileSync(new URL(`../public/roadmap/${f}.png`, import.meta.url)).length > 1000, f);
   }
 });
