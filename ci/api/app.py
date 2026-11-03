@@ -528,26 +528,27 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
         stage = {"wrong_competitor": "classifier", "wrong_category": "classifier", "not_relevant": "noise_filter",
                  "duplicate": "dedupe"}[body.reason]
         return act(item_id, "dismiss", ("awaiting_review", "auto_published", "approved"),
-                   lambda st, _: {"decision": "dismissed", "flagged": 0}, if_match, reason=body.reason,
+                   lambda st, _: {"decision": "dismissed"}, if_match, reason=body.reason,  # flag untouched (D107)
                    note=body.note, measures=lambda it: stage)
 
     def restore_before_dismiss(history: list[dict]) -> tuple[dict, dict]:
-        """(item_state update, the dismiss action) from the item's latest dismiss. A dismiss logged with state_before
-        is restored exactly; an older one from its before status (approved -> approved; flagged -> flagged;
-        awaiting_review or auto_published -> no decision, so routing decides again)."""
+        """(item_state update, the dismiss action) from the item's latest dismiss: the decision only, since neither
+        dismiss nor reopen touches the flag (D107). A dismiss logged with state_before gets its decision back exactly;
+        an older one from its before status (approved -> approved; anything else -> no decision, so routing decides
+        again)."""
         dismiss = next((a for a in reversed(history) if a["action"] == "dismiss"), None)
         if dismiss is None:
             raise ApiError(409, "conflict", "no dismiss action to reopen")
         sb = dismiss["payload"].get("state_before")
         if sb is not None:
-            return {"decision": sb["decision"], "flagged": int(sb["flagged"])}, dismiss
+            return {"decision": sb["decision"]}, dismiss
         st = dismiss["payload"]["before"]["status"]
-        return {"decision": "approved" if st == "approved" else None, "flagged": int(st == "flagged")}, dismiss
+        return {"decision": "approved" if st == "approved" else None}, dismiss
 
     @app.post("/api/v1/items/{item_id}/reopen")
     def reopen(item_id: str, body: Note | None = None, if_match: str | None = Header(default=None)):
-        """Undo a dismiss: a new 'reopen' action (the dismiss stays in the history) puts the decision and flag back
-        as they were before it. Edits are kept; nothing goes to the candidate-labels file."""
+        """Undo a dismiss: a new 'reopen' action (the dismiss stays in the history) puts the decision back as it was
+        before it. The flag and the edits are kept as they are; nothing goes to the candidate-labels file."""
         found: dict = {}
 
         def extra(before: dict, history: list[dict]) -> dict:
@@ -570,8 +571,9 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     @app.delete("/api/v1/items/{item_id}/flag")
     def unflag(item_id: str, if_match: str | None = Header(default=None)):
-        """Clears the flag only. Flag changed nothing else, so the item is back in its exact state before the flag."""
-        return act(item_id, "unflag", FLAGGABLE, lambda st, _: {"flagged": 0}, if_match, flagged=True)
+        """Clears the flag only. Flag changed nothing else, so the item is back in its exact state before the flag.
+        Also allowed on a dismissed item: dismiss keeps the flag (D107), so it can still be cleared there."""
+        return act(item_id, "unflag", (*FLAGGABLE, "dismissed"), lambda st, _: {"flagged": 0}, if_match, flagged=True)
 
     @app.patch("/api/v1/items/{item_id}")
     def edit(item_id: str, body: Edit, if_match: str | None = Header(default=None)):

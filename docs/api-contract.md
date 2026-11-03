@@ -675,18 +675,18 @@ These three bodies are `{"error": {code, message, details}}` with no `meta`.
 
 - **Body:** optional `{"note": "…"}`. **If-Match:** the item version, optional, as for the other actions (a stale one answers 409 `conflict`).
 - **Allowed from:** `dismissed` only. Any other status answers `409 conflict` with `{status, allowed_from: ["dismissed"]}`; an unknown item `404 not_found`. In demo mode, 403 `demo_read_only`.
-- **What it does:** appends a `reopen` action; the dismiss stays in the history. The decision and flag go back to what they were before the latest dismiss, so the item returns to the status it had then:
+- **What it does:** appends a `reopen` action; the dismiss stays in the history. The decision goes back to what it was before the latest dismiss, so the item returns to the status it had then; the flag isn't touched:
 
   | Status before the dismiss | After reopen |
   |---|---|
   | `awaiting_review` / `auto_published` | no decision: routing decides again, at the current level and vetted list |
   | `approved` | `approved` |
-  | (any of the above, flagged) | the same status, and the flag comes back too (`state_before.flagged`) |
+  | (any of the above, flagged or not) | the same status; the flag stays as it is now (D107: dismiss and reopen never touch it) |
 
   Edits made before or after the dismiss are kept. Nothing is written to `evals/analyst_labels.jsonl`.
 - **Response:** the action envelope (`action_id`, `action: "reopen"`, `status`, `flagged`, `version`, `at`, `meta`…) plus `reopens_action_id` (the dismiss it undid) and `status_before_dismiss`.
 - **Reads:** `GET /items/{id}` → `actions[]` gets `{action: "reopen", payload: {before, state_before, reopens_action_id, status_before_dismiss}}`. The Log row shows the new status, with `dismiss_reason: null`.
-- From 1 Nov every item action's payload also holds `state_before: {decision, flagged}`. A dismiss logged before that has none and is restored from its `before.status` (the table above).
+- From 1 Nov every item action's payload also holds `state_before: {decision, flagged}`; reopen uses its `decision` only. A dismiss logged before that has none and is restored from its `before.status` (the table above).
 
 ### 13.2 `PATCH /api/v1/items/{id}`: a note per changed field
 
@@ -725,8 +725,8 @@ These three bodies are `{"error": {code, message, details}}` with no `meta`.
 - **Flag:** allowed from `awaiting_review`, `auto_published` and `approved` when the item isn't flagged. It writes no decision, so the status stays what it was. A held item stays in the Review queue and out of the Brief until an analyst approves or dismisses it; a published item stays published.
   - An already flagged item answers `409 conflict` with `{status, flagged: true}`; `dropped`, `dismissed`, test-split and unclassified items answer `409` with `{status, allowed_from}`.
   - `measures` is still `ranking_miss` when the effective score is 2 or lower (else `""`), in the response and the action payload.
-- **Unflag:** allowed from the same statuses when the item is flagged (else `409` with `flagged: false`). It clears the flag only, so the item is back in its exact state before the flag: the same decision, status and Brief membership. Only `version` moves on.
-- **Other actions:** approve and dismiss work on a flagged item as on any other. Approve keeps the flag; dismiss clears it, and reopen brings it back from `state_before.flagged`. An edit keeps it.
+- **Unflag:** allowed from the same statuses and from `dismissed` when the item is flagged (else `409` with `flagged: false`). It clears the flag only, so the item is back in its exact state before the flag: the same decision, status and Brief membership. Only `version` moves on.
+- **Other actions:** approve and dismiss work on a flagged item as on any other. Approve, dismiss, reopen and edit all leave the flag as it is (Ofri, 4 Nov: Flag and Dismiss are separate actions). A dismissed item can't be flagged anew, but its flag can be cleared.
 - **Log:** a flag isn't a decision, so a flagged item keeps the stage routing gave it (`route`, `validate`…), not `analyst`.
 - **Counts:** Brief, Health and run `items_after_actions` count statuses only, so a flag changes none of them. The live store and the demo snapshot had 0 flagged items and 0 flag actions when this changed, so no stored or reported number moved.
 - **Before D107 (until 4 Nov):** Flag on a held item also wrote `decision: approved`, and a flagged item had the status `flagged`, counted as published.

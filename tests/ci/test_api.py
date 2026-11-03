@@ -253,9 +253,9 @@ def test_reopen_restores_approved_and_flagged_items(env):
     assert c.post("/api/v1/items/uv/reopen").json()["status"] == "approved"
     f = c.post("/api/v1/items/uv4/flag").json()
     assert (f["status"], f["flagged"]) == ("awaiting_review", True)  # D107: flagged, still held
-    c.post("/api/v1/items/uv4/dismiss", json={"reason": "not_relevant"})
+    assert c.post("/api/v1/items/uv4/dismiss", json={"reason": "not_relevant"}).json()["flagged"] is True
     r = c.post("/api/v1/items/uv4/reopen").json()
-    assert (r["status"], r["flagged"]) == ("awaiting_review", True)  # the flag came back with it
+    assert (r["status"], r["flagged"]) == ("awaiting_review", True)  # dismiss and reopen leave the flag (D107)
     u = c.delete("/api/v1/items/uv4/flag").json()
     assert (u["status"], u["flagged"]) == ("awaiting_review", False)
 
@@ -317,6 +317,29 @@ def test_unflag_restores_the_exact_state_before_the_flag(env):
         assert {k: v for k, v in after_item.items() if k != "version"} == \
             {k: v for k, v in before_item.items() if k != "version"}
         assert c.delete(f"/api/v1/items/{item_id}/flag").status_code == 409  # not flagged any more
+
+
+def test_dismiss_and_reopen_leave_the_flag_as_it_is(env):
+    c, store_path, _ = env
+    assert c.post("/api/v1/items/uv4/flag").json()["flagged"] is True
+    d = c.post("/api/v1/items/uv4/dismiss", json={"reason": "not_relevant"}).json()
+    assert (d["status"], d["flagged"]) == ("dismissed", True) and state(store_path, "uv4") == ("dismissed", 1)
+    log = {x["item_id"]: x for x in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}
+    assert (log["uv4"]["status"], log["uv4"]["flagged"]) == ("dismissed", True)
+    r = c.post("/api/v1/items/uv4/reopen").json()
+    assert (r["status"], r["flagged"]) == ("awaiting_review", True) and state(store_path, "uv4") == (None, 1)
+    assert "uv4" not in brief_ids(c)  # flagged and held: still out of the Brief
+    # reopen keeps the flag as it is now, not as it was at the dismiss
+    c.post("/api/v1/items/uv4/dismiss", json={"reason": "duplicate"})
+    u = c.delete("/api/v1/items/uv4/flag").json()  # unflag works on a dismissed item
+    assert (u["status"], u["flagged"]) == ("dismissed", False)
+    r = c.post("/api/v1/items/uv4/reopen").json()
+    assert (r["status"], r["flagged"]) == ("awaiting_review", False) and state(store_path, "uv4") == (None, 0)
+    assert c.post("/api/v1/items/pub1/flag").status_code == 200
+    c.post("/api/v1/items/pub1/dismiss", json={"reason": "duplicate"})
+    assert state(store_path, "pub1") == ("dismissed", 1)
+    c.delete("/api/v1/items/pub1/flag")
+    assert c.post("/api/v1/items/pub1/flag").status_code == 409  # a dismissed item can't be flagged anew
 
 
 def test_flag_keeps_the_ranking_miss_signal_and_no_flagged_status(env):
