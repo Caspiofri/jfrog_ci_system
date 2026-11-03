@@ -220,7 +220,7 @@ export function ItemTitle({ title, url, onOpen, className, publisher }: {
 }) {
   const text = title || "(no title)";
   return (
-    <span className="inline-flex min-w-0 items-start gap-1">
+    <span className="inline-flex min-w-0 flex-wrap items-start gap-x-1">
       {onOpen ? (
         <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }} title="Open the details"
           className={cn("min-w-0 text-left hover:text-jgreen-d hover:underline", className)}>{text}</button>
