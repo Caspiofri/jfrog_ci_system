@@ -5,12 +5,14 @@ import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Loader2, Newspaper,
 import { Button } from "@/components/ui/button";
 import { ArticleLink, Async, Empty, ErrorNote, Hint, ImportanceLegend, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { cn } from "@/lib/utils";
-import { competitorFilterOptions } from "@/lib/competitorLabel";
+import { competitorFilterOptions, soleCompetitor } from "@/lib/competitorLabel";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { BriefCard, MockTag } from "@/components/brief/BriefCard";
-import { ApiError, path, send, useApi, useRecord } from "@/lib/api";
-import { PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
+import { ApiError, get, path, send, useApi, useRecord } from "@/lib/api";
+import useSWR from "swr";
+import { CompetitorAvatar } from "@/components/CompetitorAvatar";
+import { CLEARED_TIP, COLLECTED_TIP, PATTERN_LABEL, SCORE_COLOR, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { MOCK, mockBrief, useMock } from "@/lib/mock";
 import { useUrlState } from "@/lib/useParams";
@@ -19,7 +21,7 @@ import { runCountsFor, todayTiles } from "@/lib/briefNumbers";
 import { CAPABILITY_ROWS } from "@/lib/capabilityRows";
 import { CAPABILITY_NAME, claimCapability, insightCapabilities } from "@/lib/capabilitySheet";
 import { insightsTitle } from "@/lib/insightsTitle";
-import { CONTINUITY_TIP, continuityBadge, goneLine } from "@/lib/continuity";
+import { CONTINUITY_TIP, NEW_SOURCE_TIP, continuityBadge, goneLine, newCitedIds } from "@/lib/continuity";
 
 const TOP = 5;
 const PAGE = 50;
@@ -86,8 +88,8 @@ function BriefScreen() {
               <ChevronLeft className="size-4" />
             </Button>
             <Hint text={brief.data?.window ? (backfill
-              ? "The 14-day import that started the store. Everything in it was published before the first run, so \"Found late\" badges are hidden here."
-              : `Everything discovered from ${fmtDateTime(brief.data.window.prev_anchor)} to ${fmtDateTime(brief.data.window.anchor)} Israel time (${brief.data.window.hours} h).`) : null}
+              ? "The 14-day import that started the store. Every article in it is dated before the first run, so \"Found late\" badges are hidden here."
+              : `Everything collected from ${fmtDateTime(brief.data.window.prev_anchor)} to ${fmtDateTime(brief.data.window.anchor)} Israel time (${brief.data.window.hours} h).`) : null}
               className="min-w-[13rem] text-center">{date ? fmtLongDate(date) : briefs.isLoading ? "Loading…" : "No Brief yet"}</Hint>
             <Button variant="outline" size="icon" className="size-7" disabled={!newer} onClick={() => go(newer)} aria-label="Next Brief">
               <ChevronRight className="size-4" />
@@ -131,9 +133,9 @@ function BriefScreen() {
 
                 <Panel
                   big
-                  title="What was published in this Brief?"
+                  title="What was cleared in this Brief?"
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
-                  info={`The items found in this Brief's window and rated ${b.brief_min_score ?? 3} or higher on importance, published automatically or approved by an analyst. Items still waiting in the Review queue aren't listed.`}
+                  info={`The items found in this Brief's window and rated ${b.brief_min_score ?? 3} or higher on importance, cleared by routing or approved by an analyst. Items still waiting in the Review queue aren't listed.`}
                 >
                   {b.items.items.length ? (
                     b.items.items.map((it) => <BriefCard key={it.item_id} item={it} showLate={!backfill} highlight={highlighted.has(it.item_id)} />)
@@ -142,8 +144,8 @@ function BriefScreen() {
                       {competitor || category
                         ? "Nothing matches these filters."
                         : b.summary.held
-                          ? "Nothing was published in this window. The held items above aren't verified yet, so they aren't part of the Brief."
-                          : "Nothing was published in this window."}
+                          ? "Nothing was cleared in this window. The held items above aren't cleared yet, so they aren't part of the Brief."
+                          : "Nothing was cleared in this window."}
                     </Empty>
                   )}
                   <FeedFooter total={b.items.total} all={all} offset={offset} set={set} />
@@ -184,7 +186,8 @@ function SummaryBlock({ date, s, runId }: { date: string; s: BriefSummary; runId
               <Link href={`/review?brief=${encodeURIComponent(date)}`} data-tile={t.key} className={cn(box, "transition-colors hover:border-jgreen")}>{body}</Link>
             </Hint>
           ) : (
-            <Hint key={t.key} text={t.hint} className={box}><span data-tile={t.key}>{body}</span></Hint>
+            <Hint key={t.key} text={t.key === "new" ? <><b className="font-semibold">Collected:</b> {COLLECTED_TIP} {t.hint}</> : t.key === "published" ? <><b className="font-semibold">Cleared:</b> {CLEARED_TIP} {t.hint}</> : t.hint}
+              className={box}><span data-tile={t.key}>{body}</span></Hint>
           );
         })}
       </div>
@@ -267,6 +270,11 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
     ? `Generated ${fmtDateTime(insights.generated_at)}${insights.trigger === "refresh" ? " (refreshed)" : ""}${rejected ? ` · ${rejected} rejected by the checks` : ""}`
     : undefined;
   const state = insightState(insights);
+  // the previous Brief's insights, to tell which cited articles are the "+N new source(s)" (D89); only when one matched
+  const since = insights.previous?.date ?? insights.items.find((x) => x.continuity?.status === "strengthened")?.continuity?.since ?? null;
+  const needPrev = insights.items.some((x) => x.continuity?.status === "strengthened");
+  const prev = useApi<Brief>(needPrev && since ? path("/brief", { date: since, limit: 1 }) : null);
+  const prevInsights = prev.data?.date === since ? prev.data?.insights?.items ?? null : null;
   return (
     <Panel
       big
@@ -299,7 +307,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
           {insights.status === "partial" ? <div className="mb-2 text-xs text-mute">Fewer than 3 insights passed the checks this time.</div> : null}
           <div className="flex flex-col gap-3">
             {insights.items.map((x) => (
-              <InsightCard key={x.insight_id} ins={x} selected={hl === x.insight_id} onSelect={() => setHl(hl === x.insight_id ? null : x.insight_id)} />
+              <InsightCard key={x.insight_id} ins={x} prev={prevInsights} selected={hl === x.insight_id} onSelect={() => setHl(hl === x.insight_id ? null : x.insight_id)} />
             ))}
           </div>
         </>
@@ -318,7 +326,7 @@ function windowText(w: BriefInsights["window"]): string | undefined {
 
 /** One insight per row. Always visible: type, top importance, title, summary, why it matters (no story count: the evidence lists them).
  * The claims with their quotes and sources sit behind "Show evidence" (D50: each cited item keeps its score and link). */
-function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: boolean; onSelect: () => void }) {
+function InsightCard({ ins, prev, selected, onSelect }: { ins: Insight; prev: Insight[] | null; selected: boolean; onSelect: () => void }) {
   const top = SCORE_COLOR[ins.max_score ?? 0]?.[0] ?? "#e3e8ef";
   const [details, setDetails] = useState(false); // collapsed by default: title and chips only
   const [open, setOpen] = useState(false); // the claims, inside the details
@@ -327,6 +335,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
     for (const c of ins.cited_items ?? []) if (!m.has(c.item_id)) m.set(c.item_id, c);
     return m;
   }, [ins.cited_items]);
+  const fresh = useMemo(() => newCitedIds(ins, prev), [ins, prev]);
   const n = ins.claims.length;
   const toggle = () => {
     const next = !details;
@@ -343,6 +352,7 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
     >
       <div className="flex flex-wrap items-center gap-1.5" data-insight-header>
         <Tag>{label(PATTERN_LABEL, ins.pattern)}</Tag>
+        {ins.pattern === "competitor_momentum" ? <MomentumCompetitor ins={ins} /> : null}
         <ContinuityBadge c={ins.continuity} />
         <TouchesJfrog claims={ins.claims} />
       </div>
@@ -367,12 +377,12 @@ function InsightCard({ ins, selected, onSelect }: { ins: Insight; selected: bool
               </button>
               {open ? (
                 <ul className="m-0 mt-2 flex list-none flex-col gap-3 p-0" onClick={(e) => e.stopPropagation()}>
-                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} />)}
+                  {ins.claims.map((c, k) => <ClaimBlock key={k} c={c} cited={cited} fresh={fresh} since={ins.continuity?.since ?? null} />)}
                 </ul>
               ) : null}
             </div>
           ) : null}
-          {ins.baseline_note ? <div className="text-[11px] text-mute">{ins.baseline_note}</div> : null}
+          {ins.baseline_note ? <div className="text-[0.6875rem] text-mute">{ins.baseline_note}</div> : null}
         </div>
       ) : null}
     </div>
@@ -414,9 +424,26 @@ function TouchesJfrog({ claims }: { claims: Claim[] }) {
   const caps = insightCapabilities(claims, CAPABILITY_ROWS);
   if (!caps.length) return null;
   return (
-    <Tag className="border border-jgreen/40 bg-[#eef7f0] text-[11px] font-semibold text-jgreen-d">
+    <Tag className="border border-jgreen/40 bg-[#eef7f0] text-[0.6875rem] font-semibold text-jgreen-d">
       Touches JFrog: {caps.map((k) => CAPABILITY_NAME[k]).join(" · ")}
     </Tag>
+  );
+}
+
+/** D89: beside "Competitor momentum", the competitor's avatar and name, from the cited items (GET /items/{id}, the
+ *  drawer's own record), only when every one names the same tracked competitor; otherwise nothing. */
+function MomentumCompetitor({ ins }: { ins: Insight }) {
+  const { data: meta } = useMeta();
+  const uniq = [...new Set(ins.item_ids)];
+  const q = useSWR(uniq.length ? ["cited-competitors", ...uniq] : null,
+    () => Promise.all(uniq.map((id) => get<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`))), { revalidateOnFocus: false });
+  const k = q.data ? soleCompetitor(meta, q.data.map((d) => d.item?.competitor)) : null;
+  if (!k) return null;
+  const name = meta?.competitors.find((c) => c.key === k)?.name ?? k;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink" data-momentum-competitor={k}>
+      <CompetitorAvatar k={k} name={name} />{name}
+    </span>
   );
 }
 
@@ -426,23 +453,24 @@ const BADGE_STYLE: Record<string, string> = {
   strengthened: "border-[#1e63a6]/40 bg-[#e3f0fb] text-[#1e63a6]", // sky blue: apart from New (slate blue) and the JFrog greens
 };
 
-/** New / Also in previous Brief (<date>) [· +N new sources], from the API's continuity field; nothing when absent. */
+/** New / prev. Brief (<date>) [· +N new sources], from the API's continuity field; nothing when absent. */
 function ContinuityBadge({ c }: { c: Insight["continuity"] }) {
   const b = continuityBadge(c, (d) => fmtDate(d));
   if (!b) return null;
   return (
     <Hint text={CONTINUITY_TIP}>
-      <Tag className={cn("border text-[11px] font-semibold", BADGE_STYLE[b.status])}>{b.text}</Tag>
+      <Tag className={cn("border text-[0.6875rem] font-semibold", BADGE_STYLE[b.status])}>{b.text}</Tag>
     </Hint>
   );
 }
 
-/** A cited item's row: served in insights.cited_items, or fetched (same SWR key as the drawer) when it wasn't.
- * A fetched item has no in_brief, so no "not in this Brief" tag is shown for it. */
+/** A cited item's row: served in insights.cited_items, plus the item record (same SWR key as the drawer) for what the
+ * row lacks, such as the publisher (D90). A fetched item has no in_brief, so no "not in this Brief" tag is shown for it. */
 function useCitedItem(id: string, row?: CitedItemRow) {
-  const q = useRecord<ItemDetail>(row || !id ? null : `/api/v1/items/${encodeURIComponent(id)}`, id, (d) => d.item?.item_id);
+  const q = useRecord<ItemDetail>(id ? `/api/v1/items/${encodeURIComponent(id)}` : null, id, (d) => d.item?.item_id);
   const it = row ?? q.data?.item;
   return {
+    publisher: q.data?.item ? q.data.item.publisher : undefined, // undefined until loaded: the link says "Source"
     title: it ? it.title : q.error ? `Item ${id.slice(0, 8)} (couldn't load)` : `Item ${id.slice(0, 8)}…`,
     score: it?.score ?? null,
     url: it?.url ?? null,
@@ -455,7 +483,7 @@ const SCORE_TIP = "Importance of the cited item";
 
 /** One claim as one block: the quoted item's score down the left side, then the claim, its quote, and one line per
  * cited article. The card itself is not clickable; each article's "Reinforced by article" button opens its side panel. */
-function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }) {
+function ClaimBlock({ c, cited, fresh, since }: { c: Claim; cited: Map<string, CitedItemRow>; fresh: Set<string> | null; since: string | null }) {
   const ids = [...new Set([c.quote_item_id, ...c.item_ids].filter(Boolean))];
   const main = useCitedItem(ids[0] ?? "", ids[0] ? cited.get(ids[0]) : undefined);
   const [bg, fg] = SCORE_COLOR[main.score ?? 0] ?? SCORE_COLOR[0];
@@ -466,10 +494,11 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
         {main.score ?? "–"}
       </span>
       <div className="flex min-w-0 flex-col gap-1">
-        <div className="text-[13px] font-semibold text-ink">{c.text}</div>
+        <div className="text-[0.8125rem] font-semibold text-ink">{c.text}</div>
         {c.quote ? <div className="italic text-mute">&ldquo;{c.quote}&rdquo;</div> : null}
         {c.jfrog_quote ? <JfrogQuote c={c} /> : null}
-        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} n={ids.length > 1 ? k + 1 : null} />)}
+        {ids.map((id, k) => <SourceLine key={id} id={id} row={cited.get(id)} withScore={k > 0} n={ids.length > 1 ? k + 1 : null}
+          isNew={Boolean(fresh?.has(id))} since={since} />)}
       </div>
     </li>
   );
@@ -477,27 +506,32 @@ function ClaimBlock({ c, cited }: { c: Claim; cited: Map<string, CitedItemRow> }
 
 /** One cited article's line: "Reinforced by article" (numbered when the claim cites several) opens its side panel,
  *  then its score when it isn't the claim's first item, "not in this Brief" when it applies, and Source to the article. */
-function SourceLine({ id, row, withScore, n }: { id: string; row?: CitedItemRow; withScore: boolean; n: number | null }) {
+function SourceLine({ id, row, withScore, n, isNew = false, since = null }: {
+  id: string; row?: CitedItemRow; withScore: boolean; n: number | null; isNew?: boolean; since?: string | null;
+}) {
   const drawer = useItemDrawer();
   const it = useCitedItem(id, row);
   const [bg, fg] = SCORE_COLOR[it.score ?? 0] ?? SCORE_COLOR[0];
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-mute" data-source-line={id}>
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.6875rem] text-mute" data-source-line={id}>
       <button type="button" title={`Open the details of: ${it.title}`} onClick={() => drawer.open(id)} data-reinforced-by
         className="rounded border border-line bg-page px-1.5 py-0.5 font-medium text-ink transition-colors hover:border-jgreen hover:text-jgreen-d focus-visible:outline-2 focus-visible:outline-jgreen">
         Reinforced by article{n ? ` ${n}` : ""}
       </button>
       {withScore ? (
-        <span title={SCORE_TIP} className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[10px] font-semibold tabular-nums"
+        <span title={SCORE_TIP} className="inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] px-1 text-[0.625rem] font-semibold tabular-nums"
           style={{ background: bg, color: fg }}>{it.score ?? "–"}</span>
       ) : null}
+      {isNew ? (
+        <Tag className={cn("border text-[0.625rem] font-semibold", BADGE_STYLE.new)} title={since ? NEW_SOURCE_TIP(fmtDate(since)) : undefined} data-new-source>New in this insight</Tag>
+      ) : null}
       {it.outside ? (
-        <Tag className="text-[10px]"
-          title={it.belowLine ? "Scored below the Brief's 3+ line; still a published item" : "Published, but not in this Brief's list (outside its window)"}>
+        <Tag className="text-[0.625rem]"
+          title={it.belowLine ? "Scored below the Brief's 3+ line; still a cleared item" : "Cleared, but not in this Brief's list (outside its window)"}>
           not in this Brief
         </Tag>
       ) : null}
-      <ArticleLink href={it.url} />
+      <ArticleLink href={it.url} publisher={it.publisher} />
     </div>
   );
 }

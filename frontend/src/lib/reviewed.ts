@@ -1,6 +1,12 @@
-// "Reviewed by analyst": an item an analyst approved, edited or flagged. Read from the list row itself (status,
+// "Edited by analyst" (D94; was "Reviewed by analyst"): an item whose fields an analyst edited. An edit is not a
+// decision, so the mark shows only for edits; an approval or a flag shows in the status. Read from the list row itself (status,
 // edited, flagged), so no extra request. The analyst's note stays in the side panel's history. No imports.
-export const REVIEWED_LABEL = "Reviewed by analyst";
+export const REVIEWED_LABEL = "Edited by analyst";
+
+/** The fields an analyst edited; the mark shows only when there is at least one. */
+export function editedFields(it: { edited: Record<string, unknown> | null }): string[] {
+  return Object.keys(it.edited ?? {});
+}
 
 export interface ReviewedFields { status: string; edited: Record<string, unknown> | null; flagged: boolean }
 

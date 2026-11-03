@@ -3,8 +3,11 @@
 import { CompetitorAvatar, CompetitorLabel } from "@/components/CompetitorAvatar";
 import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
-import { ItemTitle, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { Hint, ItemTitle, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+
+export const TOP_SCORE_LABEL = "Top score this week";
 import { useItemDrawer } from "@/components/ItemDrawer";
+import { CardSparkline } from "@/components/competitors/Sparkline";
 import { CATEGORY_COLOR, SOURCE_LABEL, fmtDate, label } from "@/lib/format";
 import type { CompetitorCard, Deal } from "@/lib/types";
 
@@ -21,7 +24,7 @@ export function Trend({ t, prev }: { t: CompetitorCard["trend"]; prev: number })
 /** The category mix bar (prototype .mix), with a legend under it so color is never the only cue. */
 export function MixBar({ mix, legend = false }: { mix: CompetitorCard["category_mix"]; legend?: boolean }) {
   const total = mix.reduce((a, b) => a + b.count, 0);
-  if (!total) return <div className="h-2 rounded-sm bg-track" title="No published items this week" />;
+  if (!total) return <div className="h-2 rounded-sm bg-track" title="No cleared items this week" />;
   return (
     <div>
       <div className="flex h-2 gap-px overflow-hidden rounded-sm bg-track" role="img"
@@ -32,7 +35,7 @@ export function MixBar({ mix, legend = false }: { mix: CompetitorCard["category_
         ))}
       </div>
       {legend ? (
-        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-mute">
+        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] text-mute">
           {mix.map((m) => (
             <span key={m.category} className="inline-flex items-center gap-1">
               <i className="inline-block size-2 rounded-sm" style={{ background: CATEGORY_COLOR[m.category] ?? "#9aa5b5" }} />
@@ -48,18 +51,21 @@ export function MixBar({ mix, legend = false }: { mix: CompetitorCard["category_
 export function CompetitorCardView({ c }: { c: CompetitorCard }) {
   return (
     <Link href={`/competitors/${encodeURIComponent(c.key)}`}
-      className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[18px] py-4 transition-colors hover:border-jgreen">
-      <div className="flex items-center justify-between text-[15px] font-semibold">
+      className="flex flex-col gap-2.5 rounded-md border border-line bg-card px-[1.125rem] py-4 transition-colors hover:border-jgreen">
+      <div className="flex items-center justify-between text-[0.9375rem] font-semibold">
         <span className="inline-flex items-center gap-2"><CompetitorAvatar k={c.key} name={c.name} size="md" />{c.name}</span>
-        <span className="flex items-center gap-1.5 text-xs font-normal text-mute">
-          Top score this week <ScoreBadge score={c.threat} title="Top score: the highest score of any of this competitor's items this week" />
-        </span>
+        {/* the label lives in the hover and on keyboard focus (Hint is focusable); screen readers read it as text */}
+        <Hint text={TOP_SCORE_LABEL} className="inline-flex items-center text-xs font-normal">
+          <span className="sr-only">{TOP_SCORE_LABEL}: </span>
+          <span data-top-score><ScoreBadge score={c.threat} /></span>
+        </Hint>
       </div>
       <div className="flex items-baseline gap-2">
-        <b className="text-[28px] font-semibold leading-none tabular-nums">{c.items_7d}</b>
-        <span className="text-mute">published items found in the last 7 days · {c.items_today} in this Brief</span>
+        <b className="text-[1.75rem] font-semibold leading-none tabular-nums">{c.items_7d}</b>
+        <span className="text-mute">· {c.items_today} in this Brief</span>
       </div>
       <Trend t={c.trend} prev={c.items_prev_7d} />
+      <CardSparkline k={c.key} />
       <MixBar mix={c.category_mix} />
       <div className="flex flex-wrap gap-1.5 text-xs">
         {c.pending_review ? (
@@ -76,7 +82,7 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
           {c.top_item.score ? <span className="text-mute"> · {c.top_item.score}</span> : null}
         </div>
       ) : (
-        <div className="border-t border-line pt-2 text-xs text-mute">No published items this week.</div>
+        <div className="border-t border-line pt-2 text-xs text-mute">No cleared items this week.</div>
       )}
     </Link>
   );
@@ -90,7 +96,7 @@ export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; sh
       <table className="w-full border-collapse">
         <thead>
           <tr>
-            {["Feed date", ...(showCompetitor ? ["Competitor"] : []), "Title", "Source", "Status"].map((h) => (
+            {["Article date", ...(showCompetitor ? ["Competitor"] : []), "Title", "Source", "Status"].map((h) => (
               <th key={h} className="border-b border-line px-2.5 py-2 text-left text-xs font-semibold text-mute">{h}</th>
             ))}
           </tr>
@@ -100,7 +106,7 @@ export function DealsTable({ deals, showCompetitor = true }: { deals: Deal[]; sh
             <tr key={d.item_id}>
               <td className={`${td} whitespace-nowrap`}>{fmtDate(d.published_at, true)}</td>
               {showCompetitor ? <td className={`${td} whitespace-nowrap`}><CompetitorLabel k={d.competitor} /></td> : null}
-              <td className={td}><ItemTitle title={d.title} url={d.url} onOpen={() => drawer.open(d.item_id)} /></td>
+              <td className={td}><ItemTitle title={d.title} url={d.url} publisher={d.publisher} onOpen={() => drawer.open(d.item_id)} /></td>
               <td className={`${td} text-mute`}>{d.publisher} · {label(SOURCE_LABEL, d.source)}</td>
               <td className={td}><StatusDot status={d.status} /></td>
             </tr>

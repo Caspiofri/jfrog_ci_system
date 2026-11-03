@@ -4,13 +4,14 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { History } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArticleLink, Async, ColorLegend, Tag } from "@/components/ci";
+import { ArticleLink, Async, ColorLegend, Tag, UnverifiedNote } from "@/components/ci";
 import { path, useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { displayValue } from "@/lib/matrix";
 import type { Cell, CellHistoryRow, H2HAxis, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-function CellView({ c }: { c: Cell }) {
+function CellView({ c, axis }: { c: Cell; axis: string }) {
   if (c.state === "not_tracked") {
     return <span className="italic text-mute" title={c.reason}>Not tracked{c.reason ? `: ${c.reason}` : ""}</span>;
   }
@@ -19,9 +20,9 @@ function CellView({ c }: { c: Cell }) {
       {c.state === "not_stated" ? (
         <span className="italic text-mute" title="The page says nothing on this axis: a gap in what we know, not a value">Not stated on the page</span>
       ) : (
-        <span>{c.value}</span>
+        <span>{displayValue(axis, c.value)}</span>
       )}
-      <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-mute">
+      <span className="flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-mute">
         {c.state === "stale" ? <Tag className="bg-[#fff4e0] text-[#8a5a00]" title={c.stale_reason}>Stale{c.stale_reason ? `: ${c.stale_reason}` : ""}</Tag> : null}
         {c.needs_review ? <Tag className="bg-[#fffaf0] text-[#8a5a00]" title={c.review_reason}>Needs review</Tag> : null}
         {c.source_url ? <ArticleLink href={c.source_url} label="Open the source page in a new tab" /> : null}
@@ -34,7 +35,7 @@ function CellView({ c }: { c: Cell }) {
           {c.change.status === "awaiting_review" ? (
             <> · <Link href="/review?reason=changed_cell" className="text-jgreen-d hover:underline">awaiting review</Link></>
           ) : <span className="text-mute"> · {c.change.status.replace(/_/g, " ")}</span>}
-          <div className="text-mute">Was: {c.change.old_value || "—"}</div>
+          <div className="text-mute">Was: {displayValue(axis, c.change.old_value) || "—"}</div>
         </div>
       ) : null}
     </div>
@@ -51,7 +52,7 @@ function HistoryRows({ who, axis, name }: { who: string; axis: string; name: str
         {(d) => d.items.map((h, i) => (
           <div key={i} className="border-t border-line py-1 text-xs first:border-t-0">
             <span className="text-mute">{fmtDate(h.as_of, true)} · {h.event}</span>
-            <div>{h.value || <i className="text-mute">empty</i>}</div>
+            <div>{displayValue(axis, h.value) || <i className="text-mute">empty</i>}</div>
           </div>
         ))}
       </Async>
@@ -64,7 +65,8 @@ export function HeadToHead({ competitor, name, axes }: { competitor: string; nam
   const td = "border-b border-line px-2.5 py-2.5 align-top";
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-collapse">
+      <UnverifiedNote className="mb-3" />
+      <table className="w-full min-w-[45rem] border-collapse">
         <thead>
           <tr>
             {["Axis", "JFrog", name, ""].map((h, i) => (
@@ -78,10 +80,10 @@ export function HeadToHead({ competitor, name, axes }: { competitor: string; nam
               <tr className={cn(a.changed && "bg-[#fff7e6]")}>
                 <td className={`${td} w-[9rem] font-semibold`}>
                   {a.label}
-                  {a.changed ? <div className="text-[11px] font-normal text-[#8a5a00]">changed this week</div> : null}
+                  {a.changed ? <div className="text-[0.6875rem] font-normal text-[#8a5a00]">changed this week</div> : null}
                 </td>
-                <td className={`${td} w-[40%]`}><CellView c={a.jfrog} /></td>
-                <td className={`${td} w-[40%]`}><CellView c={a.competitor} /></td>
+                <td className={`${td} w-[40%]`}><CellView c={a.jfrog} axis={a.axis} /></td>
+                <td className={`${td} w-[40%]`}><CellView c={a.competitor} axis={a.axis} /></td>
                 <td className={`${td} w-[5rem]`}>
                   <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" aria-expanded={open === a.axis}
                     onClick={() => setOpen(open === a.axis ? null : a.axis)}>

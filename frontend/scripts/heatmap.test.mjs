@@ -1,4 +1,4 @@
-// npm test: "Where competitors are active" (src/lib/heatmap.ts, components/competitors/Heatmap.tsx).
+// npm test: "Cleared items by category", formerly "Where competitors are active" (src/lib/heatmap.ts, components/competitors/Heatmap.tsx).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -75,8 +75,8 @@ const comp = readFileSync(new URL("../src/components/competitors/Heatmap.tsx", i
 const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
 
 test("title, caption, legend with the scale; directly under the matrix", () => {
-  assert.match(comp, /<Panel title="Where competitors are active" info=/);
-  assert.match(comp, /HEATMAP_CAPTION = "Published items found in the last 7 days, by category\."/);
+  assert.match(comp, /<Panel title="Cleared items by category" info=/);
+  assert.match(comp, /HEATMAP_CAPTION = "By category, in the same week as the cards below\."/);
   assert.match(comp, /legendSteps\(hm\.max\)/);
   assert.match(page, /<CapabilityMatrix \/>\s*<ActivityHeatmap \/>/);
 });
@@ -89,7 +89,7 @@ test("columns: the six tracked competitors with avatars, as the matrix; rows: th
 
 test("a click lists the cell's items; the title opens the drawer", () => {
   assert.match(comp, /onClick=\{\(\) => setSel/);
-  assert.match(comp, /<ItemTitle title=\{r\.title\} url=\{r\.url\} onOpen=\{\(\) => drawer\.open\(r\.item_id!\)\} \/>/);
+  assert.match(comp, /<ItemTitle title=\{r\.title\} url=\{r\.url\} publisher=\{r\.publisher\} onOpen=\{\(\) => drawer\.open\(r\.item_id!\)\} \/>/);
 });
 
 test("no gap, threat, ahead or behind", () => {
@@ -104,11 +104,11 @@ test("the heatmap ends where the competitor cards end (the latest Brief's run), 
   assert.doesNotMatch(comp + readFileSync(new URL("../src/lib/heatmap.ts", import.meta.url), "utf8"), /new Date\(\)|Date\.now\(\)/);
 });
 
-test("the heatmap counts as the cards and says so; a Total row per column; the totals line matches the cards' header", () => {
-  assert.match(comp, /HEATMAP_COUNTS = "Published articles, counted as on the competitor cards: by the date they were found, in the last 7 days\. Items awaiting review are not in this grid; each card shows them\.";/);
-  assert.match(comp, /<Panel title="Where competitors are active" info=\{HEATMAP_COUNTS\}>/);
-  assert.match(comp, /Total \(as on the card\)<\/th>[\s\S]*?\{hm\.colTotals\[k\]\}/);
-  assert.match(comp, /\{hm\.published\}<\/b> published[\s\S]*?the same as the cards below/);
+test("the heatmap counts as the cards and says so; no Total row (D86: the card shows it); the totals line matches the cards' header", () => {
+  assert.match(comp, /HEATMAP_COUNTS = "Cleared items \(passed routing, or approved by an analyst\), counted as on the competitor cards: by the date collected, in the same week\. Items awaiting review are not in this grid; each card shows them\.";/);
+  assert.match(comp, /<Panel title="Cleared items by category" info=\{HEATMAP_COUNTS\}>/);
+  assert.doesNotMatch(comp, /Total \(as on the card\)|data-total-row|hm\.colTotals/);
+  assert.match(comp, /\{hm\.published\}<\/b> cleared[\s\S]*?the same as the cards below/);
 });
 test("1 Nov demo: every column total equals its card's number", () => {
   // GET /competitors items_7d on the 1 Nov snapshot; checked live against the heatmap: all equal, 127 in all
@@ -116,7 +116,9 @@ test("1 Nov demo: every column total equals its card's number", () => {
   assert.equal(Object.values(cards).reduce((a, b) => a + b, 0), 127);
 });
 
-test("the cards' number uses the heatmap caption's wording", () => {
+test("D89: no \"published items found\" and no \"last 7 days\" label on the Competitors view", () => {
   const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
-  assert.match(parts, /\{c\.items_7d\}<\/b>\s*<span className="text-mute">published items found in the last 7 days · /);
+  assert.match(parts, /\{c\.items_7d\}<\/b>\s*<span className="text-mute">· \{c\.items_today\} in this Brief<\/span>/);
+  const visible = (s) => s.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "");
+  for (const s of [parts, comp, page]) assert.doesNotMatch(visible(s), /published items found|last 7 days/i);
 });

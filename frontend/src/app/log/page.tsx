@@ -10,7 +10,9 @@ import { useItemDrawer } from "@/components/ItemDrawer";
 import { ReopenButton } from "@/components/review/actions";
 import { path, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
-import { DISMISS_LABEL, STAGE_LABEL, STATUS_COLOR, STATUS_LABEL, fmtDate, label } from "@/lib/format";
+import { COLLECTED_TIP, DISMISS_LABEL, routeReasonWords, STAGE_LABEL, STATUS_COLOR, STATUS_LABEL, fmtDate, label } from "@/lib/format";
+
+const CLEARED_STATUS_TIP = "Cleared: passed routing, or approved by an analyst.";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { Log, LogRow } from "@/lib/types";
@@ -72,7 +74,7 @@ function LogScreen() {
                     options={(meta?.statuses ?? STATUS_ORDER).map((s) => ({ value: s, label: label(STATUS_LABEL, s) }))} />
                   <input type="date" aria-label="Date" min="2000-01-01" max="2099-12-31" value={date}
                     onChange={(e) => e.target.validity.valid && set({ date: e.target.value || null, offset: null })}
-                    className="h-8 rounded border border-input bg-white px-2.5 text-[13px]" />
+                    className="h-8 rounded border border-input bg-white px-2.5 text-[0.8125rem]" />
                   <Button variant="outline" size="sm" className="h-8 text-xs" disabled={!filtered}
                     onClick={() => set({ competitor: null, category: null, status: null, date: null, offset: null })}>Reset</Button>
                   <span className="text-xs text-mute">{d.total} of {collected} items</span>
@@ -82,8 +84,8 @@ function LogScreen() {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr>
-                          {["Date", "Competitor", "Title", "Category", "Score", "Status", "Stopped at", "Reason"].map((h) => (
-                            <th key={h} className="sticky top-0 z-10 border-b border-line bg-white px-2.5 py-2 text-left text-xs font-semibold text-mute">{h}</th>
+                          {["Collected", "Competitor", "Title", "Category", "Score", "Status", "Stopped at", "Reason"].map((h) => (
+                            <th key={h} title={h === "Collected" ? COLLECTED_TIP : h === "Status" ? CLEARED_STATUS_TIP : undefined} className="sticky top-0 z-10 border-b border-line bg-white px-2.5 py-2 text-left text-xs font-semibold text-mute">{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -112,13 +114,13 @@ function LogScreen() {
 function LogTr({ r }: { r: LogRow }) {
   const drawer = useItemDrawer();
   const dropped = r.status === "dropped";
-  const td = "border-b border-line px-2.5 py-[9px] align-top";
+  const td = "border-b border-line px-2.5 py-[0.5625rem] align-top";
   return (
     <tr>
       <td className={`${td} whitespace-nowrap`}>{fmtDate(r.collected_at)}</td>
       <td className={`${td} whitespace-nowrap`}>{r.competitor ? <CompetitorLabel k={r.competitor} /> : "—"}</td>
       <td className={td}>
-        <ItemTitle title={r.title} url={r.url} onOpen={dropped || !r.item_id ? undefined : () => drawer.open(r.item_id!)} />
+        <ItemTitle title={r.title} url={r.url} publisher={r.publisher} onOpen={dropped || !r.item_id ? undefined : () => drawer.open(r.item_id!)} />
         {dropped && r.duplicate_of ? (
           <button type="button" className="ml-1 text-xs text-mute hover:text-jgreen-d" onClick={() => drawer.open(r.duplicate_of!)}>· kept item</button>
         ) : null}
@@ -128,7 +130,7 @@ function LogTr({ r }: { r: LogRow }) {
       <td className={td}><StatusDot status={r.status} /></td>
       <td className={`${td} whitespace-nowrap`}>{label(STAGE_LABEL, r.stage)}</td>
       <td className={`${td} text-mute`}>
-        {r.dismiss_reason ? `Dismissed: ${label(DISMISS_LABEL, r.dismiss_reason)}` : r.reason || "—"}
+        {r.dismiss_reason ? `Dismissed: ${label(DISMISS_LABEL, r.dismiss_reason)}` : routeReasonWords(r.reason) || "—"}
         {r.status === "dismissed" && r.item_id ? <div className="mt-1"><ReopenButton itemId={r.item_id} title={r.title} /></div> : null}
       </td>
     </tr>

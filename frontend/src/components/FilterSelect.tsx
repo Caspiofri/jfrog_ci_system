@@ -14,7 +14,7 @@ export function FilterSelect({ value, onChange, allLabel, options, ariaLabel, cl
 }) {
   return (
     <Select value={value || ALL} onValueChange={(v) => onChange(v === ALL ? "" : v)}>
-      <SelectTrigger aria-label={ariaLabel} size="sm" className={className ?? "h-8 min-w-[10rem] bg-white text-[13px]"}>
+      <SelectTrigger aria-label={ariaLabel} size="sm" className={className ?? "h-8 min-w-[10rem] bg-white text-[0.8125rem]"}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

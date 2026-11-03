@@ -11,7 +11,7 @@ const ci = read("components/ci.tsx");
 test("Review rows and Brief cards open the item's drawer on click; the title stays a button for the keyboard", () => {
   for (const [name, src, v] of [["ItemRow", row, "item"], ["BriefCard", card, "item"]]) {
     assert.match(src, new RegExp(`onClick=\\{\\(e\\) => openFromRow\\(e, \\(\\) => drawer\\.open\\(${v}\\.item_id\\)\\)\\}`), name);
-    assert.match(src, /<ItemTitle title=\{item\.title\} url=\{item\.url\} onOpen=\{\(\) => drawer\.open\(item\.item_id\)\}/, name);
+    assert.match(src, /<ItemTitle title=\{item\.title\} url=\{item\.url\} publisher=\{item\.publisher\} onOpen=\{\(\) => drawer\.open\(item\.item_id\)\}/, name);
   }
   assert.match(read("app/review/page.tsx"), /<ItemRow\b/);
   assert.match(read("app/brief/page.tsx"), /<BriefCard\b/);

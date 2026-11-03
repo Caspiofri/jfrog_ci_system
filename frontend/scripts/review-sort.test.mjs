@@ -34,14 +34,14 @@ test("sorting never changes the input array", () => {
 
 test("the line under the filters states the order shown", () => {
   assert.match(SORT_LINES[""], /^Sorted as the API returns them/);
-  assert.match(SORT_LINES.newest, /newest feed date first/i);
-  assert.match(SORT_LINES.oldest, /oldest feed date first/i);
+  assert.match(SORT_LINES.newest, /newest article date first/i);
+  assert.match(SORT_LINES.oldest, /oldest article date first/i);
   for (const k of ["newest", "oldest"]) assert.match(SORT_LINES[k], /changed head-to-head cells first/i);
 });
 
 test("the page sorts after filtering, over the whole queue, and shows the matching line", () => {
   const src = readFileSync(new URL("../src/app/review/page.tsx", import.meta.url), "utf8");
-  assert.match(src, /sortQueue\(filterQueue\(r\.items, local\), sort\)/);
+  assert.match(src, /sortQueue\(filterQueue\(base, local\), sort\)/); // base: the queue, or the decided view (D91)
   assert.match(src, /SORT_LINES\[sort\]/);
   assert.match(src, /ariaLabel="Sort"/);
   assert.match(src, /getWholeQueue/);

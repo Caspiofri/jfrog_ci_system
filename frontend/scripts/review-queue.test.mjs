@@ -99,6 +99,6 @@ test("the whole queue is fetched: offsets after the first page", () => {
 });
 
 test("the sort line states the API's order", () => {
-  assert.match(SORT_ORDER_LINE, /changed head-to-head cells first.*held at every level.*score from high to low.*oldest discovered first/);
+  assert.match(SORT_ORDER_LINE, /changed head-to-head cells first.*held at every level.*score from high to low.*oldest collected first/);
   assert.doesNotMatch(SORT_ORDER_LINE, /\bD\d+\b/);
 });

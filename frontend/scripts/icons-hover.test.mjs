@@ -36,5 +36,5 @@ test("the title hover is reachable by keyboard", () => {
 });
 
 test("the Brief's window range is still available, on the date", () => {
-  assert.match(brief, /<Hint text=\{brief\.data\?\.window \? \(backfill[\s\S]*?Everything discovered from/);
+  assert.match(brief, /<Hint text=\{brief\.data\?\.window \? \(backfill[\s\S]*?Everything collected from/);
 });

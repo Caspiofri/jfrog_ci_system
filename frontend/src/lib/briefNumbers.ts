@@ -53,14 +53,14 @@ const num = (v: unknown): v is number => typeof v === "number";
 export function funnelLine(run: RunCounts, s: BriefSummary): string {
   let outcome: string;
   if (num(run.published) && num(run.held)) {
-    outcome = `${run.published} published · ${run.held} need review at the end of the run`;
+    outcome = `${run.published} cleared · ${run.held} need review at the end of the run`;
     if (num(run.after?.published) && num(run.after?.held)) {
-      outcome += ` · now ${run.after.published} published · ${run.after.held} need review after analyst actions`;
+      outcome += ` · now ${run.after.published} cleared · ${run.after.held} need review after analyst actions`;
     }
   } else if (run.published === null || run.held === null || run.reconstructedLabel) {
-    outcome = "published and need review not recorded for this run";
+    outcome = "cleared and need review not recorded for this run";
   } else {
-    outcome = `${s.published} published · ${s.held} need review`; // a row from before routing counts were kept
+    outcome = `${s.published} cleared · ${s.held} need review`; // a row from before routing counts were kept
   }
   const steps = [
     num(run.collected) ? `${run.collected} fetched` : null,
@@ -85,16 +85,16 @@ export function todayTiles(s: BriefSummary, run: RunCounts | null | undefined): 
       hint: fresh == null || !run ? NO_RUN_METRICS : funnelLine(run, s),
     },
     {
-      key: "published", label: "Published", value: s.published,
-      hint: `Items in this Brief: published and scored ${s.brief_min_score} or higher, automatically or after an analyst approved them.`,
+      key: "published", label: "Cleared", value: s.published,
+      hint: `Items in this Brief: cleared (passed routing, or approved by an analyst) and scored ${s.brief_min_score} or higher.`,
     },
     {
       key: "high", label: "High score (4+)", value: s.published_high,
-      hint: "Of the published items, those scored 4 (material change) or 5 (strategic move).",
+      hint: "Of the cleared items, those scored 4 (material change) or 5 (strategic move).",
     },
     {
       key: "review", label: "Needs review", value: s.held,
-      hint: `Found in this window and held at ${level} for an analyst; not verified, so not in the Brief yet. ${s.held_high} preliminarily scored 4–5${unscored ? `, ${unscored} not scored (a model failure)` : ""}.`,
+      hint: `Found in this window and held at ${level} for an analyst; not cleared yet, so not in the Brief. ${s.held_high} preliminarily scored 4–5${unscored ? `, ${unscored} not scored (a model failure)` : ""}.`,
     },
   ];
 }

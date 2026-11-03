@@ -36,7 +36,7 @@ test("the chip's hover uses the snippet when found, else the excerpt sentence as
 
 test("drawer shows the section; cards and rows pass the mention to the chip", () => {
   const drawer = read("../src/components/ItemDrawer.tsx");
-  assert.match(drawer, /<ArticleExcerpt excerpt=\{it\.excerpt\} url=\{it\.url\} \/>\s*<JfrogMentionSection mention=\{it\.jfrog_mention\} \/>/);
+  assert.match(drawer, /<ArticleExcerpt excerpt=\{it\.excerpt\} url=\{it\.url\} publisher=\{it\.publisher\} \/>\s*<JfrogMentionSection mention=\{it\.jfrog_mention\} \/>/);
   for (const p of ["../src/components/brief/BriefCard.tsx", "../src/components/ItemRow.tsx"]) {
     assert.match(read(p), /<MentionsJfrog excerpt=\{item\.excerpt\} mention=\{item\.jfrog_mention\} \/>/, p);
   }

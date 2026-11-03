@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ApiError } from "@/lib/api";
-import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, label, safeHref } from "@/lib/format";
+import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, UNVERIFIED_VALUES, CLEARED_TIP, label, publisherName, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** A small (i) that explains on hover and keyboard focus: long explanations live here, not on screen. */
@@ -31,7 +31,7 @@ export function PageHead({ title, sub, tools, info, icon, titleHint }: {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2.5">
       <div>
-        <h1 className="m-0 flex items-center gap-1.5 text-[22px] font-semibold">
+        <h1 className="m-0 flex items-center gap-1.5 text-[1.375rem] font-semibold">
           {icon}
           {titleHint ? <Hint text={titleHint}>{title}</Hint> : title}
           <InfoHint text={info} />
@@ -44,11 +44,21 @@ export function PageHead({ title, sub, tools, info, icon, titleHint }: {
 }
 
 /** A white card with a question as its title (prototype .card / .ct). */
+/** D88: the AI-extracted values are unverified; always visible, never only on hover. */
+export function UnverifiedNote({ className }: { className?: string }) {
+  return (
+    <p className={cn("m-0 flex items-start gap-1.5 rounded border border-[#f3d9a4] bg-[#fffaf0] px-2.5 py-1.5 text-xs text-[#5c4300]", className)} data-unverified>
+      <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+      <span>{UNVERIFIED_VALUES}</span>
+    </p>
+  );
+}
+
 export function Panel({ title, cap, children, className, right, big, info }: {
   title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean; info?: ReactNode;
 }) {
   return (
-    <section className={cn("min-w-0 rounded-md border border-line bg-card px-[18px] py-4", className)}>
+    <section className={cn("min-w-0 rounded-md border border-line bg-card px-[1.125rem] py-4", className)}>
       {title || cap || right ? (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           {title ? <h2 className={cn("m-0 flex items-center gap-1.5 font-semibold", big ? "text-lg" : "text-sm")}>{title}<InfoHint text={info} /></h2> : <span />}
@@ -68,7 +78,7 @@ export function ScoreBadge({ score, noise, title }: { score: number | null; nois
   const [bg, fg] = SCORE_COLOR[n] ?? SCORE_COLOR[0];
   return (
     <span
-      className="inline-flex h-6 min-w-[26px] shrink-0 items-center justify-center rounded px-[7px] text-xs font-semibold tabular-nums"
+      className="inline-flex h-6 min-w-[1.625rem] shrink-0 items-center justify-center rounded px-[0.4375rem] text-xs font-semibold tabular-nums"
       style={{ background: bg, color: fg }}
       title={title ?? (noise ? "Noise" : score ? `Importance ${score} of 5` : "No score")}
     >
@@ -79,7 +89,7 @@ export function ScoreBadge({ score, noise, title }: { score: number | null; nois
 
 export function StatusDot({ status }: { status: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs" title={status === "auto_published" || status === "approved" ? CLEARED_TIP : undefined}>
       <i className="inline-block size-2 rounded-full" style={{ background: STATUS_COLOR[status] ?? "#cbd3df" }} />
       {label(STATUS_LABEL, status)}
     </span>
@@ -123,12 +133,12 @@ export function ColorLegend({ title, items, className }: {
 }) {
   if (!items.length) return null;
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mute", className)} data-legend>
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6875rem] text-mute", className)} data-legend>
       {title ? <span className="font-semibold">{title}</span> : null}
       {items.map((it, i) => (
         <span key={i} className="inline-flex items-center gap-1">
           {it.text ? (
-            <i className="inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-[3px] px-0.5 text-[9px] font-semibold not-italic tabular-nums"
+            <i className="inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-[3px] px-0.5 text-[0.5625rem] font-semibold not-italic tabular-nums"
               style={{ background: it.color, color: it.fg }}>{it.text}</i>
           ) : (
             <i className="inline-block size-2.5 rounded-sm ring-1 ring-black/10" style={{ background: it.color }} aria-hidden />
@@ -175,42 +185,49 @@ export function CategoryColours({ className }: { className?: string }) {
 
 /** "n=12" next to every eval number and every measured count. */
 export function N({ n }: { n: number | null | undefined }) {
-  return <span className="ml-1 text-[11px] font-normal text-mute tabular-nums">n={n ?? "?"}</span>;
+  return <span className="ml-1 text-[0.6875rem] font-normal text-mute tabular-nums">n={n ?? "?"}</span>;
 }
 
 /** External links only open http(s) URLs (D32); safeHref turns anything else into no link. */
 export const ARTICLE_LINK_LABEL = "Open the original article in a new tab";
 
-/** The one external-link style: "Source" with the external-link icon (box with arrow), opening the original page in
- *  a new tab. Nothing when the URL isn't http(s). */
-export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className, iconOnly = false }: {
-  href: string | null | undefined; label?: string; className?: string; iconOnly?: boolean;
+/** The one external-link style: the publisher's name (D90; the article's domain for an aggregator or a missing
+ *  publisher; "Source" only when there is neither) with the external-link icon (box with arrow), opening the original
+ *  page in a new tab. A long name is cut to one line, the full name on hover. Nothing when the URL isn't http(s).
+ *  `publisher` is only for an article link: a tracked or source page keeps "Source". */
+export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className, iconOnly = false, publisher }: {
+  href: string | null | undefined; label?: string; className?: string; iconOnly?: boolean; publisher?: string | null;
 }) {
   const safe = safeHref(href);
   if (!safe) return null;
+  const name = publisher !== undefined ? publisherName(publisher, safe) : null;
+  const text = name ?? "Source";
   return (
-    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={aria} title={iconOnly ? "Source" : aria}
-      onClick={(e) => e.stopPropagation()}
-      className={cn("inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[11px] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
-      {iconOnly ? null : "Source"}<ExternalLink className={iconOnly ? "size-3.5" : "size-3"} aria-hidden="true" />
+    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={name ? `${aria}: ${name}` : aria}
+      title={name ? `${name} · ${aria}` : iconOnly ? "Source" : aria}
+      onClick={(e) => e.stopPropagation()} data-publisher={name ?? undefined}
+      className={cn("inline-flex min-w-0 shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[0.6875rem] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
+      {iconOnly ? null : <span className={name ? "max-w-[14rem] truncate" : undefined}>{text}</span>}
+      <ExternalLink className={cn("shrink-0", iconOnly ? "size-3.5" : "size-3")} aria-hidden="true" />
     </a>
   );
 }
 
-/** The one link convention for an item: the title opens the side drawer, "Source" opens the original article. */
-export function ItemTitle({ title, url, onOpen, className }: {
-  title: string; url?: string | null; onOpen?: () => void; className?: string;
+/** The one link convention for an item: the title opens the side drawer, the publisher's name opens the original
+ *  article (D90). */
+export function ItemTitle({ title, url, onOpen, className, publisher }: {
+  title: string; url?: string | null; onOpen?: () => void; className?: string; publisher?: string | null;
 }) {
   const text = title || "(no title)";
   return (
-    <span className="inline-flex min-w-0 items-start gap-1">
+    <span className="inline-flex min-w-0 flex-wrap items-start gap-x-1">
       {onOpen ? (
         <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }} title="Open the details"
           className={cn("min-w-0 text-left hover:text-jgreen-d hover:underline", className)}>{text}</button>
       ) : (
         <span className={cn("min-w-0", className)}>{text}</span>
       )}
-      <ArticleLink href={url} className="mt-0.5" />
+      <ArticleLink href={url} className="mt-0.5" publisher={publisher} />
     </span>
   );
 }
@@ -282,7 +299,7 @@ export function HBars({ rows, color = "var(--bar)", max: fixedMax }: { rows: { l
   return (
     <div>
       {rows.map((r) => (
-        <div key={r.label} className="grid grid-cols-[8.5rem_minmax(0,1fr)_2.4rem] items-center gap-2.5 py-[5px]" title={r.title}>
+        <div key={r.label} className="grid grid-cols-[8.5rem_minmax(0,1fr)_2.4rem] items-center gap-2.5 py-[0.3125rem]" title={r.title}>
           <span className="truncate">{r.label}</span>
           <div className="h-2.5 overflow-hidden rounded-sm bg-track">
             <i className="block h-full rounded-sm" style={{ width: `${(100 * r.value) / max}%`, background: r.color ?? color }} />
@@ -297,11 +314,11 @@ export function HBars({ rows, color = "var(--bar)", max: fixedMax }: { rows: { l
 /** The 4 KPI tiles. */
 export function KpiTile({ value, label: l, sub, future = false }: { value: ReactNode; label: string; sub?: ReactNode; future?: boolean }) {
   return (
-    <div className={cn("rounded-md border border-line bg-card px-[18px] py-4", future && "border-dashed opacity-70")} data-future={future ? "1" : undefined}>
-      <div className="text-[30px] font-semibold leading-[1.1] tabular-nums">{value}</div>
+    <div className={cn("rounded-md border border-line bg-card px-[1.125rem] py-4", future && "border-dashed opacity-70")} data-future={future ? "1" : undefined}>
+      <div className="text-[1.875rem] font-semibold leading-[1.1] tabular-nums">{value}</div>
       <div className="mt-1 flex items-center gap-1.5 text-mute">
         {l}
-        {future ? <Tag className="bg-[#e8eefb] text-[10px] font-semibold uppercase tracking-wide text-[#3f5b8f]">Future</Tag> : null}
+        {future ? <Tag className="bg-[#e8eefb] text-[0.625rem] font-semibold uppercase tracking-wide text-[#3f5b8f]">Future</Tag> : null}
       </div>
       {sub ? <div className="mt-1.5 text-xs">{sub}</div> : null}
     </div>

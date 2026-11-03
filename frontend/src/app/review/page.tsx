@@ -10,16 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArticleLink, Async, ColourLegends, Empty, ErrorNote, HBars, Hint, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
 import { Donut } from "@/components/Donut";
-import { FilterSelect } from "@/components/FilterSelect";
+import { FilterChip, SortControl, StatusControl } from "@/components/review/FilterBar";
 import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
-import { SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, filterQueue, hasLocalFilters, queueQuery, remainingOffsets, sortQueue, windowOptions, type QueueSort } from "@/lib/reviewQueue";
-import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
+import { DECIDED_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, decisionOptions, filterQueue, hasLocalFilters, inQueueScope, queueQuery, remainingOffsets, sortQueue, windowOptions, type DecisionView, type QueueSort } from "@/lib/reviewQueue";
+import { HOLD_LABEL, LEVEL_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
-import type { HoldReason, Level, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
+import type { HoldReason, ItemDetail, Level, Log, LogRow, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
 import { alwaysReviewedHint, holdChip } from "@/lib/holdReasons";
 import { HOLD_RULES, HOLD_RULES_INTRO } from "@/lib/holdRulesText";
 import { cn } from "@/lib/utils";
@@ -48,6 +48,17 @@ async function getWholeQueue(url: string): Promise<Review> {
   return { ...first, items: [...first.items, ...pages.flatMap((p) => p.items)] };
 }
 
+/** D91: every decided item (approved, dismissed, flagged) from GET /log, all pages, then each item's record
+ *  (GET /items/{id}, the drawer's own) so the queue's search, filters and sort apply to it unchanged. */
+async function getDecided(url: string): Promise<ReviewItemRow[]> {
+  const first = await get<Log>(url);
+  const rest = remainingOffsets(first.total, first.items.length);
+  const pages = await Promise.all(rest.map((o) => get<Log>(url.replace(/([?&])offset=0\b/, `$1offset=${o}`))));
+  const ids = decidedIds([...first.items, ...pages.flatMap((p) => p.items)] as LogRow[]);
+  const items = await Promise.all(ids.map((id) => get<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`)));
+  return items.map((d) => ({ kind: "item" as const, item: d.item, held_since: d.item.discovered_at, trust_source: null }));
+}
+
 function ReviewScreen() {
   const { get: param, set } = useUrlState();
   const { data: meta } = useMeta();
@@ -57,6 +68,9 @@ function ReviewScreen() {
   const brief = param("brief");
   const score = param("score");
   const category = param("category");
+  const viewParam = param("decision");
+  const view: DecisionView = viewParam === "approved" || viewParam === "dismissed" || viewParam === "all" ? viewParam : "";
+  const VIEW_NAME: Record<DecisionView, string> = { "": "Needs decision", approved: "Approved", dismissed: "Dismissed", all: "All" };
   const sortParam = param("sort");
   const sort: QueueSort = sortParam === "newest" || sortParam === "oldest" ? sortParam : "";
   const offset = Number(param("offset") || 0);
@@ -70,6 +84,8 @@ function ReviewScreen() {
   const q = useSWR<Review, ApiError>(path("/review", queueQuery({ level: preview, reason, competitor, brief })), getWholeQueue,
     { revalidateOnFocus: false, keepPreviousData: true });
   const briefs = useApi<Page<{ date: string }>>(path("/briefs", { limit: 200 }));
+  const decided = useSWR<ReviewItemRow[], ApiError>(path("/log", { status: DECIDED_STATUSES, competitor, limit: 200, offset: 0 }), getDecided,
+    { revalidateOnFocus: false, keepPreviousData: true });
   const current = meta?.level;
   const shown = q.data?.level;
   const previewing = Boolean(preview && current && preview !== current);
@@ -85,8 +101,23 @@ function ReviewScreen() {
       <Async {...q} retry={() => q.mutate()} rows={6}>
         {(r) => {
           const lv = r.levels.find((x) => x.level === r.level);
-          const rows = sortQueue(filterQueue(r.items, local), sort);
+          // D91: decided items in the same scope as the API's queue (window, competitor, reason at this level)
+          const done = (decided.data ?? []).filter((x) => inQueueScope(x.item, { window: r.scope?.window, reason, level: r.level }));
+          const byStatus = (st: string) => done.filter((x) => x.item.status === st);
+          const needs = r.items.length; // what the default lists: held items, plus changed cells outside a Brief window
+          const counts = { needs, approved: byStatus("approved").length, dismissed: byStatus("dismissed").length, all: needs + done.length };
+          // Dismissed is offered when the data carries dismissed items (or the URL asks for it, so the selector is never blank)
+          const viewOptions = decisionOptions(counts, view === "dismissed" || (decided.data ?? []).some((x) => x.item.status === "dismissed"));
+          const base: (ReviewItemRow | ReviewChangeRow)[] = view === "" ? r.items : view === "all" ? [...r.items, ...done] : byStatus(view);
+          const rows = sortQueue(filterQueue(base, local), sort);
           const filtered = hasLocalFilters(local) || reason || competitor || brief;
+          const anyFilter = Boolean(brief || score || category || competitor || reason);
+          // the header count: "110 of 110 held at Strict", or "Showing 14 of 110 held at Strict" with a filter or search;
+          // the whole is the unfiltered queue at this level (backlog_total), never a typed number
+          const lvName = label(LEVEL_LABEL, r.level);
+          const whole = view === "" ? (filtered ? r.backlog_total ?? r.total : r.total) : (filtered ? counts[view === "all" ? "all" : view] : base.length);
+          const what = view === "" ? `held at ${lvName}` : `· ${VIEW_NAME[view]}`;
+          const countLine = `${filtered ? "Showing " : ""}${rows.length} of ${whole} ${what}`;
           const pageRows = rows.slice(offset, offset + PAGE);
           return (
             <>
@@ -98,7 +129,7 @@ function ReviewScreen() {
                   {lv ? (
                     <Donut center={lv.held} caption="held" parts={[
                       { label: "Held for review", value: lv.held, color: "#f59e0b" },
-                      { label: "Published", value: lv.published, color: "#41be57" },
+                      { label: "Cleared", value: lv.published, color: "#41be57" },
                     ]} />
                   ) : <Empty>No counts.</Empty>}
                 </Panel>
@@ -127,33 +158,45 @@ function ReviewScreen() {
               <Panel
                 title="What needs my decision?"
                 info={<HoldRulesInfo />}
-                cap={`${rows.length} of ${r.total} held at ${label(LEVEL_LABEL, r.level)}${reason ? ` for ${label(HOLD_LABEL, reason)}` : ""}`}
+                cap={<span data-queue-count>{countLine}</span>}
               >
-                <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                  <label className="relative min-w-[16rem] flex-1">
+                {/* row 1, what is shown: status, search, sort */}
+                <div className="mb-2 flex flex-wrap items-center gap-2" data-filter-row="shown">
+                  <StatusControl ariaLabel="Decision" value={view} onChange={(v) => set({ decision: v || null, offset: null })} options={viewOptions} />
+                  <label className="relative min-w-[14rem] flex-1">
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-mute" />
                     <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search held items"
-                      placeholder="Search by item id, title or publisher"
-                      className="h-8 w-full rounded-md border border-line bg-white pr-2.5 pl-8 text-[13px] outline-none focus:border-jgreen" />
+                      placeholder="Search id, title or publisher"
+                      className="h-8 w-full rounded-md border border-line bg-white pr-2.5 pl-8 text-[0.8125rem] outline-none focus:border-jgreen" />
                   </label>
-                  <FilterSelect ariaLabel="Sort" allLabel={SORT_OPTIONS[0].label} value={sort} onChange={(v) => set({ sort: v || null, offset: null })}
+                  <SortControl ariaLabel="Sort" allLabel={SORT_OPTIONS[0].label} value={sort} onChange={(v) => set({ sort: v || null, offset: null })}
                     options={SORT_OPTIONS.slice(1)} />
-                  <FilterSelect ariaLabel="Window" allLabel="All held items" value={brief} onChange={(v) => set({ brief: v, offset: null })}
-                    options={windows} className="h-8 min-w-[14rem] bg-white text-[13px]" />
-                  <FilterSelect ariaLabel="Score" allLabel="All scores" value={score} onChange={(v) => set({ score: v, offset: null })}
-                    options={SCORE_OPTIONS} />
-                  <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
+                </div>
+                {/* row 2, filter: chips that wrap together */}
+                <div className="mb-2.5 flex flex-wrap items-center gap-1.5" data-filter-row="filter">
+                  <span className="mr-0.5 text-xs text-mute">Filter</span>
+                  <FilterChip name="Brief day" ariaLabel="Window" allLabel="All held items" value={brief} onChange={(v) => set({ brief: v, offset: null })}
+                    options={windows} display={(o) => fmtDate(o.value)} />
+                  <FilterChip name="Score" ariaLabel="Score" allLabel="All scores" value={score} onChange={(v) => set({ score: v, offset: null })}
+                    options={SCORE_OPTIONS} display={(o) => o.label.replace(/^Score /, "")} />
+                  <FilterChip name="Category" ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
                     options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
-                  <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
+                  <FilterChip name="Competitor" ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
                     options={competitorFilterOptions(meta)} />
-                  <FilterSelect ariaLabel="Hold reason" allLabel="All reasons" value={reason} onChange={(v) => set({ reason: v, offset: null })}
+                  <FilterChip name="Hold reason" ariaLabel="Hold reason" allLabel="All reasons" value={reason} onChange={(v) => set({ reason: v, offset: null })}
                     options={(meta?.hold_reasons ?? []).map((c) => ({ value: c, label: label(HOLD_LABEL, c) }))} />
+                  {anyFilter ? (
+                    <button type="button" onClick={() => set({ brief: null, score: null, category: null, competitor: null, reason: null, offset: null })}
+                      className="ml-1 text-xs font-semibold text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen" data-clear-all>Clear all</button>
+                  ) : null}
                 </div>
                 <div className="mb-2 text-xs text-mute">{SORT_LINES[sort]}{brief ? " Changed cells belong to no Brief, so a Brief window lists items only." : ""}</div>
                 {previewing ? <div className="mb-2 text-xs text-mute">Actions are off while previewing another level.</div> : null}
                 {pageRows.length ? (
                   pageRows.map((row) =>
-                    row.kind === "item" ? (
+                    row.kind === "item" && row.item.status !== "awaiting_review" ? (
+                      <DecidedItem key={row.item.item_id} row={row} level={r.level} />
+                    ) : row.kind === "item" ? (
                       <QueueItem key={row.item.item_id} row={row} level={r.level} disabled={previewing} onTrusted={setTrustMsg} />
                     ) : (
                       <ChangeRow key={`c${row.change_id}`} row={row} disabled={previewing} />
@@ -166,7 +209,7 @@ function ReviewScreen() {
                     An item already approved or dismissed is no longer held: find it in the <Link href="/log" className="font-semibold text-jgreen-d hover:underline">Log</Link>.
                   </Empty>
                 ) : (
-                  <Empty>{`The queue is empty at ${label(LEVEL_LABEL, r.level)}.`}</Empty>
+                  <Empty>{view === "approved" || view === "dismissed" ? `No ${VIEW_NAME[view].toLowerCase()} items in this scope.` : `The queue is empty at ${label(LEVEL_LABEL, r.level)}.`}</Empty>
                 )}
                 {rows.length > PAGE ? (
                   <div className="mt-2.5 flex items-center justify-end gap-2">
@@ -196,11 +239,11 @@ function LevelControl({ levels, current, shown, onPreview }: {
             shown === l.level ? "border-jgreen bg-accent" : "border-line")}>
           <span className="flex flex-1 items-center gap-1.5">
             <span className="font-semibold">{label(LEVEL_LABEL, l.level)}</span>
-            {current === l.level ? <Tag className="bg-jgreen px-1.5 text-[11px] text-white">current</Tag> : null}
+            {current === l.level ? <Tag className="bg-jgreen px-1.5 text-[0.6875rem] text-white">current</Tag> : null}
           </span>
           <span className="text-right">
             <b className="text-lg font-semibold tabular-nums">{l.held}</b>
-            <span className="block text-[11px] text-mute">held</span>
+            <span className="block text-[0.6875rem] text-mute">held</span>
           </span>
         </button>
         </Hint>
@@ -236,7 +279,7 @@ function PreviewBar({ preview, current, onBack }: { preview: Level; current: Lev
           <DialogHeader>
             <DialogTitle>Change the autonomy level to {label(LEVEL_LABEL, preview)}?</DialogTitle>
             <DialogDescription>
-              Items held only for reasons that {label(LEVEL_LABEL, preview)} doesn&apos;t hold are published at once. Items an analyst already decided keep their decision.
+              Items held only for reasons that {label(LEVEL_LABEL, preview)} doesn&apos;t hold are cleared at once. Items an analyst already decided keep their decision.
             </DialogDescription>
           </DialogHeader>
           {err ? <ErrorNote error={err} /> : null}
@@ -256,8 +299,8 @@ function HoldRulesInfo() {
     <span className="block">
       <span className="mb-1.5 block">{HOLD_RULES_INTRO}</span>
       <span className="m-0 flex flex-col gap-0.5">
-        {HOLD_RULES.map(([k, v]) => (
-          <span key={k} className="block">• <b className="font-semibold">{k}:</b> {v}</span>
+        {HOLD_RULES.map(([code, v]) => (
+          <span key={code} className="block">• <b className="font-semibold">{label(HOLD_LABEL, code)}:</b> {v}</span>
         ))}
       </span>
     </span>
@@ -281,6 +324,17 @@ function ReasonChips({ reasons, level }: { reasons: HoldReason[]; level: Level }
         );
       })}
     </div>
+  );
+}
+
+/** D91: an approved, dismissed or flagged item under Approved, Dismissed or All: its status, no actions (nothing here
+ *  changes a decision; Reopen stays in the item's side panel). */
+function DecidedItem({ row, level }: { row: ReviewItemRow; level: Level }) {
+  const it = row.item;
+  return (
+    <ItemRow item={it} showBadge={false}
+      actions={<Tag className="text-xs font-semibold" data-decision={it.status}>{label(STATUS_LABEL, it.status)}</Tag>}
+      extra={<ReasonChips reasons={it.hold_reasons} level={level} />} />
   );
 }
 
@@ -333,7 +387,7 @@ function TrustButton({ host, fromItem, suggest, approved, dismissed, disabled, o
   return (
     <span className="inline-flex items-center gap-1.5">
       <span>· {host}: {approved} approved, {dismissed} dismissed</span>
-      <Button size="sm" variant="outline" className={cn("h-6 px-2 text-[11px]", suggest && "border-jgreen text-jgreen-d")} disabled={disabled || busy} onClick={trust}
+      <Button size="sm" variant="outline" className={cn("h-6 px-2 text-[0.6875rem]", suggest && "border-jgreen text-jgreen-d")} disabled={disabled || busy} onClick={trust}
         title="Add this host to the vetted list in the store; its items stop being held for an unvetted source">
         <ShieldCheck className="size-3" /> Trust this source{suggest ? " (suggested)" : ""}
       </Button>
@@ -394,7 +448,7 @@ function TrustedSources() {
             {(d) => d.items.map((s) => (
               <div key={s.host} className="flex items-center gap-2 border-t border-line py-1.5 first:border-t-0">
                 <span className="flex-1">{s.host} <span className="text-xs text-mute">{s.approved} approved · {s.held} held</span></span>
-                <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => act(() => send("POST", "/api/v1/sources/trust", { host: s.host }))}>
+                <Button size="sm" variant="outline" className="h-6 px-2 text-[0.6875rem]" onClick={() => act(() => send("POST", "/api/v1/sources/trust", { host: s.host }))}>
                   <ShieldCheck className="size-3" /> Trust
                 </Button>
               </div>
@@ -404,11 +458,11 @@ function TrustedSources() {
         <div>
           <h3 className="mb-1 text-xs font-semibold text-mute">Trusted from this screen</h3>
           <Async {...vetted} retry={() => vetted.mutate()} rows={2} isEmpty={() => !trusted.length}
-            empty="None yet. Hosts from config/vetted_sources.yaml are managed in the repo.">
+            empty="None yet. Vetted sources come from a list maintained by the project.">
             {() => trusted.map((s) => (
               <div key={s.host} className="flex items-center gap-2 border-t border-line py-1.5 first:border-t-0">
                 <span className="flex-1">{s.host}</span>
-                <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => act(() => send("DELETE", `/api/v1/sources/trust/${encodeURIComponent(s.host)}`))}>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-[0.6875rem]" onClick={() => act(() => send("DELETE", `/api/v1/sources/trust/${encodeURIComponent(s.host)}`))}>
                   <Undo2 className="size-3" /> Remove
                 </Button>
               </div>

@@ -9,7 +9,7 @@ export const SHOW_LABEL = "Show article excerpt";
 export const HIDE_LABEL = "Hide article excerpt";
 export const NO_EXCERPT = "Only the headline is available.";
 
-export function ArticleExcerpt({ excerpt, url }: { excerpt: string | null | undefined; url?: string | null }) {
+export function ArticleExcerpt({ excerpt, url, publisher }: { excerpt: string | null | undefined; url?: string | null; publisher?: string | null }) {
   const [open, setOpen] = useState(false); // collapsed by default
   return (
     <div className="flex flex-col gap-1" data-excerpt>
@@ -21,7 +21,7 @@ export function ArticleExcerpt({ excerpt, url }: { excerpt: string | null | unde
       {open ? (
         <div className="flex flex-col gap-1 rounded border border-line bg-page px-3 py-2">
           {excerpt?.trim() ? <p className="m-0 text-[#44516a]">{excerpt}</p> : <p className="m-0 text-xs italic text-mute">{NO_EXCERPT}</p>}
-          <ArticleLink href={url} label="Open the full article in a new tab" />
+          <ArticleLink href={url} label="Open the full article in a new tab" publisher={publisher ?? null} />
         </div>
       ) : null}
     </div>

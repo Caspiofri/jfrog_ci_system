@@ -165,7 +165,7 @@ test("vendor row: bold name beside every avatar (JFrog too), value ~70 character
   assert.match(comp, /NOT_STATED_LINE = "Their page says nothing:"/);
   assert.match(comp, /NOT_TRACKED_LINE = "Not tracked yet:"/);
   const ci = readFileSync(new URL("../src/components/ci.tsx", import.meta.url), "utf8");
-  assert.match(ci, /title=\{iconOnly \? "Source" : aria\}/);
+  assert.match(ci, /title=\{name \? `\$\{name\} · \$\{aria\}` : iconOnly \? "Source" : aria\}/);
 });
 
 test("JFrog row is the anchor: own-colour avatar, green tint and edge, then a 'Competitors' separator", async () => {

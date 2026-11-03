@@ -22,7 +22,7 @@ export function JfrogMentionSection({ mention }: { mention: JfrogMention | null 
           {sec.kind === "found" ? (
             <>
               <p className="m-0 text-[#44516a]">{sec.snippet}</p>
-              <p className="m-0 text-[11px] text-mute">{MENTION_NOTE}{sec.inTitle ? " Found in the title." : ""}</p>
+              <p className="m-0 text-[0.6875rem] text-mute">{MENTION_NOTE}{sec.inTitle ? " Found in the title." : ""}</p>
             </>
           ) : <p className="m-0 text-xs italic text-mute">{NOT_IN_STORED_TEXT}</p>}
         </div>

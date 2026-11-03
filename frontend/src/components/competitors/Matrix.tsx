@@ -5,7 +5,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, ChevronRight, Clock } from "lucide-react";
-import { ArticleLink, ErrorNote, Panel } from "@/components/ci";
+import { ArticleLink, ErrorNote, Panel, UnverifiedNote } from "@/components/ci";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -17,6 +17,8 @@ import type { CompetitorProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const CAPTION = "What was found on public pages, not a verdict.";
+/** D95: under the D88 caption, visible without hovering; the date is Ofri's hand check, as written. */
+export const HAND_CHECK_LINE = "Checked once by hand against the live pages on 3 Nov 2026. See the README for results.";
 export const MATRIX_INFO = "A direct comparison of JFrog's capabilities with each competitor's, one capability at a time, from each vendor's public pages.";
 export const NOT_STATED_LINE = "Their page says nothing:";
 export const NOT_TRACKED_LINE = "Not tracked yet:";
@@ -38,10 +40,10 @@ function VendorRow({ c, k, name, jfrog = false }: { c: MatrixCell; k: string; na
         {name}
       </span>
       <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} title={open ? "Show less" : "Show all"}
-        className={cn("min-w-0 max-w-[70ch] flex-1 text-left text-[13px] font-normal text-ink hover:text-jgreen-d", !open && "line-clamp-2")}>
+        className={cn("min-w-0 max-w-[70ch] flex-1 text-left text-[0.8125rem] font-normal text-ink hover:text-jgreen-d", !open && "line-clamp-2")}>
         <Emphasized text={c.full ?? ""} />
       </button>
-      <span className="flex shrink-0 items-center gap-2 text-[11px] text-mute sm:ml-auto sm:justify-end">
+      <span className="flex shrink-0 items-center gap-2 text-[0.6875rem] text-mute sm:ml-auto sm:justify-end">
         {c.stale ? (
           <span className="inline-flex items-center gap-1 text-[#8a5a00]" title={c.staleReason ?? undefined}>
             <Clock className="size-3" aria-hidden /> Stale{c.asOf ? ` · as of ${fmtDate(c.asOf, true)}` : ""}
@@ -81,7 +83,7 @@ function CapabilityBlock({ r, order, name, title = false }: { r: MatrixRow; orde
     <section className="min-w-0 rounded-md border border-line" data-capability={r.axis} aria-label={r.label}>
       {title ? <h3 className="m-0 border-b border-line px-3 py-2 text-sm font-semibold">{r.label} <span className="text-xs font-normal text-mute">{n} of {of} pages state something</span></h3> : null}
       <VendorRow c={v.jfrog} k="jfrog" name="JFrog" jfrog />
-      <div className="flex items-center gap-2 px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-mute" data-separator>
+      <div className="flex items-center gap-2 px-3 pt-2 pb-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-mute" data-separator>
         Competitors<span className="h-px flex-1 bg-line" aria-hidden />
       </div>
       {v.listed.map((k) => <VendorRow key={k} c={r.cells[k]} k={k} name={name(k)} />)}
@@ -115,6 +117,8 @@ export function CapabilityMatrix() {
           {all ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}{all ? "Show one capability" : "Expand all"}
         </button>
       ) : null}>
+      <UnverifiedNote />
+      <p className="m-0 mb-3 mt-1 text-xs text-[#5c4300]" data-hand-check>{HAND_CHECK_LINE}</p>
       {errors.length ? <div className="mb-2"><ErrorNote error={errors[0].error!} onRetry={() => errors.forEach((x) => x.mutate())} /></div> : null}
       {loading ? <div className="py-4 text-xs text-mute" role="status">Loading the head-to-head data…</div> : !rows.length ? (
         <div className="py-3 text-xs text-mute">No head-to-head data yet.</div>
@@ -126,7 +130,7 @@ export function CapabilityMatrix() {
         <div className="grid gap-3 md:grid-cols-[15rem_minmax(0,1fr)]">
           <label className="md:hidden">
             <span className="sr-only">Capability</span>
-            <select value={sel} onChange={(e) => setSel(Number(e.target.value))} className="h-9 w-full rounded-md border border-line bg-white px-2 text-[13px]">
+            <select value={sel} onChange={(e) => setSel(Number(e.target.value))} className="h-9 w-full rounded-md border border-line bg-white px-2 text-[0.8125rem]">
               {rows.map((r, i) => { const c = capabilityCount(r); return <option key={r.axis} value={i}>{r.label} · {c.n} of {c.of} pages state something</option>; })}
             </select>
           </label>
@@ -137,8 +141,8 @@ export function CapabilityMatrix() {
                 <button key={r.axis} type="button" role="tab" aria-selected={i === sel} onClick={() => setSel(i)}
                   className={cn("rounded border px-3 py-2 text-left transition-colors hover:border-jgreen",
                     i === sel ? "border-jgreen border-l-4 bg-[#eef7f0] text-ink" : "border-line text-mute")}>
-                  <span className={cn("block text-[13px]", i === sel ? "font-bold" : "font-medium")}>{r.label}</span>
-                  <span className="block text-[11px] text-mute">{c.n} of {c.of} pages state something</span>
+                  <span className={cn("block text-[0.8125rem]", i === sel ? "font-bold" : "font-medium")}>{r.label}</span>
+                  <span className="block text-[0.6875rem] text-mute">{c.n} of {c.of} pages state something</span>
                   <VendorDots r={r} order={keys} name={name} />
                 </button>
               );

@@ -26,9 +26,9 @@ export const CATEGORY_COLOR: Record<string, string> = {
 };
 
 export const STATUS_LABEL: Record<string, string> = {
-  auto_published: "Auto-published",
+  auto_published: "Cleared", // D94: passed routing (display only; the stored status is auto_published)
   awaiting_review: "Awaiting review",
-  approved: "Approved",
+  approved: "Cleared by analyst", // D94: cleared, by an analyst's approval
   flagged: "Flagged",
   dismissed: "Dismissed",
   dropped: "Dropped",
@@ -124,13 +124,28 @@ export function fmtPublished(iso: string | null, precision: string): string {
   return precision === "day" ? `${fmtDate(iso, true)} (date only)` : fmtDate(iso, true);
 }
 
-/** The date line for an item, labeled "Feed date": the date comes from the feed, not the article page. A future
- * feed date reads as scheduled (contract §10.6). Once it passes, the API clears scheduled_for. */
+/** D94: the three terms, one name each, with their hover. Display only: API fields and stored statuses are unchanged. */
+export const ARTICLE_DATE_TIP = "The date the publisher put on the article.";
+export const COLLECTED_TIP = "When our pipeline found it.";
+export const CLEARED_TIP = "Passed routing, or approved by an analyst.";
+
+/** The route's reason as the API stores it, in words (display only): "published at strict" reads "cleared at strict"
+ *  (D94), and a list of hold-reason codes ("unvetted_source, mentions_jfrog") reads as the chips' labels ("Unvetted
+ *  source, Mentions JFrog"). Any other reason, such as the classifier's own wording, is shown as stored. */
+export function routeReasonWords(reason: string | null | undefined): string {
+  if (!reason) return "";
+  const codes = reason.split(",").map((c) => c.trim());
+  if (codes.length && codes.every((c) => c in HOLD_LABEL)) return codes.map((c) => HOLD_LABEL[c]).join(", ");
+  return reason.replace(/^published at\b/, "cleared at");
+}
+
+/** The date line for an item, labeled "Article date" (D94; the API's published_at). A future article date reads as
+ * scheduled (contract §10.6). Once it passes, the API clears scheduled_for. */
 export function itemDateText(it: { published_at: string | null; date_precision: string; scheduled_for?: string | null; published_at_source?: string | null }): string {
-  if (it.scheduled_for) return `Feed date ${fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)`;
-  // A feed date later than our collection is stored as the collection time; the feed's own date is published_at_source.
-  if (it.published_at_source) return `Feed date ${fmtDate(it.published_at_source, true)}`;
-  return `Feed date ${fmtPublished(it.published_at, it.date_precision)}`;
+  if (it.scheduled_for) return `Article date ${fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)`;
+  // An article date later than our collection is stored as the collection time; the article's own date is published_at_source.
+  if (it.published_at_source) return `Article date ${fmtDate(it.published_at_source, true)}`;
+  return `Article date ${fmtPublished(it.published_at, it.date_precision)}`;
 }
 
 /** Only http(s) links are clickable; anything else from a collected page is shown as text (D32). */
@@ -228,3 +243,29 @@ export const AXIS_LABEL: Record<string, string> = {
   cicd_integration: "CI/CD integration",
   pricing_model: "Pricing model",
 };
+
+/** D88: shown, never only on hover, wherever head-to-head or change-detection values appear. */
+export const UNVERIFIED_VALUES =
+  "Values are extracted by an AI model from the linked public pages. The system has no verification step for them, and our automated evaluation does not cover them. Check the source before relying on a value.";
+
+/** D90: aggregators whose name says nothing about who wrote the article; the article's domain is shown instead. */
+export const AGGREGATORS = ["hacker news", "google news", "news.ycombinator.com", "news.google.com"];
+
+function hostOf(u: string | null | undefined): string | null {
+  if (!u) return null;
+  try {
+    const h = new URL(u).hostname.toLowerCase();
+    return h ? h.replace(/^www\./, "") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** D90: the name on an article's external link: the stored publisher; the article's domain when the publisher is
+ *  missing, an aggregator, or itself a URL; null when there is neither (the link then says "Source"). Never invented. */
+export function publisherName(publisher: string | null | undefined, url: string | null | undefined): string | null {
+  const p = (publisher ?? "").trim();
+  const isUrl = /^https?:\/\//i.test(p);
+  if (p && !isUrl && !AGGREGATORS.includes(p.toLowerCase())) return p;
+  return hostOf(url) ?? (isUrl ? hostOf(p) : null);
+}

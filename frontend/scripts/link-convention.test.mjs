@@ -1,5 +1,5 @@
 // npm test: one link convention on every screen. An item title opens the side drawer (ItemTitle);
-// the only external link is "Source" with the external-link icon (ArticleLink), opening the original page in a new tab.
+// the only external link is ArticleLink (the publisher's name, D90, or "Source") with the external-link icon, opening the original page in a new tab.
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -18,7 +18,7 @@ test("only ArticleLink opens a new tab", () => {
   assert.deepEqual(hits.map((p) => p.replace(SRC, "")), ["components/ci.tsx"]);
   const ci = read(join(SRC, "components/ci.tsx"));
   assert.equal(ci.match(/target="_blank"/g).length, 1, "one external-link element in ci.tsx");
-  assert.match(ci, /export function ArticleLink[\s\S]*?target="_blank"[\s\S]*?\{iconOnly \? null : "Source"\}<ExternalLink/);
+  assert.match(ci, /export function ArticleLink[\s\S]*?const text = name \?\? "Source";[\s\S]*?target="_blank"[\s\S]*?\{iconOnly \? null : <span[^>]*>\{text\}<\/span>\}\s*<ExternalLink/);
 });
 
 test("no other link style is left: no text link to an article, no chain-link or arrow icon", () => {
