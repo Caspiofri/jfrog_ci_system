@@ -256,8 +256,8 @@ function HoldRulesInfo() {
     <span className="block">
       <span className="mb-1.5 block">{HOLD_RULES_INTRO}</span>
       <span className="m-0 flex flex-col gap-0.5">
-        {HOLD_RULES.map(([k, v]) => (
-          <span key={k} className="block">• <b className="font-semibold">{k}:</b> {v}</span>
+        {HOLD_RULES.map(([code, v]) => (
+          <span key={code} className="block">• <b className="font-semibold">{label(HOLD_LABEL, code)}:</b> {v}</span>
         ))}
       </span>
     </span>
