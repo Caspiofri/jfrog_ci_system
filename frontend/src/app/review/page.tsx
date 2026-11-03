@@ -20,6 +20,7 @@ import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { HoldReason, Level, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
 import { alwaysReviewedHint, holdChip } from "@/lib/holdReasons";
+import { HOLD_RULES, HOLD_RULES_INTRO } from "@/lib/holdRulesText";
 import { cn } from "@/lib/utils";
 
 const PAGE = 25;
@@ -124,6 +125,7 @@ function ReviewScreen() {
 
               <Panel
                 title="What needs my decision?"
+                info={<HoldRulesInfo />}
                 cap={`${rows.length} of ${r.total} held at ${label(LEVEL_LABEL, r.level)}${reason ? ` for ${label(HOLD_LABEL, reason)}` : ""}`}
               >
                 <div className="mb-2.5 flex flex-wrap items-center gap-2">
@@ -244,6 +246,20 @@ function PreviewBar({ preview, current, onBack }: { preview: Level; current: Lev
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/** The (i) on "What needs my decision?": why items are held, in plain words. */
+function HoldRulesInfo() {
+  return (
+    <span className="block">
+      <span className="mb-1.5 block">{HOLD_RULES_INTRO}</span>
+      <span className="m-0 flex flex-col gap-0.5">
+        {HOLD_RULES.map(([k, v]) => (
+          <span key={k} className="block">• <b className="font-semibold">{k}:</b> {v}</span>
+        ))}
+      </span>
+    </span>
   );
 }
 
