@@ -1,0 +1,38 @@
+{
+ "by_source_kind": {
+  "external": {
+   "captured": 1,
+   "n": 2
+  },
+  "feed": {
+   "captured": 2,
+   "n": 2
+  }
+ },
+ "important": {
+  "captured": 0,
+  "min_score": 4,
+  "n": 0
+ },
+ "list": "held-out (31 Oct-2 Nov, measured once)",
+ "measured_on": "2026-11-03T19:59:31.180907+00:00",
+ "missed": [
+  {
+   "competitor": "industry",
+   "expected_importance": 3,
+   "id": "industry-volta-infostealer",
+   "official_url": "https://agentbeam.com/blog/october-2026-attacks-timeline",
+   "title": "VOLTA infostealer takes SSH keys and cloud configs and ranks victims with an LLM"
+  }
+ ],
+ "overall": {
+  "captured": 3,
+  "n": 4
+ },
+ "run_id": "heldout-20261031_20261102",
+ "status": "ok",
+ "window": {
+  "first": "2026-10-31",
+  "last": "2026-11-02"
+ }
+}
