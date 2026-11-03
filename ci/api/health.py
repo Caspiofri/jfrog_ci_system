@@ -17,9 +17,10 @@
 import json
 import re
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
-from ci import coverage, eval_golden
+from ci import coverage, eval_golden, health_summary
 from ci.api import service as svc
 
 WEAK_N = 10
@@ -111,6 +112,53 @@ def is_test_eval(report: dict) -> bool:
 
 def newest(paths: list[Path]) -> Path | None:
     return max(paths, key=lambda p: (p.stat().st_mtime, p.name)) if paths else None  # ties: the timestamped name
+
+
+# ---- the eval, test-split eval and change-detection blocks, from the saved reports (also what ci.health_summary
+# copies into a demo snapshot, D83); each carries measured_on -------------------------------------------------------
+
+def eval_summary_block(evals_dir, labels_path) -> dict:
+    path = newest(eval_reports(evals_dir))
+    labels = label_summary(Path(labels_path))
+    if path is None:
+        return {"status": "none", "labels": labels, "cards": eval_cards({}, labels), "measured_on": None}
+    report = json.loads(path.read_text(encoding="utf-8"))
+    return {"status": "ok", "report": path.name, "created_at": report.get("created_at"),
+            "split": report.get("split"), "live": report.get("live"), "fingerprint": report.get("fingerprint"),
+            "model": report.get("model"), "n": report.get("n"), "labels": labels,
+            "test_eval_run": report.get("split") == "test" and bool(report.get("live")),
+            "cards": eval_cards(report, labels), "measured_on": report.get("created_at")}
+
+
+def test_eval_summary_block(evals_dir, labels_path) -> dict:
+    """D23: the newest live test-split eval report; "none" until the one test eval has run."""
+    tests = []
+    for p in eval_reports(evals_dir):
+        try:
+            r = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if is_test_eval(r):
+            tests.append((r.get("created_at") or "", p, r))
+    if not tests:
+        return {"status": "none", "note": "the test-split eval has not run (it runs once, on a frozen fingerprint)",
+                "measured_on": None}
+    _, path, r = max(tests, key=lambda t: t[0])
+    return {"status": "ok", "report": path.name, "created_at": r.get("created_at"), "split": "test",
+            "fingerprint": r.get("fingerprint"), "model": r.get("model"), "n": r.get("n"),
+            "split_counts": r.get("split_counts"), "fallbacks": r.get("fallbacks"),
+            "test_runs": len(tests), "metrics": r.get("metrics"),
+            "cards": eval_cards(r, label_summary(Path(labels_path))), "measured_on": r.get("created_at")}
+
+
+def change_summary_block(changes_out_dir) -> dict:
+    """The newest change-detection report; age_hours is added when served (it depends on the clock)."""
+    path = newest(list(Path(changes_out_dir).glob("*.report.json")))
+    if path is None:
+        return {"status": "none", "measured_on": None}
+    r = json.loads(path.read_text(encoding="utf-8"))
+    return {k: r.get(k) for k in ("run_id", "started_at", "live", "status", "pages", "fetched", "changes",
+                                  "failures", "unconfirmed", "needs_review")} | {"measured_on": r.get("started_at")}
 
 
 def _hours(now, ts: str | None) -> float | None:
@@ -207,39 +255,24 @@ def register(app, d) -> None:
                 "rule": f"silent = nothing collected in the last {MIN_RUNS_FOR_SILENT} runs; critical = nothing "
                         "collected and an error in the latest run", "items": rows}
 
+    # D83: in demo mode every block below comes from the snapshot's saved summaries, never from output/
+    demo_dir = getattr(d, "demo_dir", None)
+
     def eval_block() -> dict:
-        path = newest(eval_reports(d.evals_dir))
-        labels = label_summary(Path(d.labels_path))
-        if path is None:
-            return {"status": "none", "labels": labels, "cards": eval_cards({}, labels)}
-        report = json.loads(path.read_text(encoding="utf-8"))
-        return {"status": "ok", "report": path.name, "created_at": report.get("created_at"),
-                "split": report.get("split"), "live": report.get("live"), "fingerprint": report.get("fingerprint"),
-                "model": report.get("model"), "n": report.get("n"), "labels": labels,
-                "test_eval_run": report.get("split") == "test" and bool(report.get("live")),
-                "cards": eval_cards(report, labels)}
+        if demo_dir is not None:
+            return health_summary.served(demo_dir, "eval")
+        return eval_summary_block(d.evals_dir, d.labels_path)
 
     def test_eval_block() -> dict:
-        """D23: the newest live test-split eval report; "none" until the one test eval has run."""
-        tests = []
-        for p in eval_reports(d.evals_dir):
-            try:
-                r = json.loads(p.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
-            if is_test_eval(r):
-                tests.append((r.get("created_at") or "", p, r))
-        if not tests:
-            return {"status": "none", "note": "the test-split eval has not run (it runs once, on a frozen fingerprint)"}
-        _, path, r = max(tests, key=lambda t: t[0])
-        return {"status": "ok", "report": path.name, "created_at": r.get("created_at"), "split": "test",
-                "fingerprint": r.get("fingerprint"), "model": r.get("model"), "n": r.get("n"),
-                "split_counts": r.get("split_counts"), "fallbacks": r.get("fallbacks"),
-                "test_runs": len(tests), "metrics": r.get("metrics"),
-                "cards": eval_cards(r, label_summary(Path(d.labels_path)))}
+        if demo_dir is not None:
+            return health_summary.served(demo_dir, "test_eval")
+        return test_eval_summary_block(d.evals_dir, d.labels_path)
 
     def coverage_block() -> dict:
-        """Recomputed from the current events list (no file written) on the run of the newest coverage report."""
+        """Live: recomputed from the current events list (no file written) on the run of the newest coverage report.
+        Demo: the saved summary, with the list label it was written with (D83)."""
+        if demo_dir is not None:
+            return health_summary.served(demo_dir, "coverage")
         path = newest(list(Path(d.coverage_dir).glob("*.json")))
         if path is None or not Path(d.events_path).exists():
             return {"status": "none"}
@@ -257,19 +290,19 @@ def register(app, d) -> None:
             return {"captured": x.get("captured", 0), "n": x.get("events", 0)}
 
         return {"status": "ok", "run_id": run_id, "list": "dev (misses were found and fixed on it, so optimistic)",
+                "measured_on": svc.iso(datetime.fromtimestamp(path.stat().st_mtime, UTC)),
                 "window": rep.get("window"), "overall": count(rep["overall"]),
                 "important": {**count(rep["high_importance"]), "min_score": rep["high_importance"].get("min")},
                 "by_source_kind": {k: count(v) for k, v in rep.get("by_source_kind", {}).items()},
                 "missed": rep.get("missed", [])}
 
     def change_block() -> dict:
-        path = newest(list(Path(d.changes_out_dir).glob("*.report.json")))
-        if path is None:
-            return {"status": "none"}
-        r = json.loads(path.read_text(encoding="utf-8"))
+        r = health_summary.served(demo_dir, "change_detection") if demo_dir is not None else \
+            change_summary_block(d.changes_out_dir)
+        if r.get("status") in ("none", "not_in_snapshot"):
+            return r
         started = svc.parse_ts(r.get("started_at"))
-        return {k: r.get(k) for k in ("run_id", "started_at", "live", "status", "pages", "fetched", "changes",
-                                      "failures", "unconfirmed", "needs_review")} | {
+        return r | {  # on the demo clock this can be negative: the UI then shows no age (D83)
             "age_hours": round((d.now() - started).total_seconds() / 3600, 1) if started else None}
 
     @app.get("/api/v1/health")
