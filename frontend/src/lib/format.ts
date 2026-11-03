@@ -243,7 +243,7 @@ export const AXIS_LABEL: Record<string, string> = {
 
 /** D88: shown, never only on hover, wherever head-to-head or change-detection values appear. */
 export const UNVERIFIED_VALUES =
-  "Values are extracted by an AI model from the linked public pages. The system has no verification step for them, and our evaluation does not cover them. Check the source before relying on a value.";
+  "Values are extracted by an AI model from the linked public pages. The system has no verification step for them, and our automated evaluation does not cover them. Check the source before relying on a value.";
 
 /** D90: aggregators whose name says nothing about who wrote the article; the article's domain is shown instead. */
 export const AGGREGATORS = ["hacker news", "google news", "news.ycombinator.com", "news.google.com"];

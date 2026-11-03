@@ -458,7 +458,7 @@ function TrustedSources() {
         <div>
           <h3 className="mb-1 text-xs font-semibold text-mute">Trusted from this screen</h3>
           <Async {...vetted} retry={() => vetted.mutate()} rows={2} isEmpty={() => !trusted.length}
-            empty="None yet. Hosts from config/vetted_sources.yaml are managed in the repo.">
+            empty="None yet. Vetted sources come from a list maintained by the project.">
             {() => trusted.map((s) => (
               <div key={s.host} className="flex items-center gap-2 border-t border-line py-1.5 first:border-t-0">
                 <span className="flex-1">{s.host}</span>

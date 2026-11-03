@@ -8,7 +8,7 @@ import { UNVERIFIED_VALUES } from "../src/lib/format.ts";
 const src = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 
 test("the caption is exactly as given", () => {
-  assert.equal(UNVERIFIED_VALUES, "Values are extracted by an AI model from the linked public pages. The system has no verification step for them, and our evaluation does not cover them. Check the source before relying on a value.");
+  assert.equal(UNVERIFIED_VALUES, "Values are extracted by an AI model from the linked public pages. The system has no verification step for them, and our automated evaluation does not cover them. Check the source before relying on a value.");
 });
 
 test("rendered as visible text, not a title or hover", () => {

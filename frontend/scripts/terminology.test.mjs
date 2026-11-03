@@ -41,3 +41,9 @@ test("the Log's route reason reads cleared (the API still stores published at <l
   assert.equal(routeReasonWords(null), "");
   assert.match(readFileSync(join(root, "app/log/page.tsx"), "utf8"), /routeReasonWords\(r\.reason\)/);
 });
+
+test("the trusted-sources empty line names no file", () => {
+  const review = readFileSync(join(root, "app/review/page.tsx"), "utf8");
+  assert.match(review, /empty="None yet\. Vetted sources come from a list maintained by the project\."/);
+  assert.doesNotMatch(review, /config\/vetted_sources\.yaml are managed/);
+});
