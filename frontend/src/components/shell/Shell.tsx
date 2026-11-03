@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Activity, BarChart3, CheckCircle2, FileText, List, Map } from "lucide-react";
+import { Activity, BarChart3, CheckCircle2, FileText, List, Map, Newspaper } from "lucide-react";
 import { ItemDrawerProvider } from "@/components/ItemDrawer";
 import { useApi } from "@/lib/api";
 import { fmtDate, fmtDateTime } from "@/lib/format";
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 const NAV: { group: string; items: { href: string; label: string; icon: typeof FileText; badge?: "review" }[] }[] = [
   { group: "Primary", items: [
-    { href: "/brief", label: "Daily Brief", icon: FileText },
+    { href: "/brief", label: "Daily Brief", icon: Newspaper },
     { href: "/competitors", label: "Competitors", icon: BarChart3 },
   ] },
   { group: "Supporting", items: [

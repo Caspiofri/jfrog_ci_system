@@ -4,8 +4,8 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { History } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Async, ExtLink, Tag } from "@/components/ci";
-import { path, useApi } from "@/lib/api";
+import { ArticleLink, Async, ColorLegend, Tag } from "@/components/ci";
+import { path, useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import type { Cell, CellHistoryRow, H2HAxis, Page } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ function CellView({ c }: { c: Cell }) {
       <span className="flex flex-wrap items-center gap-1.5 text-[11px] text-mute">
         {c.state === "stale" ? <Tag className="bg-[#fff4e0] text-[#8a5a00]" title={c.stale_reason}>Stale{c.stale_reason ? `: ${c.stale_reason}` : ""}</Tag> : null}
         {c.needs_review ? <Tag className="bg-[#fffaf0] text-[#8a5a00]" title={c.review_reason}>Needs review</Tag> : null}
-        {c.source_url ? <ExtLink href={c.source_url}>source</ExtLink> : null}
+        {c.source_url ? <ArticleLink href={c.source_url} label="Open the source page in a new tab" /> : null}
         {c.as_of ? <span>as of {fmtDate(c.as_of, true)}</span> : null}
         {c.note ? <span>· {c.note}</span> : null}
       </span>
@@ -42,7 +42,8 @@ function CellView({ c }: { c: Cell }) {
 }
 
 function HistoryRows({ who, axis, name }: { who: string; axis: string; name: string }) {
-  const q = useApi<Page<CellHistoryRow> & { competitor: string; axis: string }>(path(`/competitors/${encodeURIComponent(who)}/cells/${encodeURIComponent(axis)}/history`));
+  const q = useRecord<Page<CellHistoryRow> & { competitor: string; axis: string }>(
+    path(`/competitors/${encodeURIComponent(who)}/cells/${encodeURIComponent(axis)}/history`), `${who}/${axis}`, (d) => `${d.competitor}/${d.axis}`);
   return (
     <div>
       <div className="mb-1 text-xs font-semibold text-mute">{name}</div>
@@ -100,6 +101,9 @@ export function HeadToHead({ competitor, name, axes }: { competitor: string; nam
           ))}
         </tbody>
       </table>
+      {axes.some((a) => a.changed) ? (
+        <ColorLegend className="mt-2" items={[{ color: "#fff7e6", label: "Highlighted row: changed this week, goes to review" }]} />
+      ) : null}
     </div>
   );
 }

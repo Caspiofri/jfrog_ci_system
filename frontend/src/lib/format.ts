@@ -171,6 +171,17 @@ export const RUBRIC: Record<number, { label: string; competitor: string; industr
     competitor: "Relevant development without a proven material change: improves an existing capability, a sub-feature, a partnership, a customer win, a security event with indirect impact",
     industry: "A relevant vulnerability or incident of limited scope",
   },
+  // 2 and 1: named with the rubric v2 rows' own words (docs/specs/rubric_v2.md); shown on profiles and timelines
+  2: {
+    label: "Intelligence value",
+    competitor: "No new event, but intelligence value: marketing, opinion, listicle, buyer's guide that reveals positioning or strategy",
+    industry: "Commentary and research",
+  },
+  1: {
+    label: "Routine update",
+    competitor: "A routine operational event: patch release, version support, maintenance, deprecation of a minor feature, a default/config change",
+    industry: "A routine operational event",
+  },
 };
 
 export const RELATION_LABEL: Record<string, string> = {

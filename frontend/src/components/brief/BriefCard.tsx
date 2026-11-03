@@ -1,13 +1,15 @@
 "use client";
 // A published item in the Brief (D44): score with its rubric label, then three labeled rows.
 // Every collected string renders as React text (D32); links go through safeHref via ExtLink.
+import { MentionsJfrog } from "@/components/MentionsJfrog";
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
-import { ExternalLink } from "lucide-react";
-import { CategoryTag, ExtLink, ScoreBadge, Tag } from "@/components/ci";
+import { CategoryTag, ItemTitle, ScoreBadge, Tag, openFromRow } from "@/components/ci";
+import { ReviewedMark } from "@/components/ReviewedMark";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { LensView } from "@/components/LensView";
 import { RUBRIC, itemDateText, textBasisWords } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
+import { useMeta } from "@/lib/meta";
 import type { Item, Meta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -59,32 +61,28 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function BriefCard({ item, showLate = true, highlight = false }: { item: Item; showLate?: boolean; highlight?: boolean }) {
-  const { data: meta } = useMeta();
   const drawer = useItemDrawer();
   const s = item.score ?? 0;
   const basis = textBasisWords(item.text_basis);
   return (
     <article
-      className={cn("border-t border-line px-3 py-3 first:border-t-0", EMPHASIS[s], highlight && "bg-[#f3fbf4] ring-2 ring-inset ring-jgreen")}
+      className={cn("cursor-pointer border-t border-line px-3 py-3 first:border-t-0 hover:bg-page/60", EMPHASIS[s], highlight && "bg-[#f3fbf4] ring-2 ring-inset ring-jgreen")}
       data-item={item.item_id}
+      onClick={(e) => openFromRow(e, () => drawer.open(item.item_id))}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <ScoreLabel score={item.score} competitor={item.competitor} reason={item.reason} />
-        <span className="text-xs font-medium text-ink">· {competitorName(meta, item.competitor)}</span>
+        <span className="text-xs font-medium text-ink">·</span><CompetitorLabel k={item.competitor} className="text-xs font-medium text-ink" />
         <CategoryTag category={item.category} />
         {showLate && item.badge === "late" ? (
           <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Discovered well after its feed date">Found late</Tag>
         ) : null}
-        {item.mentions_jfrog ? <Tag className="bg-[#eef7f0] font-semibold text-jgreen-d">Mentions JFrog</Tag> : null}
+        {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} mention={item.jfrog_mention} /> : null}
         {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
+        <ReviewedMark item={item} />
       </div>
       <div className="mt-1.5 flex items-start gap-1.5">
-        <button type="button" onClick={() => drawer.open(item.item_id)} className={cn("text-left font-semibold hover:text-jgreen-d", s >= 4 && "text-sm")}>
-          {item.title}
-        </button>
-        <ExtLink href={item.url} className="mt-0.5 shrink-0 text-mute">
-          <ExternalLink className="size-3.5" aria-label="Open the source" />
-        </ExtLink>
+        <ItemTitle title={item.title} url={item.url} onOpen={() => drawer.open(item.item_id)} className={cn("font-semibold", s >= 4 && "text-sm")} />
       </div>
       <dl className="m-0 mt-2 grid grid-cols-1 gap-x-3 gap-y-1.5 sm:grid-cols-[10.5rem_minmax(0,1fr)]">
         <Row label="What happened">

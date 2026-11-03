@@ -1,13 +1,18 @@
 "use client";
 // The item drawer: GET /api/v1/items/{id}. Opened from any screen with useItemDrawer().open(id).
+import { ArticleExcerpt } from "@/components/ArticleExcerpt";
+import { JfrogMentionSection } from "@/components/JfrogMentionSection";
+import { MentionsJfrog } from "@/components/MentionsJfrog";
+import { mentionExplanation, showLensBlock } from "@/lib/jfrogMention";
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { ExternalLink } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Async, CategoryTag, ExtLink, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { ArticleLink, Async, CategoryTag, Hint, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { LensView } from "@/components/LensView";
 import { ReopenButton } from "@/components/review/actions";
-import { useApi } from "@/lib/api";
-import { HOLD_LABEL, LEVEL_LABEL, NO_TEXT, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
+import { useRecord } from "@/lib/api";
+import { classifiedBy } from "@/lib/classifiedBy";
+import { HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { FieldChange, ItemAction, ItemDetail, Lens, LensStatus, Meta } from "@/lib/types";
 
@@ -49,36 +54,56 @@ function LensBlock({ lens, status }: { lens?: Lens | null; status?: LensStatus |
   );
 }
 
+/** Why the item is tagged "Mentions JFrog": how the tag is set, the sentence when the excerpt holds it, what the tag
+ *  changed, and the model's note when it names JFrog. Only fields the API serves; nothing is guessed. */
+function MentionWhy({ d }: { d: ItemDetail }) {
+  const m = mentionExplanation(d);
+  if (!m) return null;
+  return (
+    <div className="flex flex-col gap-1 rounded-sm border-l-2 border-jgreen bg-[#eef7f0] px-2.5 py-1.5 text-xs text-jgreen-d" data-jfrog-mention>
+      <b className="font-semibold">Why &ldquo;Mentions JFrog&rdquo;</b>
+      <span className="text-ink">{m.how}</span>
+      {m.sentence ? <span className="italic">&ldquo;{m.sentence}&rdquo;</span> : null}
+      {m.effect.map((e) => <span key={e} className="text-ink">{e}</span>)}
+      {m.modelNote ? <span className="text-ink"><span className="text-mute">The model&apos;s note: </span>{m.modelNote}</span> : null}
+    </div>
+  );
+}
+
 function DrawerBody({ id }: { id: string }) {
   const { data: meta } = useMeta();
-  const q = useApi<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`);
+  // only the requested item, never the previous one (a 404 or a slow earlier response shows an error or loading)
+  const q = useRecord<ItemDetail>(`/api/v1/items/${encodeURIComponent(id)}`, id, (d) => d.item?.item_id);
   return (
     <>
       <SheetHeader className="px-5 pt-5 pb-0">
-        <SheetTitle className="pr-6 text-base leading-snug">{q.data?.item.title ?? "Item"}</SheetTitle>
-        <SheetDescription className="text-xs">Item {id}</SheetDescription>
+        <SheetTitle className="flex items-start gap-1.5 pr-6 text-base leading-snug">
+          <span>{q.data?.item.title ?? "Item"}</span>
+          {q.data ? <ArticleLink href={q.data.item.url} className="mt-1" /> : null}
+        </SheetTitle>
+        <SheetDescription className="text-xs">Article headline · item {id}</SheetDescription>
       </SheetHeader>
       <div className="px-5 pb-6">
         <Async {...q} retry={() => q.mutate()} rows={6}>
           {(d) => {
             const it = d.item;
+            const cls = classifiedBy(d.classification);
             return (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <ScoreBadge score={it.score} noise={it.noise} />
                   <StatusDot status={it.status} />
                   <CategoryTag category={it.category} />
-                  {it.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">Mentions JFrog</Tag> : null}
+                  {it.mentions_jfrog ? <MentionsJfrog excerpt={it.excerpt} mention={it.jfrog_mention} /> : null}
                   {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
                   {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
-                <LensBlock lens={it.lens} status={it.lens_status} />
-                {it.excerpt ? <p className="m-0 text-mute">{it.excerpt}</p> : <p className="m-0 italic text-mute">{NO_TEXT}</p>}
-                <ExtLink href={it.url} className="inline-flex items-center gap-1 text-jgreen-d">
-                  Open the source <ExternalLink className="size-3" />
-                </ExtLink>
+                {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
+                <MentionWhy d={d} />
+                <ArticleExcerpt excerpt={it.excerpt} url={it.url} />
+                <JfrogMentionSection mention={it.jfrog_mention} />
                 <div>
-                  <Field k="Competitor">{competitorName(meta, it.competitor)}{!it.classified ? " (prefilled, not classified)" : ""}</Field>
+                  <Field k="Competitor"><CompetitorLabel k={it.competitor} />{!it.classified ? " (prefilled, not classified)" : ""}</Field>
                   <Field k="Publisher">{it.publisher} · {label(SOURCE_LABEL, it.source)}</Field>
                   {it.scheduled_for ? (
                     <Field k="Feed date">{fmtDate(it.scheduled_for, true)} (scheduled, after we collected it)</Field>
@@ -93,7 +118,7 @@ function DrawerBody({ id }: { id: string }) {
                   <Field k="Score reason">{it.reason || "—"}</Field>
                   {it.why_it_matters ? <Field k="Ranker's summary">{it.why_it_matters}</Field> : null}
                   {d.ranking?.raw_score != null && d.ranking.raw_score !== it.score ? <Field k="Model score">{d.ranking.raw_score} (adjusted to {it.score ?? "—"})</Field> : null}
-                  <Field k="Classified by">{d.classification?.method ?? "—"}{d.classification?.reason ? ` · ${d.classification.reason}` : ""}</Field>
+                  <Field k="Classified by"><Hint text={cls.hint}>{cls.label}</Hint></Field>
                   <Field k="Confidence">{it.confidence != null ? it.confidence.toFixed(2) : "—"}</Field>
                   {d.skip ? <Field k="Held out">{d.skip}</Field> : null}
                   {d.rejections.length ? <Field k="Rejected output">{d.rejections.join("; ")}</Field> : null}

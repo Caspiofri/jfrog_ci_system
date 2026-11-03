@@ -3,9 +3,11 @@ import { Suspense } from "react";
 import { Async, Empty, ErrorNote, KpiTile, Loading, PageHead, Panel, Tag } from "@/components/ci";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ChangeDetection, Coverage, EvalCards, Extraction, Funnel, LivenessAlert, MARKER, RunHistory, SilentAlert, SilentTable, SourcesTable, TestEvalBlock } from "@/components/health/parts";
-import { path, useApi } from "@/lib/api";
+import { path, useApi, useRecord } from "@/lib/api";
 import { LEVEL_LABEL, delta, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
+import { briefForRun } from "@/lib/healthBrief";
+import { noDataReason } from "@/lib/healthReasons";
 import { useUrlState } from "@/lib/useParams";
 import type { Brief, BriefRow, Health, Page, RunInfo } from "@/lib/types";
 
@@ -21,12 +23,15 @@ function HealthScreen() {
   const { get, set } = useUrlState();
   const runId = get("run");
   const runs = useApi<Page<RunInfo>>(path("/runs", { limit: 50 }));
-  const q = useApi<Health>(path("/health", { run_id: runId || undefined }));
+  // a chosen run: shown only when the response is that run; the latest run (no choice) has nothing to match
+  const q = useRecord<Health>(path("/health", { run_id: runId || undefined }), runId || "latest", (d) => (runId ? d.run?.run_id : "latest"));
+  const { data: meta } = useMeta();
+  const missing = noDataReason(meta?.meta?.mode);
   return (
     <>
       <PageHead
         title="Health"
-        sub="Does the system run, and is it correct"
+        info="Does the system run, and is it correct?"
         tools={runs.data?.items.length ? (
           <FilterSelect ariaLabel="Run" allLabel="Latest daily run" value={runId} onChange={(v) => set({ run: v })} className="h-8 min-w-[16rem] bg-white text-[13px]"
             options={runs.data.items.map((r) => ({ value: r.run_id, label: `${fmtDateTime(r.started_at)} · ${r.kind} · ${MARKER[r.marker ?? r.status]?.label ?? r.status}` }))} />
@@ -55,10 +60,10 @@ function HealthScreen() {
             <Panel title="Did each run finish?" cap="Newest first · pick a run to see its numbers below">
               {runs.data?.items.length ? (
                 <RunHistory runs={runs.data.items} selected={runId || h.run?.run_id || null} metrics={h.run_metrics} onSelect={(v) => set({ run: v })} />
-              ) : runs.error ? null : runs.data ? <Empty>No runs yet.</Empty> : <Loading rows={2} />}
+              ) : runs.error ? <Empty>The run history could not be loaded.</Empty> : runs.data ? <Empty>No runs yet.</Empty> : <Loading rows={2} />}
             </Panel>
 
-            <BriefCounts />
+            <BriefCounts runId={runId} />
 
             <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
               <Panel title="Where do items drop off?" cap={h.funnel ? `All sources, this run · published and held at ${label(LEVEL_LABEL, h.funnel.level)}` : undefined}>
@@ -74,23 +79,23 @@ function HealthScreen() {
             </Panel>
 
             <Panel title="Do we get the article text?" cap="Full or partial page text, per source and publisher">
-              {h.extraction ? <Extraction e={h.extraction} /> : <Empty>No extraction data.</Empty>}
+              {h.extraction ? <Extraction e={h.extraction} /> : <Empty>{missing}</Empty>}
             </Panel>
 
             <Panel title="What does the held-out test split say?" cap="The reported accuracy · runs once, on a frozen system">
-              <TestEvalBlock t={h.test_eval} />
+              <TestEvalBlock t={h.test_eval} missing={missing} />
             </Panel>
 
             <Panel title="How accurate is the system?" cap="Single labeler · golden set · newest eval of any split">
-              {h.eval ? <EvalCards ev={h.eval} /> : <Empty>No eval report yet.</Empty>}
+              {h.eval ? <EvalCards ev={h.eval} missing={missing} /> : <Empty>{missing}</Empty>}
             </Panel>
 
             <div className="grid items-start gap-3.5 lg:grid-cols-2">
               <Panel title="Do we miss real events?" cap="Coverage check · counts with n, not a rate">
-                {h.coverage ? <Coverage cv={h.coverage} /> : <Empty>No coverage check yet.</Empty>}
+                {h.coverage ? <Coverage cv={h.coverage} missing={missing} /> : <Empty>{missing}</Empty>}
               </Panel>
               <Panel title="Did the tracked pages change?" cap="Head-to-head change detection">
-                {h.change_detection ? <ChangeDetection c={h.change_detection} /> : <Empty>No change-detection run yet.</Empty>}
+                {h.change_detection ? <ChangeDetection c={h.change_detection} missing={missing} /> : <Empty>{missing}</Empty>}
               </Panel>
             </div>
           </>
@@ -102,15 +107,15 @@ function HealthScreen() {
 
 type Tile = { key: string; label: string; value: number; prev: number | null };
 
-/** The latest Brief's counts on Health. "Published" and "rated 4–5" come from the Brief's summary (scored 3+, the
+/** The Brief's counts on Health: the Brief of the run picked in the Run filter, or the latest Brief. "Published" and "rated 4–5" come from the Brief's summary (scored 3+, the
  * same numbers the Brief shows); the previous Brief's from its /briefs row. Found late and Mentions JFrog are the
  * operational counts that left the Brief: they still come from `kpis` and count every published score.
  * No delta when the previous Brief was the initial import: a 14-day backfill isn't comparable with one day. */
-function BriefCounts() {
+function BriefCounts({ runId }: { runId: string }) {
   const { data: meta } = useMeta();
-  const date = meta?.latest_brief_date;
-  const q = useApi<Brief>(date ? path("/brief", { date, limit: 1 }) : null);
   const briefs = useApi<Page<BriefRow>>(path("/briefs", { limit: 200 }));
+  const { date, picked } = briefForRun(briefs.data?.items ?? [], runId, meta?.latest_brief_date);
+  const q = useRecord<Brief>(date ? path("/brief", { date, limit: 1 }) : null, date, (b) => b.date);
   const b = q.data;
   const rows = briefs.data?.items ?? [];
   const i = b ? rows.findIndex((r) => r.date === b.date) : -1;
@@ -125,9 +130,11 @@ function BriefCounts() {
   ] : [];
   const error = q.error ?? briefs.error;
   return (
-    <Panel title="How did the latest Brief's counts move?"
+    <Panel title={picked ? "How did this run's Brief counts move?" : "How did the latest Brief's counts move?"}
       cap={b ? `Brief of ${fmtLongDate(b.date)} · ${prevIsImport ? "the previous Brief was the initial import, so no comparison" : "vs the previous Brief"}` : undefined}>
-      {error ? <ErrorNote error={error} onRetry={() => { q.mutate(); briefs.mutate(); }} /> : !b || !briefs.data ? (
+      {error ? <ErrorNote error={error} onRetry={() => { q.mutate(); briefs.mutate(); }} /> : picked && briefs.data && date === null ? (
+        <Empty>This run has no Brief of its own.</Empty>
+      ) : !b || !briefs.data ? (
         meta && !meta.latest_brief_date ? <Empty>No Brief yet.</Empty> : <Loading rows={1} />
       ) : !tiles.length ? (
         <Empty>No counts for the Brief of {fmtLongDate(b.date)}.</Empty>

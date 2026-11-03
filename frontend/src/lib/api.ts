@@ -1,5 +1,6 @@
 // Typed client for the CI API. The browser calls same-origin /api/v1/*; next.config.ts forwards it to the API.
 import useSWR, { type SWRConfiguration } from "swr";
+import { isStale, pickRecord } from "@/lib/record";
 
 export class ApiError extends Error {
   constructor(
@@ -67,4 +68,13 @@ export function send<T>(method: "POST" | "PUT" | "PATCH" | "DELETE", url: string
 /** SWR on a GET path; pass null to skip. */
 export function useApi<T>(url: string | null, opts?: SWRConfiguration<T, ApiError>) {
   return useSWR<T, ApiError>(url, get<T>, { revalidateOnFocus: false, keepPreviousData: true, ...opts });
+}
+
+/** SWR for one record by id: no keepPreviousData, and the data only when its id equals the requested id
+ *  (lib/record.ts). A failed load returns the error with no data, so the previous record is never shown. */
+export function useRecord<T>(url: string | null, requested: string | null | undefined, idOf: (d: T) => string | null | undefined,
+  opts?: SWRConfiguration<T, ApiError>) {
+  const q = useSWR<T, ApiError>(url, get<T>, { revalidateOnFocus: false, ...opts, keepPreviousData: false });
+  const data = pickRecord(requested, q.data, idOf);
+  return { data, error: q.error, isLoading: q.isLoading || (!data && !q.error && Boolean(url)), mutate: q.mutate, stale: isStale(requested, q.data, idOf) };
 }

@@ -81,6 +81,7 @@ export interface Item {
   urgency: string | null;
   confidence: number | null;
   mentions_jfrog: boolean;
+  jfrog_mention?: JfrogMention | null; // D77: where JFrog is mentioned; null when mentions_jfrog is false
   reason: string;
   why_it_matters: string;
   published_at: string | null;
@@ -148,6 +149,8 @@ export interface Claim {
   quote: string;
   quote_item_id: string;
   jfrog_quote?: string; // D42: verbatim from the JFrog capability sheet, when the claim is about JFrog
+  jfrog_axis?: string | null; // not served today: the capability the quote comes from, if the generator ever stores it
+  axis?: string | null;
 }
 
 export interface Insight {
@@ -167,6 +170,23 @@ export interface Insight {
   jfrog_quotes?: string[];
   /** Contract §10.4 (D50): one row per cited item, claim order. in_brief false = not in this Brief's list. */
   cited_items?: CitedItemRow[];
+  /** Contract §14: absent on older data. */
+  continuity?: InsightContinuity | null;
+}
+
+export interface InsightContinuity {
+  status: "new" | "continuing" | "strengthened" | string;
+  since: string | null; // the previous Brief's date
+  new_stories: number | null;
+  matched?: string[];
+}
+
+export interface PreviousInsights {
+  date: string | null;
+  status: string | null;
+  insights: number;
+  unmatched: number;
+  unmatched_ids?: string[];
 }
 
 export interface CitedItemRow {
@@ -190,6 +210,7 @@ export interface BriefInsights {
   window?: { from?: string; to?: string; days?: number; items?: number; stories?: number };
   rejected?: number; // a count (§10.4)
   items: Insight[];
+  previous?: PreviousInsights | null; // contract §14: absent on older data
   mock?: boolean; // dev mock scenarios only
 }
 
@@ -522,6 +543,9 @@ export interface RunStep {
 export interface RunMetrics {
   run_id: string;
   status: string;
+  items?: { collected?: number; kept?: number; new?: number; [k: string]: unknown } | null; // contract §11.1
+  items_after_actions?: { published?: number | null; held?: number | null; [k: string]: unknown } | null; // §11.2, D74
+  reconstructed?: { decision?: string; at?: string; label?: string; sources?: Record<string, string>; empty?: Record<string, string> } | null; // D74
   error?: string | null;
   steps: RunStep[];
   fingerprints?: Record<string, string | null> | null;
@@ -601,6 +625,7 @@ export interface Health {
   } | null;
   coverage: {
     status: string;
+    measured_on?: string | null; // when the coverage check was measured (BE, D82)
     run_id?: string;
     list?: string;
     window?: { first: string; last: string };
@@ -623,4 +648,11 @@ export interface Health {
     age_hours?: number;
   } | null;
   meta: ApiMeta;
+}
+
+/** Contract (3 Nov, D77): read-only, a mention and not a comparison. */
+export interface JfrogMention {
+  status: "found" | "not_in_stored_text";
+  snippet: string | null; // at most 280 characters around the first match; null when not in the stored text
+  found_in: "text" | "title" | null;
 }

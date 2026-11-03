@@ -1,18 +1,41 @@
 "use client";
 // Small shared pieces in the prototype's style. All API strings are rendered as React text (D32).
 import type { ReactNode } from "react";
-import { AlertTriangle, Inbox, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, Inbox, Info, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ApiError } from "@/lib/api";
-import { CATEGORY_COLOR, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, label, safeHref } from "@/lib/format";
+import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, label, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export function PageHead({ title, sub, tools }: { title: string; sub?: ReactNode; tools?: ReactNode }) {
+/** A small (i) that explains on hover and keyboard focus: long explanations live here, not on screen. */
+export function InfoHint({ text, label: aria = "What this means" }: { text: ReactNode; label?: string }) {
+  if (!text) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" aria-label={aria} data-info-hint
+          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full align-middle text-mute outline-none hover:text-jgreen-d focus-visible:ring-2 focus-visible:ring-jgreen">
+          <Info className="size-3.5" aria-hidden />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-left font-normal">{text}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function PageHead({ title, sub, tools, info, icon, titleHint }: {
+  title: string; sub?: ReactNode; tools?: ReactNode; info?: ReactNode; icon?: ReactNode; titleHint?: ReactNode;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2.5">
       <div>
-        <h1 className="m-0 text-[22px] font-semibold">{title}</h1>
+        <h1 className="m-0 flex items-center gap-1.5 text-[22px] font-semibold">
+          {icon}
+          {titleHint ? <Hint text={titleHint}>{title}</Hint> : title}
+          <InfoHint text={info} />
+        </h1>
         {sub ? <div className="mt-0.5 text-mute">{sub}</div> : null}
       </div>
       {tools ? <div className="flex flex-wrap items-center gap-2">{tools}</div> : null}
@@ -21,14 +44,14 @@ export function PageHead({ title, sub, tools }: { title: string; sub?: ReactNode
 }
 
 /** A white card with a question as its title (prototype .card / .ct). */
-export function Panel({ title, cap, children, className, right, big }: {
-  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean;
+export function Panel({ title, cap, children, className, right, big, info }: {
+  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean; info?: ReactNode;
 }) {
   return (
     <section className={cn("min-w-0 rounded-md border border-line bg-card px-[18px] py-4", className)}>
       {title || cap || right ? (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          {title ? <h2 className={cn("m-0 font-semibold", big ? "text-lg" : "text-sm")}>{title}</h2> : <span />}
+          {title ? <h2 className={cn("m-0 flex items-center gap-1.5 font-semibold", big ? "text-lg" : "text-sm")}>{title}<InfoHint text={info} /></h2> : <span />}
           <div className="flex items-baseline gap-3">
             {cap ? <span className="text-xs text-mute">{cap}</span> : null}
             {right}
@@ -81,19 +104,114 @@ export function CategoryTag({ category }: { category: string | null }) {
   );
 }
 
+/** An explanation on hover and on keyboard focus. The trigger is focusable; pass asChild when the child already is. */
+export function Hint({ text, children, asChild = false, className }: { text: ReactNode; children: ReactNode; asChild?: boolean; className?: string }) {
+  if (!text) return <>{children}</>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {asChild ? children : <span tabIndex={0} className={cn("cursor-help rounded outline-none focus-visible:ring-2 focus-visible:ring-jgreen", className)}>{children}</span>}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-left">{text}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** A visible colour legend: every colour that carries meaning is named on screen, never only in a hover. */
+export function ColorLegend({ title, items, className }: {
+  title?: ReactNode; items: { color: string; label: ReactNode; fg?: string; text?: string }[]; className?: string;
+}) {
+  if (!items.length) return null;
+  return (
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mute", className)} data-legend>
+      {title ? <span className="font-semibold">{title}</span> : null}
+      {items.map((it, i) => (
+        <span key={i} className="inline-flex items-center gap-1">
+          {it.text ? (
+            <i className="inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-[3px] px-0.5 text-[9px] font-semibold not-italic tabular-nums"
+              style={{ background: it.color, color: it.fg }}>{it.text}</i>
+          ) : (
+            <i className="inline-block size-2.5 rounded-sm ring-1 ring-black/10" style={{ background: it.color }} aria-hidden />
+          )}
+          {it.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The category colours, for the categories shown (or every category). */
+export function CategoryLegend({ categories, title = "Categories:" }: { categories: string[]; title?: ReactNode }) {
+  return <ColorLegend title={title} items={categories.map((c) => ({ color: CATEGORY_COLOR[c] ?? "#9aa5b5", label: c }))} />;
+}
+
+/** The two colour legends every item view shows, always visible: Importance (score colours) and Category. */
+export function ColourLegends({ unscored = false, className }: { unscored?: boolean; className?: string }) {
+  return (
+    <div className={cn("flex flex-col gap-1 rounded-md border border-line bg-card px-3 py-2", className)} aria-label="Colour legend" data-legends>
+      <ImportanceLegend unscored={unscored} />
+      <CategoryColours />
+    </div>
+  );
+}
+
+/** "Importance (1–5)": the score colours, 5 to 1, with the rubric's names; N and – when the view shows them. */
+export function ImportanceLegend({ unscored = false, className }: { unscored?: boolean; className?: string }) {
+  const extra = unscored ? [
+    { color: SCORE_COLOR[0][0], fg: SCORE_COLOR[0][1], text: "N", label: "noise" },
+    { color: SCORE_COLOR[0][0], fg: SCORE_COLOR[0][1], text: "–", label: "not scored" },
+  ] : [];
+  return (
+    <ColorLegend className={className} title="Importance (1–5)" items={[5, 4, 3, 2, 1].map((n) => ({
+      color: SCORE_COLOR[n][0], fg: SCORE_COLOR[n][1], text: String(n), label: RUBRIC[n]?.label ?? null,
+    })).concat(extra)} />
+  );
+}
+
+/** "Category": all seven category colours, in one fixed order. */
+export function CategoryColours({ className }: { className?: string }) {
+  return <div className={className}><CategoryLegend title="Category" categories={Object.keys(CATEGORY_COLOR)} /></div>;
+}
+
 /** "n=12" next to every eval number and every measured count. */
 export function N({ n }: { n: number | null | undefined }) {
   return <span className="ml-1 text-[11px] font-normal text-mute tabular-nums">n={n ?? "?"}</span>;
 }
 
-/** An external link that only opens http(s) URLs (D32). Other URLs show as plain text. */
-export function ExtLink({ href, children, className }: { href: string | null | undefined; children: ReactNode; className?: string }) {
+/** External links only open http(s) URLs (D32); safeHref turns anything else into no link. */
+export const ARTICLE_LINK_LABEL = "Open the original article in a new tab";
+
+/** The one external-link style: "Source" with the external-link icon (box with arrow), opening the original page in
+ *  a new tab. Nothing when the URL isn't http(s). */
+export function ArticleLink({ href, label: aria = ARTICLE_LINK_LABEL, className, iconOnly = false }: {
+  href: string | null | undefined; label?: string; className?: string; iconOnly?: boolean;
+}) {
   const safe = safeHref(href);
-  if (!safe) return <span className={className}>{children}</span>;
+  if (!safe) return null;
   return (
-    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" className={cn("hover:text-jgreen-d hover:underline", className)}>
-      {children}
+    <a href={safe} target="_blank" rel="noopener noreferrer nofollow" aria-label={aria} title={iconOnly ? "Source" : aria}
+      onClick={(e) => e.stopPropagation()}
+      className={cn("inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded text-[11px] font-normal text-mute hover:text-jgreen-d hover:underline focus-visible:outline-2 focus-visible:outline-jgreen", className)}>
+      {iconOnly ? null : "Source"}<ExternalLink className={iconOnly ? "size-3.5" : "size-3"} aria-hidden="true" />
     </a>
+  );
+}
+
+/** The one link convention for an item: the title opens the side drawer, "Source" opens the original article. */
+export function ItemTitle({ title, url, onOpen, className }: {
+  title: string; url?: string | null; onOpen?: () => void; className?: string;
+}) {
+  const text = title || "(no title)";
+  return (
+    <span className="inline-flex min-w-0 items-start gap-1">
+      {onOpen ? (
+        <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(); }} title="Open the details"
+          className={cn("min-w-0 text-left hover:text-jgreen-d hover:underline", className)}>{text}</button>
+      ) : (
+        <span className={cn("min-w-0", className)}>{text}</span>
+      )}
+      <ArticleLink href={url} className="mt-0.5" />
+    </span>
   );
 }
 
@@ -177,12 +295,27 @@ export function HBars({ rows, color = "var(--bar)", max: fixedMax }: { rows: { l
 }
 
 /** The 4 KPI tiles. */
-export function KpiTile({ value, label: l, sub }: { value: ReactNode; label: string; sub?: ReactNode }) {
+export function KpiTile({ value, label: l, sub, future = false }: { value: ReactNode; label: string; sub?: ReactNode; future?: boolean }) {
   return (
-    <div className="rounded-md border border-line bg-card px-[18px] py-4">
+    <div className={cn("rounded-md border border-line bg-card px-[18px] py-4", future && "border-dashed opacity-70")} data-future={future ? "1" : undefined}>
       <div className="text-[30px] font-semibold leading-[1.1] tabular-nums">{value}</div>
-      <div className="mt-1 text-mute">{l}</div>
+      <div className="mt-1 flex items-center gap-1.5 text-mute">
+        {l}
+        {future ? <Tag className="bg-[#e8eefb] text-[10px] font-semibold uppercase tracking-wide text-[#3f5b8f]">Future</Tag> : null}
+      </div>
       {sub ? <div className="mt-1.5 text-xs">{sub}</div> : null}
     </div>
   );
+}
+
+/** A click anywhere on an item row or card opens the item's drawer, except on its own controls (buttons, links, fields, menus),
+ *  inside a dialog or menu rendered elsewhere (React bubbles portal clicks), or when the user is selecting text.
+ *  Keyboard users open it with the title button. */
+const INTERACTIVE = "button, a, input, textarea, select, label, [role='menuitem'], [role='menu'], [role='dialog'], [role='radio']";
+export function openFromRow(e: React.MouseEvent<HTMLElement>, open: () => void) {
+  const t = e.target as HTMLElement;
+  if (!e.currentTarget.contains(t)) return; // a portal (Edit dialog, Dismiss menu)
+  if (t.closest(INTERACTIVE)) return;
+  if (typeof window !== "undefined" && window.getSelection()?.toString()) return;
+  open();
 }

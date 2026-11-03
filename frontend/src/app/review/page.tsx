@@ -1,20 +1,27 @@
 "use client";
-import { Suspense, useState } from "react";
-import { Check, ChevronDown, Pencil, ShieldCheck, Undo2, X } from "lucide-react";
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import useSWR from "swr";
+import { Check, ChevronDown, Pencil, Search, ShieldCheck, Undo2, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Async, Empty, ErrorNote, ExtLink, HBars, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
+import { ArticleLink, Async, ColourLegends, Empty, ErrorNote, HBars, Hint, Loading, N, PageHead, Panel, Tag } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
-import { ApiError, path, send, useApi } from "@/lib/api";
+import { ApiError, get, path, send, useApi } from "@/lib/api";
+import { competitorFilterOptions } from "@/lib/competitorLabel";
+import { SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, filterQueue, hasLocalFilters, queueQuery, remainingOffsets, sortQueue, windowOptions, type QueueSort } from "@/lib/reviewQueue";
 import { HOLD_LABEL, LEVEL_LABEL, fmtDateTime, fmtLongDate, label } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
+import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { HoldReason, Level, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
+import { alwaysReviewedHint, holdChip } from "@/lib/holdReasons";
+import { HOLD_RULES, HOLD_RULES_INTRO } from "@/lib/holdRulesText";
 import { cn } from "@/lib/utils";
 
 const PAGE = 25;
@@ -32,29 +39,55 @@ export default function ReviewPage() {
   );
 }
 
+/** Every page of GET /review for these API-side filters, so search and the local filters see the whole queue. */
+async function getWholeQueue(url: string): Promise<Review> {
+  const first = await get<Review>(url);
+  const rest = remainingOffsets(first.total, first.items.length);
+  if (!rest.length) return first;
+  const pages = await Promise.all(rest.map((o) => get<Review>(url.replace(/([?&])offset=0\b/, `$1offset=${o}`))));
+  return { ...first, items: [...first.items, ...pages.flatMap((p) => p.items)] };
+}
+
 function ReviewScreen() {
-  const { get, set } = useUrlState();
+  const { get: param, set } = useUrlState();
   const { data: meta } = useMeta();
-  const preview = get("preview") as Level | "";
-  const reason = get("reason");
-  const competitor = get("competitor");
-  const offset = Number(get("offset") || 0);
-  const brief = get("brief");
-  const q = useApi<Review>(path("/review", { level: preview || undefined, reason, competitor, brief, limit: PAGE, offset }));
+  const preview = param("preview") as Level | "";
+  const reason = param("reason");
+  const competitor = param("competitor");
+  const brief = param("brief");
+  const score = param("score");
+  const category = param("category");
+  const sortParam = param("sort");
+  const sort: QueueSort = sortParam === "newest" || sortParam === "oldest" ? sortParam : "";
+  const offset = Number(param("offset") || 0);
+  const [search, setSearch] = useState(param("q"));
+  const urlQ = param("q");
+  useEffect(() => {
+    if (search === urlQ) return;
+    const t = setTimeout(() => set({ q: search || null, offset: null }), 250);
+    return () => clearTimeout(t);
+  }, [search, urlQ, set]);
+  const q = useSWR<Review, ApiError>(path("/review", queueQuery({ level: preview, reason, competitor, brief })), getWholeQueue,
+    { revalidateOnFocus: false, keepPreviousData: true });
+  const briefs = useApi<Page<{ date: string }>>(path("/briefs", { limit: 200 }));
   const current = meta?.level;
   const shown = q.data?.level;
   const previewing = Boolean(preview && current && preview !== current);
   const [trustMsg, setTrustMsg] = useState<TrustResult | null>(null);
+  const local = { q: urlQ, score, category };
+  const windows = windowOptions((briefs.data?.items ?? []).map((b) => b.date).concat(brief ? [brief] : []), fmtLongDate);
 
   return (
     <>
-      <PageHead title="Review queue" sub="Items held by the routing rules, each with the reason it was held" />
-      {brief ? <BriefScope brief={brief} applied={q.data ? q.data.scope?.brief === brief : null} onClear={() => set({ brief: null, offset: null })} /> : null}
+      <PageHead title="Review queue" info="Items held by the routing rules, each with the reason it was held." />
       {trustMsg ? <TrustToast res={trustMsg} onDone={() => setTrustMsg(null)} /> : null}
 
       <Async {...q} retry={() => q.mutate()} rows={6}>
         {(r) => {
           const lv = r.levels.find((x) => x.level === r.level);
+          const rows = sortQueue(filterQueue(r.items, local), sort);
+          const filtered = hasLocalFilters(local) || reason || competitor || brief;
+          const pageRows = rows.slice(offset, offset + PAGE);
           return (
             <>
               <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
@@ -89,35 +122,57 @@ function ReviewScreen() {
 
               <TrustedSources />
 
+              <ColourLegends />
+
               <Panel
                 title="What needs my decision?"
-                cap={`${r.total} held at ${label(LEVEL_LABEL, r.level)}${reason ? ` for ${label(HOLD_LABEL, reason)}` : ""} · held at every level first`}
-                right={
-                  <span className="flex flex-wrap gap-2">
-                    <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
-                      options={(meta?.competitors ?? []).map((c) => ({ value: c.key, label: c.name }))} />
-                    <FilterSelect ariaLabel="Hold reason" allLabel="All reasons" value={reason} onChange={(v) => set({ reason: v, offset: null })}
-                      options={(meta?.hold_reasons ?? []).map((c) => ({ value: c, label: label(HOLD_LABEL, c) }))} />
-                  </span>
-                }
+                info={<HoldRulesInfo />}
+                cap={`${rows.length} of ${r.total} held at ${label(LEVEL_LABEL, r.level)}${reason ? ` for ${label(HOLD_LABEL, reason)}` : ""}`}
               >
+                <div className="mb-2.5 flex flex-wrap items-center gap-2">
+                  <label className="relative min-w-[16rem] flex-1">
+                    <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-mute" />
+                    <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search held items"
+                      placeholder="Search by item id, title or publisher"
+                      className="h-8 w-full rounded-md border border-line bg-white pr-2.5 pl-8 text-[13px] outline-none focus:border-jgreen" />
+                  </label>
+                  <FilterSelect ariaLabel="Sort" allLabel={SORT_OPTIONS[0].label} value={sort} onChange={(v) => set({ sort: v || null, offset: null })}
+                    options={SORT_OPTIONS.slice(1)} />
+                  <FilterSelect ariaLabel="Window" allLabel="All held items" value={brief} onChange={(v) => set({ brief: v, offset: null })}
+                    options={windows} className="h-8 min-w-[14rem] bg-white text-[13px]" />
+                  <FilterSelect ariaLabel="Score" allLabel="All scores" value={score} onChange={(v) => set({ score: v, offset: null })}
+                    options={SCORE_OPTIONS} />
+                  <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
+                    options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
+                  <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
+                    options={competitorFilterOptions(meta)} />
+                  <FilterSelect ariaLabel="Hold reason" allLabel="All reasons" value={reason} onChange={(v) => set({ reason: v, offset: null })}
+                    options={(meta?.hold_reasons ?? []).map((c) => ({ value: c, label: label(HOLD_LABEL, c) }))} />
+                </div>
+                <div className="mb-2 text-xs text-mute">{SORT_LINES[sort]}{brief ? " Changed cells belong to no Brief, so a Brief window lists items only." : ""}</div>
                 {previewing ? <div className="mb-2 text-xs text-mute">Actions are off while previewing another level.</div> : null}
-                {r.items.length ? (
-                  r.items.map((row) =>
+                {pageRows.length ? (
+                  pageRows.map((row) =>
                     row.kind === "item" ? (
                       <QueueItem key={row.item.item_id} row={row} level={r.level} disabled={previewing} onTrusted={setTrustMsg} />
                     ) : (
                       <ChangeRow key={`c${row.change_id}`} row={row} disabled={previewing} />
                     ),
                   )
+                ) : filtered ? (
+                  <Empty>
+                    Nothing held matches {urlQ.trim() ? <>&ldquo;{urlQ.trim()}&rdquo; with </> : null}these filters
+                    {brief ? <> in the Brief of {fmtLongDate(brief)}. <button type="button" className="font-semibold text-jgreen-d hover:underline" onClick={() => set({ brief: null, offset: null })}>Search all held items</button></> : "."}{" "}
+                    An item already approved or dismissed is no longer held: find it in the <Link href="/log" className="font-semibold text-jgreen-d hover:underline">Log</Link>.
+                  </Empty>
                 ) : (
-                  <Empty>{reason || competitor ? "Nothing held matches these filters." : `The queue is empty at ${label(LEVEL_LABEL, r.level)}.`}</Empty>
+                  <Empty>{`The queue is empty at ${label(LEVEL_LABEL, r.level)}.`}</Empty>
                 )}
-                {r.total > PAGE ? (
+                {rows.length > PAGE ? (
                   <div className="mt-2.5 flex items-center justify-end gap-2">
-                    <span className="text-xs text-mute">{offset + 1}–{Math.min(offset + PAGE, r.total)} of {r.total}</span>
+                    <span className="text-xs text-mute">{offset + 1}–{Math.min(offset + PAGE, rows.length)} of {rows.length}</span>
                     <Button variant="outline" size="sm" className="h-7 text-xs" disabled={offset === 0} onClick={() => set({ offset: String(Math.max(0, offset - PAGE)) })}>Previous</Button>
-                    <Button variant="outline" size="sm" className="h-7 text-xs" disabled={offset + PAGE >= r.total} onClick={() => set({ offset: String(offset + PAGE) })}>Next</Button>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" disabled={offset + PAGE >= rows.length} onClick={() => set({ offset: String(offset + PAGE) })}>Next</Button>
                   </div>
                 ) : null}
               </Panel>
@@ -135,19 +190,20 @@ function LevelControl({ levels, current, shown, onPreview }: {
   return (
     <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Autonomy level">
       {levels.map((l) => (
-        <button key={l.level} type="button" role="radio" aria-checked={shown === l.level} onClick={() => onPreview(l.level)}
+        <Hint key={l.level} text={LEVEL_HELP[l.level]} asChild>
+        <button type="button" role="radio" aria-checked={shown === l.level} onClick={() => onPreview(l.level)}
           className={cn("flex items-center gap-3 rounded border px-3 py-2 text-left transition-colors hover:border-jgreen",
             shown === l.level ? "border-jgreen bg-accent" : "border-line")}>
-          <span className="flex-1">
+          <span className="flex flex-1 items-center gap-1.5">
             <span className="font-semibold">{label(LEVEL_LABEL, l.level)}</span>
-            {current === l.level ? <Tag className="ml-2 bg-jgreen px-1.5 text-[11px] text-white">current</Tag> : null}
-            <span className="block text-[11px] text-mute">{LEVEL_HELP[l.level]}</span>
+            {current === l.level ? <Tag className="bg-jgreen px-1.5 text-[11px] text-white">current</Tag> : null}
           </span>
           <span className="text-right">
             <b className="text-lg font-semibold tabular-nums">{l.held}</b>
             <span className="block text-[11px] text-mute">held</span>
           </span>
         </button>
+        </Hint>
       ))}
     </div>
   );
@@ -194,18 +250,33 @@ function PreviewBar({ preview, current, onBack }: { preview: Level; current: Lev
   );
 }
 
+/** The (i) on "What needs my decision?": why items are held, in plain words. */
+function HoldRulesInfo() {
+  return (
+    <span className="block">
+      <span className="mb-1.5 block">{HOLD_RULES_INTRO}</span>
+      <span className="m-0 flex flex-col gap-0.5">
+        {HOLD_RULES.map(([k, v]) => (
+          <span key={k} className="block">• <b className="font-semibold">{k}:</b> {v}</span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
 function ReasonChips({ reasons, level }: { reasons: HoldReason[]; level: Level }) {
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
       {reasons.map((h) => {
-        const always = h.held_at.length === 3;
+        const chip = holdChip(h, label(HOLD_LABEL, h.code));
+        const always = chip.levels == null;
         const active = h.held_at.includes(level);
         return (
-          <span key={h.code} title={h.detail}
+          <span key={h.code} title={chip.hint || undefined}
             className={cn("inline-flex items-center gap-1 rounded-[3px] border px-2 py-px text-xs",
               always ? "border-[#e5483b] bg-[#fff5f5] text-[#a32d2d]" : active ? "border-[#f59e0b] bg-[#fffaf0] text-[#8a5a00]" : "border-line text-mute")}>
-            <b className="font-semibold">{label(HOLD_LABEL, h.code)}</b>
-            <span>· {always ? "every level" : h.held_at.map((l) => LEVEL_LABEL[l] ?? l).join(", ")}</span>
+            <b className="font-semibold">{chip.label}</b>
+            {chip.levels ? <span>· {chip.levels}</span> : null}
           </span>
         );
       })}
@@ -313,7 +384,7 @@ function TrustedSources() {
     }
   };
   return (
-    <Panel title="Which sources have earned trust?" cap="Suggested after 3+ approvals and no dismissals">
+    <Panel title="Which sources have earned trust?" info="A host is suggested after 3 or more approvals and no dismissals.">
       {err ? <div className="mb-2"><ErrorNote error={err} /></div> : null}
       <div className="grid gap-4 md:grid-cols-2">
         <div>
@@ -356,7 +427,6 @@ const CHANGE_DISMISS: Record<string, string> = {
 };
 
 function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean }) {
-  const { data: meta } = useMeta();
   const refresh = useRefreshAll();
   const [err, setErr] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
@@ -381,7 +451,7 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
     <div className="flex items-start gap-3 border-t border-line bg-[#fff7e6] px-2.5 py-2.5 first:border-t-0">
       <Tag className="bg-[#f59e0b] text-white">Cell</Tag>
       <div className="min-w-0 flex-1">
-        <div className="font-semibold">{competitorName(meta, row.competitor)} · {row.axis_label ?? row.axis ?? "axis unknown"}: head-to-head cell changed</div>
+        <div className="font-semibold"><CompetitorLabel k={row.competitor} /> · {row.axis_label ?? row.axis ?? "axis unknown"}: head-to-head cell changed</div>
         <div className="mt-1 grid gap-2 text-xs md:grid-cols-2">
           <div><div className="text-mute">Was</div>{row.old_value || "—"}{row.old_evidence ? <div className="mt-0.5 italic text-mute">&ldquo;{row.old_evidence}&rdquo;</div> : null}</div>
           <div><div className="text-mute">Now</div>{row.new_value || "—"}{row.new_evidence ? <div className="mt-0.5 italic text-mute">&ldquo;{row.new_evidence}&rdquo;</div> : null}</div>
@@ -395,8 +465,8 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
         ) : null}
         <div className="mt-1 flex flex-wrap gap-2 text-xs text-mute">
           {row.held_since ? <span>Detected {fmtDateTime(row.held_since)}</span> : null}
-          {row.page_url ? <ExtLink href={row.page_url}>tracked page</ExtLink> : null}
-          <span>Held at every level</span>
+          {row.page_url ? <ArticleLink href={row.page_url} label="Open the tracked page in a new tab" /> : null}
+          <span title={alwaysReviewedHint("changed_cell", "")}>Always reviewed: changed head-to-head cell</span>
         </div>
         {editing ? (
           <div className="mt-2 flex flex-col gap-1.5">
@@ -427,19 +497,6 @@ function ChangeRow({ row, disabled }: { row: ReviewChangeRow; disabled: boolean 
         </DropdownMenu>
         <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs" disabled={off} onClick={() => setEditing(true)}><Pencil className="size-3.5" /> Edit</Button>
       </div>
-    </div>
-  );
-}
-
-/** The queue scoped to one Brief window (from the Brief's "Review these"). Says so when the API ignores the filter. */
-function BriefScope({ brief, applied, onClear }: { brief: string; applied: boolean | null; onClear: () => void }) {
-  return (
-    <div className="-mt-2 flex flex-wrap items-center gap-2 text-xs">
-      <Tag className="bg-[#e8eefb] font-semibold text-[#3f5b8f]">Held from the Brief of {fmtLongDate(brief)}</Tag>
-      {applied === false ? (
-        <span className="text-[#8a5a00]">The API doesn&apos;t filter by Brief yet, so this is the whole backlog.</span>
-      ) : null}
-      <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onClear}>Show the whole backlog</Button>
     </div>
   );
 }

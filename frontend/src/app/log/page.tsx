@@ -1,15 +1,17 @@
 "use client";
 // Log: layout and titles kept from the prototype (the user liked it as is). Data from GET /api/v1/log.
+import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Async, Empty, ExtLink, HBars, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
+import { Async, ColourLegends, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { ReopenButton } from "@/components/review/actions";
 import { path, useApi } from "@/lib/api";
+import { competitorFilterOptions } from "@/lib/competitorLabel";
 import { DISMISS_LABEL, STAGE_LABEL, STATUS_COLOR, STATUS_LABEL, fmtDate, label } from "@/lib/format";
-import { competitorName, useMeta } from "@/lib/meta";
+import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
 import type { Log, LogRow } from "@/lib/types";
 
@@ -38,7 +40,7 @@ function LogScreen() {
 
   return (
     <>
-      <PageHead title="Log" sub="Every collected item, including dropped ones" />
+      <PageHead title="Log" info="Every collected item, including dropped ones." />
       <Async {...q} retry={() => q.mutate()} rows={6}>
         {(d) => {
           const byStatus = d.counts.status;
@@ -58,10 +60,12 @@ function LogScreen() {
                 </Panel>
               </div>
 
+              <ColourLegends unscored />
+
               <Panel>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
-                    options={(meta?.competitors ?? []).map((c) => ({ value: c.key, label: c.name }))} />
+                    options={competitorFilterOptions(meta)} />
                   <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
                     options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
                   <FilterSelect ariaLabel="Status" allLabel="All statuses" value={status} onChange={(v) => set({ status: v, offset: null })}
@@ -84,7 +88,7 @@ function LogScreen() {
                         </tr>
                       </thead>
                       <tbody>
-                        {d.items.map((r, i) => <LogTr key={`${r.item_id}-${r.run_id}-${r.stage}-${i}`} r={r} name={competitorName(meta, r.competitor)} />)}
+                        {d.items.map((r, i) => <LogTr key={`${r.item_id}-${r.run_id}-${r.stage}-${i}`} r={r} />)}
                       </tbody>
                     </table>
                   </div>
@@ -105,20 +109,16 @@ function LogScreen() {
   );
 }
 
-function LogTr({ r, name }: { r: LogRow; name: string }) {
+function LogTr({ r }: { r: LogRow }) {
   const drawer = useItemDrawer();
   const dropped = r.status === "dropped";
   const td = "border-b border-line px-2.5 py-[9px] align-top";
   return (
     <tr>
       <td className={`${td} whitespace-nowrap`}>{fmtDate(r.collected_at)}</td>
-      <td className={`${td} whitespace-nowrap`}>{r.competitor ? name : "—"}</td>
+      <td className={`${td} whitespace-nowrap`}>{r.competitor ? <CompetitorLabel k={r.competitor} /> : "—"}</td>
       <td className={td}>
-        {dropped || !r.item_id ? (
-          <ExtLink href={r.url}>{r.title || "(no title)"}</ExtLink>
-        ) : (
-          <button type="button" className="text-left hover:text-jgreen-d" onClick={() => drawer.open(r.item_id!)}>{r.title || "(no title)"}</button>
-        )}
+        <ItemTitle title={r.title} url={r.url} onOpen={dropped || !r.item_id ? undefined : () => drawer.open(r.item_id!)} />
         {dropped && r.duplicate_of ? (
           <button type="button" className="ml-1 text-xs text-mute hover:text-jgreen-d" onClick={() => drawer.open(r.duplicate_of!)}>· kept item</button>
         ) : null}

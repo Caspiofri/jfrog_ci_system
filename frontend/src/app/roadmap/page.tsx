@@ -93,7 +93,7 @@ function Shot({ slug, title }: { slug: string; title: string }) {
 export default function RoadmapPage() {
   return (
     <>
-      <PageHead title="Roadmap" sub="Concepts from the design prototype that need data the pipeline doesn't produce yet" />
+      <PageHead title="Roadmap" info="Concepts from the design prototype that need data the pipeline doesn't produce yet." />
       <div className="-mt-2 text-xs text-mute">
         Every image here uses the prototype&apos;s sample data and isn&apos;t connected to the pipeline. The other screens show only real data.
       </div>

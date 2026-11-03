@@ -297,3 +297,38 @@ def dropped_rows(runs_dir: Path, run_ids: list[str]) -> list[dict]:
         if path.exists():
             out += [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     return out
+
+
+# ---- insight continuity (API layer only; ci/insights.py is untouched) ----
+
+CONTINUITY_MIN_SHARED_STORIES = 2
+
+
+def insight_continuity(today: list[dict], previous: list[dict], previous_date: str | None) -> tuple[dict, dict]:
+    """({insight_id: continuity}, the previous Brief's side) from the stored story_ids of two Briefs' insights.
+
+    A previous insight matches one of today's when it has the same pattern and shares at least 2 stories with it:
+    - "continuing": at least one match; since = the previous Brief's date;
+    - "strengthened": continuing, and today's insight cites stories none of its matches cited (new_stories);
+    - "new": no match. An insight sharing stories only with a previous insight of another pattern is new: it says
+      something else about them.
+    When several previous insights match, new_stories counts against all of them together."""
+    def stories(x: dict) -> set[str]:
+        return set(x.get("story_ids") or [])
+
+    out, matched_prev = {}, set()
+    for t in today:
+        mine = stories(t)
+        same = [p for p in previous if p.get("pattern") == t.get("pattern")
+                and len(mine & stories(p)) >= CONTINUITY_MIN_SHARED_STORIES]
+        if not same:
+            out[t["insight_id"]] = {"status": "new", "since": None, "new_stories": None, "matched": []}
+            continue
+        matched_prev.update(p["insight_id"] for p in same)
+        added = len(mine - set().union(*(stories(p) for p in same)))
+        out[t["insight_id"]] = {"status": "strengthened" if added else "continuing", "since": previous_date,
+                                "new_stories": added, "matched": [p["insight_id"] for p in same]}
+    unmatched = [p["insight_id"] for p in previous if p["insight_id"] not in matched_prev]
+    return out, {"date": previous_date, "insights": len(previous), "unmatched": len(unmatched),
+                 "unmatched_ids": unmatched}
+

@@ -1,4 +1,5 @@
 "use client";
+import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { Suspense } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -9,7 +10,7 @@ import { ItemRow } from "@/components/ItemRow";
 import { ActivityChart } from "@/components/competitors/ActivityChart";
 import { HeadToHead } from "@/components/competitors/HeadToHead";
 import { DealsTable, MixBar, Trend } from "@/components/competitors/parts";
-import { path, useApi } from "@/lib/api";
+import { path, useRecord } from "@/lib/api";
 import { CATEGORY_COLOR, fmtDate } from "@/lib/format";
 import { useUrlState } from "@/lib/useParams";
 import type { CompetitorProfile } from "@/lib/types";
@@ -28,7 +29,7 @@ function Profile() {
   const { key } = useParams<{ key: string }>();
   const { get, set } = useUrlState();
   const offset = Number(get("offset") || 0);
-  const q = useApi<CompetitorProfile>(path(`/competitors/${encodeURIComponent(key)}`, { limit: PAGE, offset }));
+  const q = useRecord<CompetitorProfile>(path(`/competitors/${encodeURIComponent(key)}`, { limit: PAGE, offset }), key, (d) => d.key);
   return (
     <>
       <div>
@@ -43,19 +44,19 @@ function Profile() {
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h1 className="m-0 text-[22px] font-semibold">{p.name}</h1>
+                  <h1 className="m-0 flex items-center gap-2 text-[22px] font-semibold"><CompetitorAvatar k={p.key} name={p.name} size="lg" />{p.name}</h1>
                   <div className="mt-0.5 text-mute">
                     Week to {fmtDate(p.date, true)} · last activity {fmtDate(c.last_activity_at, true)}
                   </div>
                 </div>
-                <span className="flex items-center gap-2 text-mute">Threat this week <ScoreBadge score={c.threat} /></span>
+                <span className="flex items-center gap-2 text-mute">Top score this week <ScoreBadge score={c.threat} /></span>
               </div>
 
               <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
                 <KpiTile value={c.items_7d} label="Published in 7 days" sub={<Trend t={c.trend} prev={c.items_prev_7d} />} />
                 <KpiTile value={c.items_today} label="In this Brief" />
                 <KpiTile value={c.pending_review} label="Awaiting review" sub={c.pending_max_score ? <span className="text-mute">highest score {c.pending_max_score}</span> : undefined} />
-                <KpiTile value={c.head_to_head_changes ?? "—"} label="Head-to-head changes" sub={<span className="text-mute">{c.tracked_changes ?? 0} tracked-page changes</span>} />
+                <KpiTile future value={c.head_to_head_changes ?? "—"} label="Head-to-head changes" sub={<span className="text-mute">{c.tracked_changes ?? 0} tracked-page changes</span>} />
               </div>
 
               <Panel title="What happened this week?">
@@ -71,7 +72,7 @@ function Profile() {
                 <Panel title="What are they focused on?" cap="Published items this week">
                   {c.category_mix.length ? (
                     <>
-                      <MixBar mix={c.category_mix} />
+                      <MixBar mix={c.category_mix} legend />
                       <div className="mt-3">
                         <HBars rows={c.category_mix.map((m) => ({ label: m.category, value: m.count, color: CATEGORY_COLOR[m.category] }))} />
                       </div>
@@ -81,9 +82,11 @@ function Profile() {
               </div>
 
               {p.head_to_head ? (
-                <Panel title="How do they compare with JFrog?" cap="Changed cells are highlighted and go to review · not stated = the page says nothing, not a gap">
+                <div id="head-to-head" className="scroll-mt-20">
+                <Panel title="How do they compare with JFrog?" info="Changed cells are highlighted and go to review. Not stated means the page says nothing on that axis, not that there is a gap.">
                   <HeadToHead competitor={p.key} name={p.name} axes={p.head_to_head.axes} />
                 </Panel>
+                </div>
               ) : (
                 <Panel title="How do they compare with JFrog?"><Empty>{p.name} is a channel, not a vendor: no head-to-head.</Empty></Panel>
               )}
