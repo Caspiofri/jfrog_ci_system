@@ -179,7 +179,7 @@ def test_dismiss_flag_unflag_and_if_match(env):
     assert "pub1" not in ids(c.get("/api/v1/brief", params={"date": "2026-10-30"}).json()["items"]["items"])
     assert c.post("/api/v1/items/late/dismiss", json={"reason": "bored"}).status_code == 422
     f = c.post("/api/v1/items/late/flag").json()
-    assert f["status"] == "flagged" and f["flagged"] is True
+    assert f["status"] == "auto_published" and f["flagged"] is True  # D107: the flag is a marker, not a status
     assert c.post("/api/v1/items/late/flag", headers={"If-Match": "0"}).status_code == 409  # stale version
     assert c.delete("/api/v1/items/late/flag", headers={"If-Match": "1"}).json()["status"] == "auto_published"
     with Store(store_path) as s:
@@ -251,10 +251,85 @@ def test_reopen_restores_approved_and_flagged_items(env):
     assert c.post("/api/v1/items/uv/approve").json()["status"] == "approved"
     c.post("/api/v1/items/uv/dismiss", json={"reason": "duplicate"})
     assert c.post("/api/v1/items/uv/reopen").json()["status"] == "approved"
-    assert c.post("/api/v1/items/uv4/flag").json()["status"] == "flagged"  # from awaiting_review: approved + flag
+    f = c.post("/api/v1/items/uv4/flag").json()
+    assert (f["status"], f["flagged"]) == ("awaiting_review", True)  # D107: flagged, still held
     c.post("/api/v1/items/uv4/dismiss", json={"reason": "not_relevant"})
-    assert c.post("/api/v1/items/uv4/reopen").json()["status"] == "flagged"
-    assert c.delete("/api/v1/items/uv4/flag").json()["status"] == "approved"  # the decision came back too
+    r = c.post("/api/v1/items/uv4/reopen").json()
+    assert (r["status"], r["flagged"]) == ("awaiting_review", True)  # the flag came back with it
+    u = c.delete("/api/v1/items/uv4/flag").json()
+    assert (u["status"], u["flagged"]) == ("awaiting_review", False)
+
+
+def brief_ids(c, date="2026-10-30"):
+    return ids(c.get("/api/v1/brief", params={"date": date}).json()["items"]["items"])
+
+
+def state(store_path, item_id):
+    with Store(store_path) as s:
+        row = s.item_states().get(item_id) or {"decision": None, "flagged": 0}
+    return row["decision"], row["flagged"]
+
+
+def test_flag_on_a_held_item_only_marks_it_d107(env):
+    c, store_path, _ = env
+    summary = c.get("/api/v1/brief", params={"date": "2026-10-30"}).json()["summary"]
+    f = c.post("/api/v1/items/uv4/flag", json={"note": "look at this"}).json()
+    assert (f["status"], f["flagged"], f["measures"]) == ("awaiting_review", True, "")  # score 4: no ranking miss
+    assert state(store_path, "uv4") == (None, 1)  # no decision was written
+    item = c.get("/api/v1/items/uv4").json()["item"]
+    assert (item["status"], item["flagged"]) == ("awaiting_review", True)
+    assert "uv4" not in brief_ids(c)  # held: out of the Brief until an analyst decides
+    after = c.get("/api/v1/brief", params={"date": "2026-10-30"}).json()["summary"]
+    assert (after["published"], after["held"]) == (summary["published"], summary["held"])
+    queue = {x["item"]["item_id"]: x["item"] for x in c.get("/api/v1/review").json()["items"] if x["kind"] == "item"}
+    assert queue["uv4"]["flagged"] is True  # still in the review queue, with the marker
+    log = {x["item_id"]: x for x in c.get("/api/v1/log", params={"limit": 200}).json()["items"]}
+    assert log["uv4"]["status"] == "awaiting_review" and log["uv4"]["stage"] != "analyst"  # a flag is no decision
+    assert log["uv4"]["flagged"] is True and log["pub1"]["flagged"] is False
+    assert c.post("/api/v1/items/uv4/flag").status_code == 409  # already flagged
+    assert c.post("/api/v1/items/uv4/approve").json()["status"] == "approved"  # the analyst decides; flag stays
+    assert state(store_path, "uv4") == ("approved", 1) and "uv4" in brief_ids(c)
+
+
+def test_flag_on_a_published_item_leaves_it_published(env):
+    c, store_path, _ = env
+    for item_id, status in (("pub1", "auto_published"), ("late", "auto_published")):
+        assert c.post(f"/api/v1/items/{item_id}/flag").json()["status"] == status
+        assert state(store_path, item_id) == (None, 1)
+    c.post("/api/v1/items/uv/approve")
+    assert c.post("/api/v1/items/uv/flag").json()["status"] == "approved"
+    assert state(store_path, "uv") == ("approved", 1)
+    assert sorted(brief_ids(c)) == ["late", "pub1", "uv"]  # the Brief without the flags, plus the approval
+    assert all(x["flagged"] for x in c.get("/api/v1/brief", params={"date": "2026-10-30"}).json()["items"]["items"])
+
+
+def test_unflag_restores_the_exact_state_before_the_flag(env):
+    c, store_path, _ = env
+    c.post("/api/v1/items/uv/approve")
+    for item_id in ("uv4", "pub1", "uv"):  # held, auto-published, approved
+        before_item = c.get(f"/api/v1/items/{item_id}").json()["item"]
+        before_state, before_brief = state(store_path, item_id), brief_ids(c)
+        c.post(f"/api/v1/items/{item_id}/flag")
+        u = c.delete(f"/api/v1/items/{item_id}/flag").json()
+        after_item = c.get(f"/api/v1/items/{item_id}").json()["item"]
+        assert u["status"] == before_item["status"] and u["flagged"] is False
+        assert state(store_path, item_id) == (before_state[0], 0) and brief_ids(c) == before_brief
+        assert {k: v for k, v in after_item.items() if k != "version"} == \
+            {k: v for k, v in before_item.items() if k != "version"}
+        assert c.delete(f"/api/v1/items/{item_id}/flag").status_code == 409  # not flagged any more
+
+
+def test_flag_keeps_the_ranking_miss_signal_and_no_flagged_status(env):
+    c, store_path, _ = env
+    c.patch("/api/v1/items/late", json={"score": 2})
+    f = c.post("/api/v1/items/late/flag").json()
+    assert f["measures"] == "ranking_miss" and f["flagged"] is True
+    with Store(store_path) as s:
+        assert s.actions("late")[-1]["payload"]["measures"] == "ranking_miss"
+    m = c.get("/api/v1/meta").json()
+    assert "flagged" not in m["statuses"] and m["dismiss_reasons"] == ["not_relevant", "wrong_competitor",
+                                                                       "wrong_category", "duplicate"]
+    assert c.post("/api/v1/items/noise/flag").status_code == 409  # dropped items are not flaggable
 
 
 def test_reopen_of_a_dismiss_logged_before_state_before_existed(env):

@@ -90,7 +90,8 @@ Used by the Brief, the Competitors profile, Review and Log.
 | `discovered_at` | …Z | ✅ | `items.discovered_at` (only moves earlier) |
 | `discovery_lag_hours` | float \| null | 🔧 | `discovered_at − published_at` |
 | `badge` | `new`\|`late`\|null | 🔧 / ❌ | **D31.** In a Brief context, computed live from the Brief window (§3.1). Freezing it per Brief needs ❌ a `brief_items` table. `follow_up` needs ❌ events |
-| `status` | `auto_published`\|`awaiting_review`\|`approved`\|`dismissed`\|`flagged`\|`dropped` | ❌ | ❌ `ci/route.py` (a pure function of hold reasons + level, §5) + ❌ `item_state` for analyst decisions. **Until those land, every item that isn't noise is `awaiting_review` or `auto_published`, computed by the 🔧 routing query** |
+| `status` | `auto_published`\|`awaiting_review`\|`approved`\|`dismissed`\|`dropped` (no `flagged` since D107: see `flagged`) | ❌ | ❌ `ci/route.py` (a pure function of hold reasons + level, §5) + ❌ `item_state` for analyst decisions. **Until those land, every item that isn't noise is `awaiting_review` or `auto_published`, computed by the 🔧 routing query** |
+| `flagged` | bool | ✅ | `item_state.flagged`. **D107:** a marker only, separate from `status`; it never changes the status, the decision or the Brief (§15) |
 | `hold_reasons` | [`HoldReason`] | 🔧 / ❌ | §5. Computed from stored fields; `changed_cell` comes from changes.sqlite |
 | `stage` | `url_dedupe`\|`embedding_dedupe`\|`test_skip`\|`classify`\|`rank`\|`validate`\|`route`\|`analyst` | 🔧 / ❌ | where the item stopped. Dropped items need ❌ dropped rows in the store (today they're only in `.dropped.jsonl`); `analyst` needs ❌ `item_state` |
 | `stage_reason` | str | 🔧 / ❌ | the dedupe reason, the skip reason, the rejection reason (D32) or the routing reasons |
@@ -413,7 +414,7 @@ The Brief separates what is known (published items scored 3+), what is pending (
 
 ### 10.1 `GET /api/v1/brief?date=`: items scored 3+ only (#3h)
 
-- `items` lists the window's **published** items (`auto_published`, `approved`, `flagged`) with `score >= brief_min_score`.
+- `items` lists the window's **published** items (`auto_published`, `approved`) with `score >= brief_min_score`. A flag doesn't put an item in or take it out (D107).
   - `brief_min_score` is `3`, set in `config/brief.yaml` (`min_score`). It's a config value, not code, and it isn't part of any fingerprint.
   - The response echoes it as `brief_min_score`.
 - Below the threshold, per rubric v2's "Shown in" column: score 2 belongs to the competitor profile and score 1 to the timeline. The Brief never lists them; it only counts them (`summary.published_below`).
@@ -680,7 +681,7 @@ These three bodies are `{"error": {code, message, details}}` with no `meta`.
   |---|---|
   | `awaiting_review` / `auto_published` | no decision: routing decides again, at the current level and vetted list |
   | `approved` | `approved` |
-  | `flagged` | `flagged` (and the decision under the flag comes back too) |
+  | (any of the above, flagged) | the same status, and the flag comes back too (`state_before.flagged`) |
 
   Edits made before or after the dismiss are kept. Nothing is written to `evals/analyst_labels.jsonl`.
 - **Response:** the action envelope (`action_id`, `action: "reopen"`, `status`, `flagged`, `version`, `at`, `meta`…) plus `reopens_action_id` (the dismiss it undid) and `status_before_dismiss`.
@@ -715,3 +716,17 @@ These three bodies are `{"error": {code, message, details}}` with no `meta`.
 - **`since`** is the previous Brief's date, not the first Brief of a longer run of matches.
 - **`previous`:** the previous Brief's `date` (`null` for the first Brief), its generator `status` (`null` when it stored no generation), its number of `insights`, and how many of them (`unmatched`, `unmatched_ids`) no insight of this Brief matches. When the previous Brief has no insights, every insight is `new`.
 - **Story ids** are the generator's own (the id of a story's first, richest item). On 31 Oct → 1 Nov they were stable; a story whose representative item changes between days would count as a different story.
+
+## 15. Flag is a marker only (D107, 4 Nov; as built)
+
+`POST /api/v1/items/{id}/flag` and `DELETE /api/v1/items/{id}/flag` change `item_state.flagged` and nothing else.
+
+- **Field:** `flagged` (bool) on every Item (`GET /items/{id}`, Brief, Review, competitor profile) and on every Log row (`false` for dropped rows). It's the only place the flag shows; there is no `flagged` status any more, and `GET /meta` → `statuses` no longer lists it.
+- **Flag:** allowed from `awaiting_review`, `auto_published` and `approved` when the item isn't flagged. It writes no decision, so the status stays what it was. A held item stays in the Review queue and out of the Brief until an analyst approves or dismisses it; a published item stays published.
+  - An already flagged item answers `409 conflict` with `{status, flagged: true}`; `dropped`, `dismissed`, test-split and unclassified items answer `409` with `{status, allowed_from}`.
+  - `measures` is still `ranking_miss` when the effective score is 2 or lower (else `""`), in the response and the action payload.
+- **Unflag:** allowed from the same statuses when the item is flagged (else `409` with `flagged: false`). It clears the flag only, so the item is back in its exact state before the flag: the same decision, status and Brief membership. Only `version` moves on.
+- **Other actions:** approve and dismiss work on a flagged item as on any other. Approve keeps the flag; dismiss clears it, and reopen brings it back from `state_before.flagged`. An edit keeps it.
+- **Log:** a flag isn't a decision, so a flagged item keeps the stage routing gave it (`route`, `validate`…), not `analyst`.
+- **Counts:** Brief, Health and run `items_after_actions` count statuses only, so a flag changes none of them. The live store and the demo snapshot had 0 flagged items and 0 flag actions when this changed, so no stored or reported number moved.
+- **Before D107 (until 4 Nov):** Flag on a held item also wrote `decision: approved`, and a flagged item had the status `flagged`, counted as published.
