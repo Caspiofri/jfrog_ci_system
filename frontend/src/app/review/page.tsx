@@ -3,7 +3,7 @@ import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Check, ChevronDown, Pencil, Search, ShieldCheck, Undo2, X } from "lucide-react";
+import { Check, ChevronDown, Flag, Pencil, Search, ShieldCheck, Undo2, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { ItemRow } from "@/components/ItemRow";
 import { ItemActions, useRefreshAll } from "@/components/review/actions";
 import { ApiError, get, path, send, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
-import { DECIDED_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, decisionOptions, filterQueue, hasLocalFilters, inQueueScope, queueQuery, remainingOffsets, sortQueue, windowOptions, type DecisionView, type QueueSort } from "@/lib/reviewQueue";
+import { LOG_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, decisionOptions, filterQueue, flaggedFirst, hasLocalFilters, inQueueScope, queueQuery, remainingOffsets, sortQueue, windowOptions, type DecisionView, type QueueSort } from "@/lib/reviewQueue";
 import { HOLD_LABEL, LEVEL_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
@@ -69,8 +69,8 @@ function ReviewScreen() {
   const score = param("score");
   const category = param("category");
   const viewParam = param("decision");
-  const view: DecisionView = viewParam === "approved" || viewParam === "dismissed" || viewParam === "all" ? viewParam : "";
-  const VIEW_NAME: Record<DecisionView, string> = { "": "Needs decision", approved: "Approved", dismissed: "Dismissed", all: "All" };
+  const view: DecisionView = viewParam === "approved" || viewParam === "flagged" || viewParam === "dismissed" || viewParam === "all" ? viewParam : "";
+  const VIEW_NAME: Record<DecisionView, string> = { "": "Needs decision", approved: "Approved", flagged: "Flagged", dismissed: "Dismissed", all: "All" };
   const sortParam = param("sort");
   const sort: QueueSort = sortParam === "newest" || sortParam === "oldest" ? sortParam : "";
   const offset = Number(param("offset") || 0);
@@ -84,7 +84,7 @@ function ReviewScreen() {
   const q = useSWR<Review, ApiError>(path("/review", queueQuery({ level: preview, reason, competitor, brief })), getWholeQueue,
     { revalidateOnFocus: false, keepPreviousData: true });
   const briefs = useApi<Page<{ date: string }>>(path("/briefs", { limit: 200 }));
-  const decided = useSWR<ReviewItemRow[], ApiError>(path("/log", { status: DECIDED_STATUSES, competitor, limit: 200, offset: 0 }), getDecided,
+  const decided = useSWR<ReviewItemRow[], ApiError>(path("/log", { status: LOG_STATUSES, competitor, limit: 200, offset: 0 }), getDecided,
     { revalidateOnFocus: false, keepPreviousData: true });
   const current = meta?.level;
   const shown = q.data?.level;
@@ -104,12 +104,16 @@ function ReviewScreen() {
           // D91: decided items in the same scope as the API's queue (window, competitor, reason at this level)
           const done = (decided.data ?? []).filter((x) => inQueueScope(x.item, { window: r.scope?.window, reason, level: r.level }));
           const byStatus = (st: string) => done.filter((x) => x.item.status === st);
+          const isFlagged = (x: ReviewItemRow | ReviewChangeRow) => x.kind === "item" && x.item.flagged;
+          // D107: flagged = the boolean on any item, held ones included (they stay in Needs decision)
+          const flaggedRows = [...r.items.filter(isFlagged), ...done.filter(isFlagged)];
           const needs = r.items.length; // what the default lists: held items, plus changed cells outside a Brief window
-          const counts = { needs, approved: byStatus("approved").length, dismissed: byStatus("dismissed").length, all: needs + done.length };
+          const counts = { needs, approved: byStatus("approved").length, flagged: flaggedRows.length, dismissed: byStatus("dismissed").length, all: needs + done.length };
           // Dismissed is offered when the data carries dismissed items (or the URL asks for it, so the selector is never blank)
           const viewOptions = decisionOptions(counts, view === "dismissed" || (decided.data ?? []).some((x) => x.item.status === "dismissed"));
-          const base: (ReviewItemRow | ReviewChangeRow)[] = view === "" ? r.items : view === "all" ? [...r.items, ...done] : byStatus(view);
-          const rows = sortQueue(filterQueue(base, local), sort);
+          const base: (ReviewItemRow | ReviewChangeRow)[] = view === "" ? r.items : view === "all" ? [...r.items, ...done] : view === "flagged" ? flaggedRows : byStatus(view);
+          const sorted = sortQueue(filterQueue(base, local), sort);
+          const rows = view === "" || view === "all" ? flaggedFirst(sorted) : sorted; // flagged items lead the list
           const filtered = hasLocalFilters(local) || reason || competitor || brief;
           const anyFilter = Boolean(brief || score || category || competitor || reason);
           // the header count: "110 of 110 held at Strict", or "Showing 14 of 110 held at Strict" with a filter or search;
@@ -163,6 +167,11 @@ function ReviewScreen() {
                 {/* row 1, what is shown: status, search, sort */}
                 <div className="mb-2 flex flex-wrap items-center gap-2" data-filter-row="shown">
                   <StatusControl ariaLabel="Decision" value={view} onChange={(v) => set({ decision: v || null, offset: null })} options={viewOptions} />
+                  {/* flagged items leave the default view; their count stays next to the filter, one click away */}
+                  <button type="button" onClick={() => set({ decision: "flagged", offset: null })} data-flagged-count={counts.flagged}
+                    className="inline-flex shrink-0 items-center gap-1 text-xs text-mute hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-jgreen">
+                    <Flag className="size-3.5" aria-hidden /> {counts.flagged} flagged
+                  </button>
                   <label className="relative min-w-[14rem] flex-1">
                     <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-mute" />
                     <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search held items"
@@ -209,7 +218,7 @@ function ReviewScreen() {
                     An item already approved or dismissed is no longer held: find it in the <Link href="/log" className="font-semibold text-jgreen-d hover:underline">Log</Link>.
                   </Empty>
                 ) : (
-                  <Empty>{view === "approved" || view === "dismissed" ? `No ${VIEW_NAME[view].toLowerCase()} items in this scope.` : `The queue is empty at ${label(LEVEL_LABEL, r.level)}.`}</Empty>
+                  <Empty>{view === "approved" || view === "flagged" || view === "dismissed" ? `No ${VIEW_NAME[view].toLowerCase()} items in this scope.` : `The queue is empty at ${label(LEVEL_LABEL, r.level)}.`}</Empty>
                 )}
                 {rows.length > PAGE ? (
                   <div className="mt-2.5 flex items-center justify-end gap-2">
@@ -327,8 +336,9 @@ function ReasonChips({ reasons, level }: { reasons: HoldReason[]; level: Level }
   );
 }
 
-/** D91: an approved, dismissed or flagged item under Approved, Dismissed or All: its status, no actions (nothing here
- *  changes a decision; Reopen stays in the item's side panel). */
+/** D91: an item that is not held (approved, dismissed, or a flagged cleared item) under Approved, Flagged, Dismissed or
+ *  All: its status, no actions (nothing here changes a decision; Reopen stays in the item's side panel). A flagged item
+ *  carries the Flagged badge from ItemRow (D107). */
 function DecidedItem({ row, level }: { row: ReviewItemRow; level: Level }) {
   const it = row.item;
   return (

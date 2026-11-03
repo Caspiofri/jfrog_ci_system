@@ -66,3 +66,12 @@ test("demo mode only: the snapshot line under the header, dated from the manifes
   assert.match(shell, /Demo snapshot of \{fmtDate\(d, true\)\}\. The live system keeps running daily at 06:00\./);
   assert.match(shell, /<\/header>\s*<DemoLine \/>/);
 });
+
+test("D107: Flag toggles with Unflag, with the hover as written; one Flagged badge in Review, the drawer and the Log", () => {
+  const a = src("components/review/actions.tsx");
+  assert.match(a, /\{item\.flagged \? \([\s\S]*?send\("DELETE", `\/api\/v1\/items\/\$\{id\}\/flag`[\s\S]*?Unflag[\s\S]*?\) : \([\s\S]*?title=\{FLAG_TIP\}[\s\S]*?send\("POST", `\/api\/v1\/items\/\$\{id\}\/flag`/);
+  assert.match(src("components/ci.tsx"), /export const FLAG_TIP = "Marks this item as important\. It does not approve or publish it\.";/);
+  assert.match(src("components/ItemRow.tsx"), /\{item\.flagged \? <FlaggedBadge \/> : null\}/);
+  assert.match(src("components/ItemDrawer.tsx"), /\{it\.flagged \? <FlaggedBadge \/> : null\}/);
+  assert.match(src("app/log/page.tsx"), /\{r\.flagged \? <FlaggedBadge \/> : null\}/);
+});

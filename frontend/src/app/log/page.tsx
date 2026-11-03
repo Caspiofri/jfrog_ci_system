@@ -3,7 +3,7 @@
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Async, ColourLegends, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
+import { Async, ColourLegends, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot, FlaggedBadge } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
@@ -127,7 +127,7 @@ function LogTr({ r }: { r: LogRow }) {
       </td>
       <td className={td}>{r.category ?? "—"}</td>
       <td className={td}><ScoreBadge score={r.score} noise={r.stage === "classify" && r.score === null} /></td>
-      <td className={td}><StatusDot status={r.status} /></td>
+      <td className={td}><span className="inline-flex flex-wrap items-center gap-1.5"><StatusDot status={r.status} />{r.flagged ? <FlaggedBadge /> : null}</span></td>
       <td className={`${td} whitespace-nowrap`}>{label(STAGE_LABEL, r.stage)}</td>
       <td className={`${td} text-mute`}>
         {r.dismiss_reason ? `Dismissed: ${label(DISMISS_LABEL, r.dismiss_reason)}` : routeReasonWords(r.reason) || "—"}

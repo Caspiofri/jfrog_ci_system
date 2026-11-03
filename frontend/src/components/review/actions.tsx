@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FilterSelect } from "@/components/FilterSelect";
 import { ApiError, send } from "@/lib/api";
-import { ErrorNote } from "@/components/ci";
+import { ErrorNote, FLAG_TIP } from "@/components/ci";
 import { DISMISS_LABEL, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import type { Item } from "@/lib/types";
@@ -22,6 +22,8 @@ export function useRefreshAll() {
 }
 
 const btn = "h-7 px-2.5 text-xs";
+
+const UNFLAG_TIP = "Removes the important mark. The item's status does not change.";
 
 export function ItemActions({ item, disabled, onError }: { item: Item; disabled?: boolean; onError: (e: ApiError | null) => void }) {
   const refresh = useRefreshAll();
@@ -75,10 +77,18 @@ export function ItemActions({ item, disabled, onError }: { item: Item; disabled?
       <Button size="sm" variant="outline" className={btn} disabled={off} onClick={() => setEditing(true)}>
         <Pencil className="size-3.5" /> Edit
       </Button>
-      <Button size="sm" variant="outline" className={btn} disabled={off} title="Mark as important; a flag on a low score is a ranking miss"
-        onClick={() => run(() => send("POST", `/api/v1/items/${id}/flag`, {}, item.version))}>
-        <Flag className="size-3.5" /> Flag
-      </Button>
+      {/* D107: Flag only marks the item; it toggles with Unflag, and neither changes the item's status */}
+      {item.flagged ? (
+        <Button size="sm" variant="outline" className={btn} disabled={off} title={UNFLAG_TIP} aria-pressed
+          onClick={() => run(() => send("DELETE", `/api/v1/items/${id}/flag`, undefined, item.version))}>
+          <Flag className="size-3.5 fill-current" /> Unflag
+        </Button>
+      ) : (
+        <Button size="sm" variant="outline" className={btn} disabled={off} title={FLAG_TIP} aria-pressed={false}
+          onClick={() => run(() => send("POST", `/api/v1/items/${id}/flag`, {}, item.version))}>
+          <Flag className="size-3.5" /> Flag
+        </Button>
+      )}
       {editing ? (
         <EditDialog item={item} onClose={() => setEditing(false)}
           onSave={(body) => run(() => send("PATCH", `/api/v1/items/${id}`, body, item.version)).then(() => setEditing(false))} />

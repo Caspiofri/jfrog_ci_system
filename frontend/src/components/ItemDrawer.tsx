@@ -7,7 +7,7 @@ import { mentionExplanation, showLensBlock } from "@/lib/jfrogMention";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ArticleLink, Async, CategoryTag, Hint, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { ArticleLink, Async, CategoryTag, FlaggedBadge, Hint, ScoreBadge, StatusDot } from "@/components/ci";
 import { LensView } from "@/components/LensView";
 import { ReopenButton } from "@/components/review/actions";
 import { useRecord } from "@/lib/api";
@@ -95,7 +95,7 @@ function DrawerBody({ id }: { id: string }) {
                   <StatusDot status={it.status} />
                   <CategoryTag category={it.category} />
                   {it.mentions_jfrog ? <MentionsJfrog excerpt={it.excerpt} mention={it.jfrog_mention} /> : null}
-                  {it.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
+                  {it.flagged ? <FlaggedBadge /> : null}
                   {it.status === "dismissed" ? <span className="ml-auto"><ReopenButton itemId={it.item_id} version={it.version} title={it.title} /></span> : null}
                 </div>
                 {showLensBlock(it.lens, it.lens_status) ? <LensBlock lens={it.lens} status={it.lens_status} /> : null}
