@@ -92,6 +92,16 @@ class ItemOut(BaseModel):
     lens: dict | None  # D42: {axis, capability_quote, relation, why_it_matters, why}; None when none passed its check
     lens_status: Literal["ok", "rejected", "failed"] | None  # the latest lens row's status; None when no lens row
     text_basis: "TextBasisOut"  # D39/D44
+    jfrog_mention: "JfrogMentionOut | None"  # D77: None when mentions_jfrog is false
+
+
+class JfrogMentionOut(BaseModel):
+    """D77: where JFrog is mentioned, from the stored text with the mentions_jfrog pattern; a mention, not a
+    comparison. snippet is at most 280 characters (D36); null when the mention is not in the stored text."""
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["found", "not_in_stored_text"]
+    snippet: str | None = Field(max_length=280)
+    found_in: Literal["title", "text"] | None
 
 
 class TextBasisOut(BaseModel):
