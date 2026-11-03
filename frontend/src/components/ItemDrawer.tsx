@@ -6,10 +6,11 @@ import { mentionExplanation, showLensBlock } from "@/lib/jfrogMention";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ArticleLink, Async, CategoryTag, ScoreBadge, StatusDot, Tag } from "@/components/ci";
+import { ArticleLink, Async, CategoryTag, Hint, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 import { LensView } from "@/components/LensView";
 import { ReopenButton } from "@/components/review/actions";
 import { useRecord } from "@/lib/api";
+import { classifiedBy } from "@/lib/classifiedBy";
 import { HOLD_LABEL, LEVEL_LABEL, SOURCE_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtPublished, label } from "@/lib/format";
 import { competitorName, useMeta } from "@/lib/meta";
 import type { FieldChange, ItemAction, ItemDetail, Lens, LensStatus, Meta } from "@/lib/types";
@@ -85,6 +86,7 @@ function DrawerBody({ id }: { id: string }) {
         <Async {...q} retry={() => q.mutate()} rows={6}>
           {(d) => {
             const it = d.item;
+            const cls = classifiedBy(d.classification);
             return (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -114,7 +116,7 @@ function DrawerBody({ id }: { id: string }) {
                   <Field k="Score reason">{it.reason || "—"}</Field>
                   {it.why_it_matters ? <Field k="Ranker's summary">{it.why_it_matters}</Field> : null}
                   {d.ranking?.raw_score != null && d.ranking.raw_score !== it.score ? <Field k="Model score">{d.ranking.raw_score} (adjusted to {it.score ?? "—"})</Field> : null}
-                  <Field k="Classified by">{d.classification?.method ?? "—"}{d.classification?.reason ? ` · ${d.classification.reason}` : ""}</Field>
+                  <Field k="Classified by"><Hint text={cls.hint}>{cls.label}</Hint></Field>
                   <Field k="Confidence">{it.confidence != null ? it.confidence.toFixed(2) : "—"}</Field>
                   {d.skip ? <Field k="Held out">{d.skip}</Field> : null}
                   {d.rejections.length ? <Field k="Rejected output">{d.rejections.join("; ")}</Field> : null}
