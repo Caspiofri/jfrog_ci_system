@@ -1,7 +1,7 @@
 "use client";
 // Small shared pieces in the prototype's style. All API strings are rendered as React text (D32).
 import type { ReactNode } from "react";
-import { AlertTriangle, ExternalLink, Inbox, Info, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, Flag, Inbox, Info, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -44,6 +44,17 @@ export function PageHead({ title, sub, tools, info, icon, titleHint }: {
 }
 
 /** A white card with a question as its title (prototype .card / .ct). */
+export const FLAG_TIP = "Marks this item as important. It does not approve or publish it.";
+
+/** D107: the analyst's flag, a marker only (the item's status is unchanged). One look on every screen. */
+export function FlaggedBadge({ className }: { className?: string }) {
+  return (
+    <Tag className={cn("inline-flex items-center gap-1 border border-[#a32d2d]/30 bg-[#fdeaea] font-semibold text-[#a32d2d]", className)} title="Flagged by an analyst as important">
+      <Flag className="size-3" aria-hidden /> Flagged
+    </Tag>
+  );
+}
+
 /** D88: the AI-extracted values are unverified; always visible, never only on hover. */
 export function UnverifiedNote({ className }: { className?: string }) {
   return (

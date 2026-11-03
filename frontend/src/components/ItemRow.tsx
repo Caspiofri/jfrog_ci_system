@@ -3,7 +3,7 @@
 import { MentionsJfrog } from "@/components/MentionsJfrog";
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import type { ReactNode } from "react";
-import { CategoryTag, ItemTitle, ScoreBadge, Tag, openFromRow } from "@/components/ci";
+import { CategoryTag, FlaggedBadge, ItemTitle, openFromRow, ScoreBadge, Tag } from "@/components/ci";
 import { ReviewedMark } from "@/components/ReviewedMark";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { ARTICLE_DATE_TIP, NO_TEXT, itemDateText } from "@/lib/format";
@@ -50,7 +50,7 @@ export function ItemRow({ item, showBadge = true, highlight = false, actions, ex
             <Tag className="bg-[#fff4e0] font-semibold text-[#8a5a00]" title="Collected well after its article date">Found late</Tag>
           ) : null}
           {item.mentions_jfrog ? <MentionsJfrog excerpt={item.excerpt} mention={item.jfrog_mention} /> : null}
-          {item.flagged ? <Tag className="bg-[#fdeaea] text-[#a32d2d]">Flagged</Tag> : null}
+          {item.flagged ? <FlaggedBadge /> : null}
           <ReviewedMark item={item} />
         </div>
         {item.why_it_matters ? <div className="mt-1 text-[#44516a]">{item.why_it_matters}</div> : null}

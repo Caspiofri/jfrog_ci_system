@@ -3,11 +3,11 @@
 import { CompetitorLabel } from "@/components/CompetitorAvatar";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Async, ColourLegends, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot } from "@/components/ci";
+import { Async, ColourLegends, Empty, HBars, ItemTitle, Loading, PageHead, Panel, ScoreBadge, StatusDot, FlaggedBadge } from "@/components/ci";
 import { Donut } from "@/components/Donut";
 import { FilterSelect } from "@/components/FilterSelect";
 import { useItemDrawer } from "@/components/ItemDrawer";
-import { ReopenButton } from "@/components/review/actions";
+import { ReopenButton, UnflagButton } from "@/components/review/actions";
 import { path, useApi } from "@/lib/api";
 import { competitorFilterOptions } from "@/lib/competitorLabel";
 import { COLLECTED_TIP, DISMISS_LABEL, routeReasonWords, STAGE_LABEL, STATUS_COLOR, STATUS_LABEL, fmtDate, label } from "@/lib/format";
@@ -127,11 +127,13 @@ function LogTr({ r }: { r: LogRow }) {
       </td>
       <td className={td}>{r.category ?? "—"}</td>
       <td className={td}><ScoreBadge score={r.score} noise={r.stage === "classify" && r.score === null} /></td>
-      <td className={td}><StatusDot status={r.status} /></td>
+      <td className={td}><span className="inline-flex flex-wrap items-center gap-1.5"><StatusDot status={r.status} />{r.flagged ? <FlaggedBadge /> : null}</span></td>
       <td className={`${td} whitespace-nowrap`}>{label(STAGE_LABEL, r.stage)}</td>
       <td className={`${td} text-mute`}>
         {r.dismiss_reason ? `Dismissed: ${label(DISMISS_LABEL, r.dismiss_reason)}` : routeReasonWords(r.reason) || "—"}
-        {r.status === "dismissed" && r.item_id ? <div className="mt-1"><ReopenButton itemId={r.item_id} title={r.title} /></div> : null}
+        {r.status === "dismissed" && r.item_id ? (
+          <div className="mt-1 flex flex-wrap gap-1.5"><ReopenButton itemId={r.item_id} title={r.title} />{r.flagged ? <UnflagButton itemId={r.item_id} /> : null}</div>
+        ) : null}
       </td>
     </tr>
   );

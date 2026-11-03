@@ -125,15 +125,18 @@ export function remainingOffsets(total: number, got: number): number[] {
 // ---- D91: which items the queue lists, by decision ----
 
 /** "" is Needs decision, the default: GET /review, items no analyst approved or dismissed yet. */
-export type DecisionView = "" | "approved" | "dismissed" | "all";
-/** Decided statuses, read from GET /log (the queue endpoint lists only awaiting_review). Flagged is published by an
- *  analyst's flag; it has no option of its own and shows under All. */
-export const DECIDED_STATUSES = ["approved", "dismissed", "flagged"];
+export type DecisionView = "" | "approved" | "flagged" | "dismissed" | "all";
+/** Decided statuses, read from GET /log (the queue endpoint lists only awaiting_review). D107: a flag is not a status
+ *  but the boolean `flagged`, a marker on any item; a flagged held item stays in the queue. */
+export const DECIDED_STATUSES = ["approved", "dismissed"];
+/** What the page reads from GET /log: the decided items, plus auto-published rows so a flagged cleared item is found. */
+export const LOG_STATUSES = ["approved", "dismissed", "auto_published"];
 
-/** Each decided item once (the Log lists an item once per run that saw it), in the Log's order. */
-export function decidedIds(rows: { item_id: string | null; status: string }[]): string[] {
+/** Each item once (the Log lists an item once per run that saw it), in the Log's order: every decided item, and any
+ *  other item an analyst flagged. */
+export function decidedIds(rows: { item_id: string | null; status: string; flagged?: boolean }[]): string[] {
   const seen = new Set<string>();
-  for (const r of rows) if (r.item_id && DECIDED_STATUSES.includes(r.status)) seen.add(r.item_id);
+  for (const r of rows) if (r.item_id && (DECIDED_STATUSES.includes(r.status) || r.flagged)) seen.add(r.item_id);
   return [...seen];
 }
 
@@ -152,11 +155,25 @@ export function inQueueScope(
 }
 
 /** The filter's options with their counts. Dismissed only when the data carries dismissed items. */
-export function decisionOptions(n: { needs: number; approved: number; dismissed: number; all: number }, hasDismissed: boolean) {
+export function decisionOptions(n: { needs: number; approved: number; flagged: number; dismissed: number; all: number }, hasDismissed: boolean) {
   return [
     { value: "" as DecisionView, label: `Needs decision (${n.needs})` },
     { value: "approved" as DecisionView, label: `Approved (${n.approved})` },
+    { value: "flagged" as DecisionView, label: `Flagged (${n.flagged})` },
     ...(hasDismissed ? [{ value: "dismissed" as DecisionView, label: `Dismissed (${n.dismissed})` }] : []),
     { value: "all" as DecisionView, label: `All (${n.all})` },
   ];
+}
+
+/** A flag that counts: set, on an item that is not dismissed. Dismiss keeps the flag (BE, after D107), but a dismissed
+ *  item is decided, so it is not counted as flagged, not in the Flagged view and not put first. */
+export function isActiveFlag(r: { kind: string; item?: { flagged?: boolean; status?: string } }): boolean {
+  return r.kind === "item" && Boolean(r.item?.flagged) && r.item?.status !== "dismissed";
+}
+
+/** Flagged items first (the analyst marked them important; dismissed ones excluded), then the rest in the order given.
+ *  Stable. */
+export function flaggedFirst<T extends { kind: string; item?: { flagged?: boolean; status?: string } }>(rows: T[]): T[] {
+  const isFlag = (r: T) => isActiveFlag(r);
+  return [...rows.filter(isFlag), ...rows.filter((r) => !isFlag(r))];
 }

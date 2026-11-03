@@ -387,6 +387,7 @@ export interface LogRow {
   stage: string | null;
   reason: string;
   dismiss_reason?: string | null; // §3.5: the latest dismiss action's reason, null on every other row
+  flagged?: boolean; // D107: the analyst's flag, a marker only
   duplicate_of: string | null;
   text_status: string | null;
 }
