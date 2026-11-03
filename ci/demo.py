@@ -6,7 +6,8 @@
 The snapshot has the live store's own format (ci.sqlite and changes.sqlite, same tables), so the API code is the
 same; only these differ:
 - items keep an allowlist of fields (ALLOWED_RAW). Full article text never goes in: `text` holds the 280-character
-  excerpt the API would show anyway, and the number of characters the ranker read is kept as a count;
+  excerpt the API would show anyway, and the number of characters the ranker read is kept as a count; the JFrog
+  mention snippet (D77, at most 280 characters) is computed from the full text before the cut;
 - local file paths (page snapshot files) are cleared;
 - a manifest (snapshot.json) names the snapshot's date, its source runs and the commit it was built from.
 The API in demo mode opens both files read-only, refuses every write with 403 demo_read_only, makes no LLM call,
@@ -23,7 +24,7 @@ from pathlib import Path
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from ci import run_meta
+from ci import jfrog_mention, run_meta
 from ci.api import service as svc
 from ci.pipeline import CI_DATA_DIR
 
@@ -43,6 +44,7 @@ def snapshot_raw(raw: dict) -> dict:
     excerpt = svc.excerpt(raw)
     out["text"] = out["teaser"] = excerpt  # what content_text reads, whatever the text status
     out["chars_used_for_scoring"] = svc.text_basis(raw)["chars_used_for_scoring"]
+    out[jfrog_mention.RAW_KEY] = jfrog_mention.find(raw)  # D77: from the full text, before the cut; <= 280 chars
     return out
 
 
@@ -102,7 +104,7 @@ def check(snapshot_dir: Path) -> None:
     """Raise if any item in the snapshot carries a field off the allowlist or more text than the excerpt."""
     db = sqlite3.connect(f"file:{snapshot_dir / STORE_FILE}?mode=ro", uri=True)
     try:
-        allowed = {*ALLOWED_RAW, "text", "teaser", "chars_used_for_scoring"}
+        allowed = {*ALLOWED_RAW, "text", "teaser", "chars_used_for_scoring", jfrog_mention.RAW_KEY}
         for item_id, raw in db.execute("SELECT item_id, raw FROM items"):
             r = json.loads(raw)
             extra = set(r) - allowed
@@ -110,6 +112,10 @@ def check(snapshot_dir: Path) -> None:
                 raise ValueError(f"{item_id}: fields off the allowlist {sorted(extra)}")
             if len(r.get("text") or "") > svc.EXCERPT_CHARS or len(r.get("teaser") or "") > svc.EXCERPT_CHARS:
                 raise ValueError(f"{item_id}: text longer than the excerpt")
+            match = r.get(jfrog_mention.RAW_KEY)
+            if match is not None and (set(match) != {"snippet", "found_in"}
+                                      or len(match["snippet"]) > jfrog_mention.SNIPPET_CHARS):
+                raise ValueError(f"{item_id}: JFrog mention snippet off its shape or longer than 280 characters")
     finally:
         db.close()
 

@@ -7,7 +7,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from ci import demo
+from ci import demo, jfrog_mention
 from ci.api import service as svc
 from ci.api.app import create_app
 from tests.ci.test_api import CFG, LONG, build
@@ -31,7 +31,7 @@ def test_the_snapshot_keeps_only_the_allowlist_and_the_excerpt(snap):
     assert LONG not in json.dumps(rows) and len(pub["text"]) <= svc.EXCERPT_CHARS  # no article text
     assert pub["text"] == svc.excerpt(live["pub1"]) and pub["title"] == live["pub1"]["title"]
     assert pub["chars_used_for_scoring"] == svc.text_basis(live["pub1"])["chars_used_for_scoring"]
-    assert set(pub) <= {*demo.ALLOWED_RAW, "text", "teaser", "chars_used_for_scoring"}
+    assert set(pub) <= {*demo.ALLOWED_RAW, "text", "teaser", "chars_used_for_scoring", jfrog_mention.RAW_KEY}
     assert manifest["date"] and manifest["commit"] and manifest["runs"]
     with pytest.raises(FileExistsError):  # a frozen snapshot is never rebuilt in place
         demo.build(out, store_path)

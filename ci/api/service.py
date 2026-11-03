@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 from ci import config as ci_config
-from ci import route, sources
+from ci import jfrog_mention, route, sources
 from ci.classify import CATEGORIES, content_text
 from ci.packet import INDUSTRY
 from ci.rank import LLM_TEXT_CHARS as RANKER_TEXT_CHARS
@@ -178,6 +178,7 @@ class Snapshot:
             "lens": self.lens_out(item_id),
             "lens_status": (self.lens.get(item_id) or {}).get("status"),
             "text_basis": text_basis(raw),
+            "jfrog_mention": jfrog_mention.mention(raw, bool(c.get("mentions_jfrog", False))),  # D77
         }
 
     def lens_out(self, item_id: str) -> dict | None:

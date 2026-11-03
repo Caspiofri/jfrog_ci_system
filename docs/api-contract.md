@@ -531,6 +531,18 @@ Every `Item` gains `text_basis`, and `lens` gains `why_it_matters`:
   | `failed` | The lens call for its batch failed (model or parse error) | `null` |
   | `null` | No lens row: the lens was not run on this item | `null` |
 
+- **`jfrog_mention`** (added 3 Nov, D77; read-only): where JFrog is mentioned in the stored text. It is a mention, not a comparison. `null` when `mentions_jfrog` is false. Otherwise:
+
+  ```json
+  "jfrog_mention": {"status": "found", "snippet": "…according to JFrog researchers. Threat hunters…", "found_in": "text"}
+  ```
+
+  | `status` | `snippet` | `found_in` |
+  |---|---|---|
+  | `found` | at most 280 characters around the first match, `…` where it was cut, whitespace collapsed | `text`, or `title` when only the title has it |
+  | `not_in_stored_text` | `null`: the flag is true but no match is in the stored title or text (the flag also reads the whole fetched page, while only 6,000 characters are stored) | `null` |
+
+  The match uses the flag's own pattern (`ci.classify.JFROG_RE`, URLs and domains not counted); no model call. A demo snapshot stores the match, computed from the full text before the text is cut to the excerpt.
 - The item's own `why_it_matters` (the ranker's summary) is unchanged.
 - **Not built:**
   - `lens.source_url` / `source_label` (#3d). The sheet's Sources list isn't labelled by axis, and most lines hold several links, so choosing one per axis would be a guess. It needs the sheet to name a source per axis row.
