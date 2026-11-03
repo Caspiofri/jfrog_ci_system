@@ -36,6 +36,7 @@ API_VERSION = "1"
 CHANGES_PATH = DATA_DIR / "ci" / "changes.sqlite"
 ANALYST_LABELS_PATH = EVALS_DIR / "analyst_labels.jsonl"  # candidates Ofri merges by hand (D31 Q4)
 MAX_LIMIT = 200
+FLAGGABLE = ("awaiting_review", "auto_published", "approved")  # D107: the flag is a marker on any of these
 Multi = Annotated[list[str] | None, Query()]  # a repeatable query filter (?competitor=a&competitor=b)
 Badges = Annotated[list[Literal["new", "late"]] | None, Query()]
 Kinds = Annotated[list[Literal["item", "change"]] | None, Query()]
@@ -476,9 +477,10 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     def act(item_id: str, action: str, allowed: tuple[str, ...], update: Callable[[dict, str], dict],
             if_match: str | None, reason: str | None = None, note: str | None = None,
             measures: Callable[[dict], str] = lambda it: "",
-            extra: Callable[[dict, list[dict]], dict] = lambda before, history: {}) -> dict:
+            extra: Callable[[dict, list[dict]], dict] = lambda before, history: {},
+            flagged: bool | None = None) -> dict:
         """extra(item before, the item's actions so far): more payload for the action row, read in the same
-        snapshot as the checks."""
+        snapshot as the checks. flagged: when set, the item's flag must have this value (409 otherwise)."""
         store, s = snap()
         with store:
             if item_id not in s.items:
@@ -487,6 +489,9 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             if before["status"] not in allowed:
                 raise ApiError(409, "conflict", f"cannot {action} an item that is {before['status']}",
                                {"status": before["status"], "allowed_from": list(allowed)})
+            if flagged is not None and before["flagged"] != flagged:
+                raise ApiError(409, "conflict", f"cannot {action} an item that is {'' if before['flagged'] else 'not '}"
+                               "flagged", {"status": before["status"], "flagged": before["flagged"]})
             try:
                 expect = int(if_match) if if_match is not None else None
             except ValueError:
@@ -522,27 +527,28 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     def dismiss(item_id: str, body: Dismiss, if_match: str | None = Header(default=None)):
         stage = {"wrong_competitor": "classifier", "wrong_category": "classifier", "not_relevant": "noise_filter",
                  "duplicate": "dedupe"}[body.reason]
-        return act(item_id, "dismiss", ("awaiting_review", "auto_published", "approved", "flagged"),
-                   lambda st, _: {"decision": "dismissed", "flagged": 0}, if_match, reason=body.reason,
+        return act(item_id, "dismiss", ("awaiting_review", "auto_published", "approved"),
+                   lambda st, _: {"decision": "dismissed"}, if_match, reason=body.reason,  # flag untouched (D107)
                    note=body.note, measures=lambda it: stage)
 
     def restore_before_dismiss(history: list[dict]) -> tuple[dict, dict]:
-        """(item_state update, the dismiss action) from the item's latest dismiss. A dismiss logged with state_before
-        is restored exactly; an older one from its before status (approved -> approved; flagged -> flagged;
-        awaiting_review or auto_published -> no decision, so routing decides again)."""
+        """(item_state update, the dismiss action) from the item's latest dismiss: the decision only, since neither
+        dismiss nor reopen touches the flag (D107). A dismiss logged with state_before gets its decision back exactly;
+        an older one from its before status (approved -> approved; anything else -> no decision, so routing decides
+        again)."""
         dismiss = next((a for a in reversed(history) if a["action"] == "dismiss"), None)
         if dismiss is None:
             raise ApiError(409, "conflict", "no dismiss action to reopen")
         sb = dismiss["payload"].get("state_before")
         if sb is not None:
-            return {"decision": sb["decision"], "flagged": int(sb["flagged"])}, dismiss
+            return {"decision": sb["decision"]}, dismiss
         st = dismiss["payload"]["before"]["status"]
-        return {"decision": "approved" if st == "approved" else None, "flagged": int(st == "flagged")}, dismiss
+        return {"decision": "approved" if st == "approved" else None}, dismiss
 
     @app.post("/api/v1/items/{item_id}/reopen")
     def reopen(item_id: str, body: Note | None = None, if_match: str | None = Header(default=None)):
-        """Undo a dismiss: a new 'reopen' action (the dismiss stays in the history) puts the decision and flag back
-        as they were before it. Edits are kept; nothing goes to the candidate-labels file."""
+        """Undo a dismiss: a new 'reopen' action (the dismiss stays in the history) puts the decision back as it was
+        before it. The flag and the edits are kept as they are; nothing goes to the candidate-labels file."""
         found: dict = {}
 
         def extra(before: dict, history: list[dict]) -> dict:
@@ -557,14 +563,17 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
 
     @app.post("/api/v1/items/{item_id}/flag")
     def flag(item_id: str, body: Note | None = None, if_match: str | None = Header(default=None)):
-        return act(item_id, "flag", ("auto_published", "approved", "awaiting_review"),
-                   lambda st, status: {"flagged": 1, **({"decision": "approved"} if status == "awaiting_review"
-                                                        else {})}, if_match, note=body.note if body else None,
+        """D107: Flag only marks the item. It sets the flag and nothing else: no decision, so the status (held,
+        published or approved) stays what it was and a held item stays out of the Brief."""
+        return act(item_id, "flag", FLAGGABLE, lambda st, _: {"flagged": 1}, if_match,
+                   note=body.note if body else None, flagged=False,
                    measures=lambda it: "ranking_miss" if (it["score"] or 0) <= 2 else "")
 
     @app.delete("/api/v1/items/{item_id}/flag")
     def unflag(item_id: str, if_match: str | None = Header(default=None)):
-        return act(item_id, "unflag", ("flagged",), lambda st, _: {"flagged": 0}, if_match)
+        """Clears the flag only. Flag changed nothing else, so the item is back in its exact state before the flag.
+        Also allowed on a dismissed item: dismiss keeps the flag (D107), so it can still be cleared there."""
+        return act(item_id, "unflag", (*FLAGGABLE, "dismissed"), lambda st, _: {"flagged": 0}, if_match, flagged=True)
 
     @app.patch("/api/v1/items/{item_id}")
     def edit(item_id: str, body: Edit, if_match: str | None = Header(default=None)):
@@ -588,7 +597,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                           for k, v in fields.items()]
             return {"changes": changes}
 
-        res = act(item_id, "edit", ("awaiting_review", "auto_published", "approved", "flagged", "dismissed"),
+        res = act(item_id, "edit", ("awaiting_review", "auto_published", "approved", "dismissed"),
                   lambda st, _: {f"edit_{k}": v for k, v in fields.items()}, if_match, note=body.note,
                   measures=lambda it: "label_candidate", extra=extra)
         labels_out.parent.mkdir(parents=True, exist_ok=True)
@@ -685,7 +694,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                 stage, why = "pending", "not classified yet"
             elif it["noise"]:
                 stage, why = "classify", s.outputs[i]["classification"].get("reason") or "classified as noise"
-            elif st.get("decision") or st.get("flagged"):
+            elif st.get("decision"):  # D107: a flag is not a decision; a flagged item stops where routing put it
                 stage, why = "analyst", it["status"]
             elif s.rejections.get(i):
                 stage, why = "validate", "; ".join(s.rejections[i])
@@ -700,6 +709,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                          "collected_at": sg["seen_at"], "discovered_at": it["discovered_at"], "status": it["status"],
                          "stage": stage, "reason": why, "duplicate_of": None,
                          "dismiss_reason": dismissed_for.get(i) if it["status"] == "dismissed" else None,
+                         "flagged": it["flagged"],  # D107: the marker, apart from the status
                          "text_status": s.items[i]["raw"].get("text_status")})
         for d in svc.dropped_rows(runs_dir, [r["run_id"] for r in s.runs]):
             rows.append({"item_id": d.get("id"), "run_id": d.get("run_id"), "title": d.get("title") or "",
@@ -709,7 +719,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                          "published_at": d.get("published_at"), "collected_at": d.get("collected_at"),
                          "discovered_at": None, "status": "dropped", "stage": d.get("drop_stage"),
                          "reason": d.get("drop_reason") or "", "duplicate_of": d.get("duplicate_of"),
-                         "dismiss_reason": None, "text_status": d.get("text_status")})
+                         "dismiss_reason": None, "flagged": False, "text_status": d.get("text_status")})
         return rows
 
     @app.get("/api/v1/log")

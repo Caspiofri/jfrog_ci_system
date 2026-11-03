@@ -23,7 +23,7 @@ from config.settings import CONFIG_DIR
 
 TZ = ZoneInfo("Asia/Jerusalem")
 EXCERPT_CHARS = 280
-PUBLISHED = ("auto_published", "approved", "flagged")
+PUBLISHED = ("auto_published", "approved")  # D107: a flag is a marker on the item, not a status
 BRIEF_RUN_KINDS = ("daily", "import")  # an imported collection run anchors the Brief of its day, like a daily run
 BRIEF_RUN_STATUSES = ("ok", "degraded")
 DISMISS_REASONS = ("not_relevant", "wrong_competitor", "wrong_category", "duplicate")
@@ -134,9 +134,7 @@ class Snapshot:
             return "dropped"
         if state.get("decision") == "dismissed":
             return "dismissed"
-        if state.get("flagged"):
-            return "flagged"
-        if state.get("decision") == "approved":
+        if state.get("decision") == "approved":  # D107: the flag never sets or overrides the status
             return "approved"
         return route.status(x, level or self.level, None, self.vetted)
 
@@ -284,7 +282,8 @@ def competitor_keys(cfg: ci_config.CIConfig) -> list[str]:
 def meta_lists(cfg: ci_config.CIConfig) -> dict:
     return {"competitors": [{"key": c.key, "name": c.name, "is_industry": c.key == INDUSTRY} for c in cfg.competitors],
             "categories": CATEGORIES, "levels": list(route.LEVELS), "default_level": route.DEFAULT_LEVEL,
-            "statuses": [*route.STATUSES, HELD_OUT], "dismiss_reasons": list(DISMISS_REASONS),
+            "statuses": [*(x for x in route.STATUSES if x != "flagged"), HELD_OUT],  # D107: no flagged status
+            "dismiss_reasons": list(DISMISS_REASONS),
             "hold_reasons": ["unvetted_source", "low_confidence", "teaser_high_score", "junk_extraction", "pricing",
                              "m_and_a", "mentions_jfrog", "model_failure", "invalid_output", "changed_cell"]}
 
