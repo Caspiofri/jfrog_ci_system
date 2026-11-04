@@ -284,8 +284,11 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   - **Why:** per BE, the upgrade changes only the two package files and no fingerprinted file, so the measured
     system is unchanged. The Windows check covered the bundle a reviewer would clone.
   - **Later:** replaced as the code freeze by D128.
-- **Final code freeze (D128):** `22b45b6`, tag `freeze-20261105`, per BE. 1,239 pytest and 275 frontend tests
-  passed. From here only documents change.
+- **D128:** Final code freeze at 22b45b6, local annotated tag freeze-20261105, per BE: a normal merge of 4a82f28
+  (D125), changing only docker/ui.Dockerfile compared with f73b549. The UI image base is now node:22-trixie-slim.
+  1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank 99b79890ceea; 7 snapshot files identical;
+  repro recomputes with 0 differences. The Windows check of 4a82f28 passed. Only documents change from here.
+  Replaces D127.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in
