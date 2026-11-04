@@ -299,23 +299,10 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 
 ## Screens
 
-Each UI round changed display only; nothing measured moved.
-
-- **D44, D45:** the Brief separates what is known (published items scored 3+), what is pending (held items, shown
-  only as counts) and what cannot be concluded yet (insight states, evidence basis).
-- **D72:** an outside review: tiles on the Brief, explanations moved to hover, continuity badges, one link convention
-  (the title opens the drawer, an icon opens the article), letter avatars instead of logos, a heatmap of where
-  competitor activity lands.
-- **D89:** the author's review of the merged demo: new articles marked as new, fewer repeated labels.
-- **D104:** no raw errors, no false affordances, no duplicate panels; concept images labelled "Concept, sample data".
-- **D112:** Competitors cards answer what happened and what is waiting; the heatmap already answers how much, so it
-  gets a Total row and the cards lose the repeated counts. "+N vs previous 7 days" removed, because collection started
-  on 30 Oct and it read as a surge.
-- **D113:** from an outside reader: "Items in this Brief" instead of "Today in numbers" (wrong on a past Brief),
-  "Cumulative insights" instead of "Weekly", JFrog vs competitors marked as an interim view, "Checked manually" with
-  its date.
-- **D114:** the four "Items in this Brief" tiles share one box so labels and numbers line up; no text or number
-  changed.
+**The UI went through several display-only rounds, and nothing measured moved.** Three choices shaped it:
+- The Brief separates what is known, what is pending and what cannot be concluded yet: published items scored 3+, held items shown only as counts, and insight states with their evidence basis (D44, D45).
+- Numbers must not mislead. "+N vs previous 7 days" was removed from the Competitors cards, because collection started on 30 Oct and it read as a surge. "Today in numbers" became "Items in this Brief", because "today" is wrong on a past Brief (D112, D113).
+- Concept images are labelled "Concept, sample data", and the JFrog comparison is marked as an interim view, so neither reads as a measured finding (D104, D113).
 
 ## Stage 2
 
