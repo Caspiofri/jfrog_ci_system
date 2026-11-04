@@ -34,7 +34,7 @@ def test_coverage_summary_keeps_the_live_shape_and_drops_paths_and_matches():
 
 def test_check_refuses_paths_and_per_item_fields_but_keeps_confusion_rows():
     with pytest.raises(hs.Unsafe, match="local path"):
-        hs.check({"a": {"b": ["/home/ofri/x.json"]}})
+        hs.check({"a": {"b": ["/home/user/x.json"]}})
     with pytest.raises(hs.Unsafe, match="matches"):
         hs.check({"events": [{"matches": []}]})
     hs.check({"metrics": {"confusion": {"category": [{"label": "Security", "pred": "AI", "n": 4}]}}})

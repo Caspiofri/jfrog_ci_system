@@ -8,7 +8,7 @@ from collections.abc import Callable
 log = logging.getLogger(__name__)
 
 LOCALHOST = "127.0.0.1"
-ENV_VAR = "LABELING_HOSTS"  # comma-separated, e.g. 127.0.0.1,100.103.185.9
+ENV_VAR = "LABELING_HOSTS"  # comma-separated, e.g. 127.0.0.1,100.64.0.1
 WILDCARDS = {"0.0.0.0", "::"}
 
 

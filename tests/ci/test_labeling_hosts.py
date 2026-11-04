@@ -5,7 +5,7 @@ from ci.labeling import hosts
 
 
 def test_default_is_localhost_plus_tailscale():
-    assert hosts.resolve_hosts(None, env={}, detect=lambda: "100.103.185.9") == ["127.0.0.1", "100.103.185.9"]
+    assert hosts.resolve_hosts(None, env={}, detect=lambda: "100.64.0.1") == ["127.0.0.1", "100.64.0.1"]
 
 
 def test_no_tailscale_means_localhost_only():
@@ -20,14 +20,14 @@ def test_env_list_then_cli_take_precedence():
 
 def test_wildcard_warns():
     assert hosts.wildcard_warning(["0.0.0.0"]) and hosts.wildcard_warning(["::"])
-    assert hosts.wildcard_warning(["127.0.0.1", "100.103.185.9"]) is None
+    assert hosts.wildcard_warning(["127.0.0.1", "100.64.0.1"]) is None
 
 
 def test_tailscale_ip_parses_and_survives_failures(monkeypatch, caplog):
     def ok(*a, **kw):
-        return subprocess.CompletedProcess(a, 0, stdout="100.103.185.9\n", stderr="")
+        return subprocess.CompletedProcess(a, 0, stdout="100.64.0.1\n", stderr="")
     monkeypatch.setattr(hosts.subprocess, "run", ok)
-    assert hosts.tailscale_ip() == "100.103.185.9"
+    assert hosts.tailscale_ip() == "100.64.0.1"
 
     def missing(*a, **kw):
         raise FileNotFoundError("tailscale")
