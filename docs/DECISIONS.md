@@ -1,7 +1,7 @@
 # Decisions
 
 The main design decisions behind Jessi, each with what was decided, why, and what else was considered.
-IDs refer to the project's full decision log.
+IDs refer to the project's internal decision log, which is not in this repo.
 
 Sections: [Product](#product) · [Routing and analyst actions](#routing-and-analyst-actions) ·
 [Classification and scoring](#classification-and-scoring) · [The JFrog comparison](#the-jfrog-comparison) ·
@@ -89,7 +89,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   demo.
 - **Corrected:** D3 said "FastAPI over the LangGraph pipeline". The `ci/` pipeline is plain Python: `run_daily()`
   calls the steps in order, with thread pools during collection. LangGraph is imported only in `modules/graph.py`,
-  used by the legacy newsletter path (per BE on `fbc9677`, D117). No reason for building it this way is recorded.
+  used by the legacy newsletter path (checked on `fbc9677`, D117). No reason for building it this way is recorded.
 
 ## The JFrog comparison
 
@@ -216,9 +216,8 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   leaving the copy, live behaviour unchanged, and Health and evaluation numbers reading saved summaries.
 
 **Build first, then verify the exact system that is submitted (D47, D57).**
-- **What:** build days ended with a code freeze, a clean-clone test and a demo snapshot freeze. After that: fixes
-  found in verification, docs, screenshots and video. No change to classify, rank, lens or insights prompts and
-  rules.
+- **What:** build days ended with a code freeze, a clean-clone test and a demo snapshot freeze. After that: no
+  change to classify, rank, lens or insights prompts and rules.
 - **Why:** finishing and verifying was worth more than any further change.
 
 **A portable fingerprint beside the legacy one (D59).**
@@ -271,13 +270,6 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 - **Future, not built:** add agents for small, bounded processes inside the pipeline.
 - **Why:** the brief asks for a working GenAI tool, not an agent. Moving to an agent now would reopen the freeze, and
   the checks would no longer describe what is submitted.
-
-**The README states a vision, not built and with no date (D126).**
-- **What:** from a daily feed to an analysis partner: a chat assistant for analysts that uses the collected items,
-  citations and JFrog comparison. The first step is to learn the analysts' pain points; the assistant also needs
-  protection against prompt injection. No screen or code change.
-- **Why:** the submission should not read as if the system stays as it is. No analysts have been interviewed, so
-  the direction is stated as a vision, not as a validated need.
 
 ## Screens
 

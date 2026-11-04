@@ -391,7 +391,7 @@ freeze keeps the measured system unchanged (D99).
 | Fixes known, not applied | — | Publisher dates instead of feed dates; JFrog mention from stored text only; hiring signals (D12, dropped) |
 | Screen speed (not measured) | — | Competitors takes about a second to appear by eye on the Windows demo, and the Review page makes one item request per decided row |
 
-**Where this goes next: from a daily feed to an analysis partner.** The collected items, citations and JFrog comparison can power a chat assistant that helps analysts investigate a question, compare competitors and draft their analysis, with every answer tied to its sources. None of this is built. The first step is to learn from the analysts where their work is slowest and which decisions they need help with, so that the assistant solves real pain points. Article text is untrusted input, so the assistant also needs protection against prompt injection.
+**Where this goes next: from a daily feed to an analysis partner.** The collected items, citations and JFrog comparison can power a chat assistant that helps analysts investigate a question, compare competitors and draft their analysis, with every answer tied to its sources. None of this is built. The first step is to learn from the analysts where their work is slowest and which decisions they need help with, so that the assistant solves real pain points. Article text is untrusted input, so the assistant also needs protection against prompt injection. No analysts have been interviewed, so this is a vision, not a validated need.
 
 ## Origin, legacy code
 
