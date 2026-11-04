@@ -190,5 +190,13 @@ test("still at the top of the Competitors view, above the cards; JFrog row first
 
 test("the title's (i) says it is a direct comparison of JFrog's capabilities with the competitors'", () => {
   assert.match(comp, /<Panel title="JFrog vs competitors" info=\{MATRIX_INFO\}/);
-  assert.match(comp, /MATRIX_INFO = "A direct comparison of JFrog's capabilities with each competitor's, one capability at a time, from each vendor's public pages\.";/);
+  assert.match(comp, /MATRIX_INFO = "A direct comparison of JFrog's capabilities with each competitor's, one capability at a time, from each vendor's public pages\. The planned view needs more collected items and a further processing step, so it is not built in this submission\. Check the source before relying on a value\.";/);
+});
+
+test("D113: a Future view link next to Expand all, to the Roadmap's 'Where is the market heading?' card", () => {
+  assert.match(comp, /"Expand all"\}[\s\S]{0,200}<\/button>\s*\) : null\}\s*<Link href=\{FUTURE_VIEW_HREF\} data-future-view[^>]*>\s*<MapIcon [^>]*\/>Future view\s*<\/Link>/);
+  assert.match(comp, /FUTURE_VIEW_HREF = "\/roadmap#topics";/);
+  const r = readFileSync(new URL("../src/app/roadmap/page.tsx", import.meta.url), "utf8");
+  assert.match(r, /slug: "topics",\s*wide: true,\s*title: "Where is the market heading\?"/);
+  assert.match(r, /<section key=\{c\.slug\} id=\{c\.slug\}/);
 });

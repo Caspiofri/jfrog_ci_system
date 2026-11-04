@@ -20,7 +20,7 @@ import type { Brief, BriefInsights, BriefRow, BriefSummary, CitedItemRow, Claim,
 import { runCountsFor, todayTiles } from "@/lib/briefNumbers";
 import { CAPABILITY_ROWS } from "@/lib/capabilityRows";
 import { CAPABILITY_NAME, claimCapability, insightCapabilities } from "@/lib/capabilitySheet";
-import { insightsTitle } from "@/lib/insightsTitle";
+import { INSIGHTS_TITLE_HINT, insightsTitle } from "@/lib/insightsTitle";
 import { INSIGHTS_FROZEN } from "@/lib/demo";
 import { CONTINUITY_TIP, NEW_SOURCE_TIP, continuityBadge, goneLine, newCitedIds } from "@/lib/continuity";
 
@@ -126,6 +126,7 @@ function BriefScreen() {
 
                 <Panel
                   big
+                  id={CLEARED_ID}
                   title="What was cleared in this Brief?"
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
                   info={`The items found in this Brief's window and rated ${b.brief_min_score ?? 3} or higher on importance, cleared by routing or approved by an analyst. Items still waiting in the Review queue aren't listed.`}
@@ -159,14 +160,16 @@ function BriefScreen() {
   );
 }
 
-/** "Today in numbers": four tiles, each number straight from the API, each explained on hover. */
+const CLEARED_ID = "cleared-in-brief";
+
+/** "Items in this Brief": four tiles, each number straight from the API, each explained on hover. */
 function SummaryBlock({ date, s, runId }: { date: string; s: BriefSummary; runId: string }) {
   // keepPreviousData off: a 404 for this run must not leave the previous Brief's count on screen
   const run = useApi<RunMetrics>(path(`/run-metrics/${encodeURIComponent(runId)}`), { shouldRetryOnError: false, keepPreviousData: false });
   const tiles = todayTiles(s, runCountsFor(runId, run.data));
   return (
-    <section aria-label="Today in numbers">
-      <h2 className="m-0 mb-2 text-sm font-semibold">Today in numbers{s.mock ? <MockTag what="these counts" /> : null}</h2>
+    <section aria-label="Items in this Brief">
+      <h2 className="m-0 mb-2 text-sm font-semibold">Items in this Brief{s.mock ? <MockTag what="these counts" /> : null}</h2>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map((t) => {
           const body = (
@@ -185,8 +188,14 @@ function SummaryBlock({ date, s, runId }: { date: string; s: BriefSummary; runId
             <Hint key={t.key} text={<>{t.hint} Click to review them.</>} asChild>
               <Link href={`/review?brief=${encodeURIComponent(date)}`} data-tile={t.key} className={cn(box, "transition-colors hover:border-jgreen")}>{body}</Link>
             </Hint>
+          ) : t.key === "published" || t.key === "high" ? (
+            // D113: Cleared and High score scroll to the cleared list; no filter changes
+            <Hint key={t.key} text={<>{t.key === "published" ? <><b className="font-semibold">Cleared:</b> {CLEARED_TIP} </> : null}{t.hint} Click to see the cleared items.</>} asChild>
+              <button type="button" data-tile={t.key} className={cn(box, "w-full cursor-pointer transition-colors hover:border-jgreen")}
+                onClick={() => document.getElementById(CLEARED_ID)?.scrollIntoView({ behavior: "smooth", block: "start" })}>{body}</button>
+            </Hint>
           ) : (
-            <Hint key={t.key} text={t.key === "new" ? <><b className="font-semibold">Collected:</b> {COLLECTED_TIP} {t.hint}</> : t.key === "published" ? <><b className="font-semibold">Cleared:</b> {CLEARED_TIP} {t.hint}</> : t.hint}
+            <Hint key={t.key} text={t.key === "new" ? <><b className="font-semibold">Collected:</b> {COLLECTED_TIP} {t.hint}</> : t.hint}
               className={box}><span data-tile={t.key}>{body}</span></Hint>
           );
         })}
@@ -282,7 +291,7 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
       big
       title={
         <span className="inline-flex items-center gap-2">
-          {insightsTitle(insights.window)}
+          <Hint text={INSIGHTS_TITLE_HINT}>{insightsTitle(insights.window)}</Hint>
           <AiLabel />
         </span>
       }

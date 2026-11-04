@@ -1,4 +1,4 @@
-// npm test: the Brief's "Today in numbers" tiles (src/lib/briefNumbers.ts).
+// npm test: the Brief's "Items in this Brief" tiles (src/lib/briefNumbers.ts).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";

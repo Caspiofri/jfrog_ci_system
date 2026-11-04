@@ -106,6 +106,8 @@
      large screen). Laptops stay at the browser's normal size; the user's own font setting still applies. */
   html {
     font-size: clamp(100%, 0.25rem + 0.8333vw, 125%);
+    /* D113: the fixed header (and, on narrow screens, the nav row) never covers an anchor target; set by Shell */
+    scroll-padding-top: calc(var(--head-h, 3.5rem) + var(--nav-h, 0px) + 0.5rem);
   }
   * {
     @apply border-border outline-ring/50;

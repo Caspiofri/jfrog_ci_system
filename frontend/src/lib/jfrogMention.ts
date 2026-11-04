@@ -17,6 +17,12 @@ export const MENTION_NOTE = "A mention of JFrog in the article, not a comparison
 export const NOT_IN_STORED_TEXT =
   "JFrog is named on the article page, but not in the part of the article we store, so no passage can be shown.";
 
+/** The text cut into pieces, each "JFrog" (any letter case) marked, for React to render as plain text nodes (D113).
+ *  Joining every piece's text gives the input back unchanged. */
+export function splitJfrog(text: string): { text: string; jfrog: boolean }[] {
+  return text.split(/(jfrog)/i).filter((t) => t !== "").map((t) => ({ text: t, jfrog: /^jfrog$/i.test(t) }));
+}
+
 export interface JfrogMentionLike { status?: string; snippet?: string | null; found_in?: string | null }
 export type MentionSection = { kind: "found"; snippet: string; inTitle: boolean } | { kind: "not_in_stored_text" };
 

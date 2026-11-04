@@ -102,7 +102,7 @@ export default function RoadmapPage() {
           on half-width cards each line has a 2-line slot, so every half-width card is the same height */}
       <div className="grid gap-x-3.5 gap-y-3.5 md:grid-cols-2" data-roadmap-grid>
         {CONCEPTS.map((c) => (
-          <section key={c.slug} className={cn("row-span-4 grid grid-rows-subgrid gap-2.5 rounded-md border border-line bg-card px-[1.125rem] py-4", c.wide && "md:col-span-2")}
+          <section key={c.slug} id={c.slug} className={cn("row-span-4 grid grid-rows-subgrid scroll-mt-4 gap-2.5 rounded-md border border-line bg-card px-[1.125rem] py-4", c.wide && "md:col-span-2")}
             data-wide={c.wide || undefined}>
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="m-0 text-sm font-semibold">{c.title}</h2>

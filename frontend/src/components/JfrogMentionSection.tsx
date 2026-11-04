@@ -3,7 +3,7 @@
 // excerpt. Shows the API's snippet as is, or says the mention isn't in the stored text. Not shown without the field.
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { MENTION_NOTE, MENTION_TITLE, NOT_IN_STORED_TEXT, mentionSection } from "@/lib/jfrogMention";
+import { MENTION_NOTE, MENTION_TITLE, NOT_IN_STORED_TEXT, mentionSection, splitJfrog } from "@/lib/jfrogMention";
 import type { JfrogMention } from "@/lib/types";
 
 export function JfrogMentionSection({ mention }: { mention: JfrogMention | null | undefined }) {
@@ -21,7 +21,10 @@ export function JfrogMentionSection({ mention }: { mention: JfrogMention | null 
         <div className="flex flex-col gap-1 rounded border border-line bg-page px-3 py-2">
           {sec.kind === "found" ? (
             <>
-              <p className="m-0 text-[#44516a]">{sec.snippet}</p>
+              <p className="m-0 text-[#44516a]">
+                {/* D113: JFrog in green; text nodes only, never the article text as HTML */}
+                {splitJfrog(sec.snippet).map((p, i) => (p.jfrog ? <mark key={i} className="bg-transparent font-semibold text-jgreen-d" data-jfrog-word>{p.text}</mark> : <span key={i}>{p.text}</span>))}
+              </p>
               <p className="m-0 text-[0.6875rem] text-mute">{MENTION_NOTE}{sec.inTitle ? " Found in the title." : ""}</p>
             </>
           ) : <p className="m-0 text-xs italic text-mute">{NOT_IN_STORED_TEXT}</p>}
