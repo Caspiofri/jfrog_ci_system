@@ -248,7 +248,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   [ARCHITECTURE.md](ARCHITECTURE.md).
 
 **AWS production design, design only, none of it built (D116).**
-- **What:** step 1 is one EC2 instance with SQLite and ChromaDB on its disk and an hourly AWS Backup of the whole
+- **What:** size S is one EC2 instance with SQLite and ChromaDB on its disk and an hourly AWS Backup of the whole
   disk. Access through an ALB with a Cognito login, an HTTPS certificate and a domain name; the server in a private
   subnet with a NAT gateway. Keys in Parameter Store, shell through Session Manager. A failed or degraded run alerts at
   once; a 26-hour missing-metric alarm covers a run that never started or finished and the whole instance going down.
@@ -258,11 +258,13 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 - **Why:** each service carries what it does and why it beat the simpler option, so every choice can be defended in
   plain words. Artifactory and Xray follow from the requirement that everything running has been scanned; this has
   not been built for Jessi, and the scan and push were run in Stage 2 on the forked app.
-- **Stated openly:** about one hour of possible loss, and the single instance is a single point of failure. Step 1
+- **Stated openly:** about one hour of possible loss, and the single instance is a single point of failure. Size S
   needs the configuration and script changes listed in ARCHITECTURE.md, none built. The cost of about $125 a month is
   an unverified estimate. Running the design against the code showed that "no change to the app code" was not true as
   first written, so the list states the real changes.
 - **Considered:** Kubernetes, ECS and Step Functions; left out because they could not be defended.
+- **Renamed:** in the approved design, "step 1" is now "Size S" under "Moving to production", and "step 2" is
+  "Size M"; the design adds sizes S, M and L and "Serving more teams" (ARCHITECTURE.md).
 
 **Product name Jessi (D46).** JFrog's Engine for Strategic Signals & Intelligence.
 
@@ -329,3 +331,5 @@ Each UI round changed display only; nothing measured moved.
   is linux/arm64, built on the Pi. The adapted workflow stays in the repo, described as prepared, not run.
 - **Why:** the brief allows the CLI. A blocked UI login stopped the OIDC setup; OIDC stays the production
   recommendation.
+
+**Stage 2 is finalized on the fork's main at `7e9d10b` (D121).**
