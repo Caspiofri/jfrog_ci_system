@@ -325,10 +325,6 @@ freeze keeps the measured system unchanged (D99).
   shared cited stories; "strengthened" means a newly cited story, not more evidence.
 - **Insights merge patterns that mean different things.** Copilot Fusion and the GitHub package firewall were found
   but merged into one insight (D60).
-- **Insight claims rarely quote the capability sheet:** 2 of 33 claims across 31 Oct, 1 Nov and 2 Nov, 0 of 12 on the
-  demo day.
-- **An insight cites items outside today's Brief,** because a pattern needs more than one day. The card tags them
-  "not in this Brief" (D37, D44, D50).
 
 **Prompt injection (open)**
 - A planted sentence passes the quote check: it proves the words are in the article, not that they are true.
@@ -337,12 +333,11 @@ freeze keeps the measured system unchanged (D99).
 - Nothing detects or strips injected text before the prompt (D51).
 
 **Product and UI**
-- **Flag approved held items** (fixed). Ofri's screen review found that Flag on a held item also approved it, so it
+- **Flag approved held items** (fixed). A manual screen review found that Flag on a held item also approved it, so it
   could reach the Brief without a decision. Flag now only marks an item as important. 0 flagged items existed in the
   live store and the snapshot, so no reported number was affected (D107, D108).
 - **Head-to-head values are unverified** beyond the one manual check of 3 Nov; the system has no ongoing verification
   (D88, D95).
-- **Edits show field by field in the item drawer,** not in Log rows.
 
 ## Now vs future
 
@@ -357,7 +352,7 @@ freeze keeps the measured system unchanged (D99).
 | Lens | Closest JFrog capability, quote-checked (D42) | Redesign: competitor or external event, capability match, evidence, "relevant, impact undetermined"; wider coverage |
 | Review and Log | Routing by autonomy level, analyst actions, full Log (D9, D16) | Per-analyst queues, SLAs |
 | Quality | Golden set with a frozen split, held-out coverage, daily checks, a reproducibility pack | A faithfulness judge (D17); ranking precision@k; continuous eval from analyst actions; capture–recapture coverage; a "Missed event" button; JFrog's own blog as a "self" source (D43) |
-| Observability | `run_metrics`, run status, Health | Not built: LangSmith tracing of the daily run (D48, D57) |
+| Observability | `run_metrics` (per step: seconds, LLM call count, status and error), run status, Health | Not built: alerts on a failed, degraded or missing run (D116); a per-call record of LLM latency, token use and errors. Model accuracy is already measured separately on the golden set. |
 | Readers | CI analysts | Role-based digests, an internal MCP server (D19) |
 | Infra | Docker Compose, SQLite, ChromaDB, one daily scheduler, a writable demo | Not built: RDS when more than one API instance or a smaller loss window is needed; a bigger instance for more sources; hourly collection after its own check; Amazon Bedrock, subject to JFrog's policies (D116, D117); see ARCHITECTURE.md |
 | Agents | — | Not built: add agents for small, bounded processes inside the pipeline (D118) |

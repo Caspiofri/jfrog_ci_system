@@ -155,7 +155,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   spread a wrong claim.
 
 **Expected patterns are written before the generator runs (D43, D60).**
-- **What:** four patterns in `evals/expected_insights_389e71.yaml`, written by Ofri from a neutral listing and
+- **What:** four patterns in `evals/expected_insights_389e71.yaml`, written by the author from a neutral listing and
   checked by a second reader. Any later generator change is tuning on this file and is reported as such.
 - **Why:** a recall number needs a reference the generator never shaped. Result on 1 Nov: 0 of 4 found fully, 3
   partly, 1 not found; two patterns were found only by being merged.
@@ -207,7 +207,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   snapshot; actions write only there and reset on restart. Insights are frozen. The README lists the real runs up to
   submission day.
 - **Why:** a reviewer must see the product in one command, without a key. Read-only "does not look good and the
-  system cannot really be experienced" (Ofri, 4 Nov); the copy is isolated, so actions cannot pollute measured data.
+  system cannot really be experienced" (the author, 4 Nov); the copy is isolated, so actions cannot pollute measured data.
 - **Considered:** read-only (D110), reversed the same day under a time box with `d4e219b` as the fallback. The final freeze is `fbc9677` (D115).
 - **Conditions:** allowed only with proofs: a guard showing that startup changes 0 rows on the copy, no write
   leaving the copy, live behaviour unchanged, and Health and evaluation numbers reading saved summaries.
@@ -286,7 +286,7 @@ Each UI round changed display only; nothing measured moved.
 - **D72:** an outside review: tiles on the Brief, explanations moved to hover, continuity badges, one link convention
   (the title opens the drawer, an icon opens the article), letter avatars instead of logos, a heatmap of where
   competitor activity lands.
-- **D89:** Ofri's review of the merged demo: new articles marked as new, fewer repeated labels.
+- **D89:** the author's review of the merged demo: new articles marked as new, fewer repeated labels.
 - **D104:** no raw errors, no false affordances, no duplicate panels; concept images labelled "Concept, sample data".
 - **D112:** Competitors cards answer what happened and what is waiting; the heatmap already answers how much, so it
   gets a Total row and the cards lose the repeated counts. "+N vs previous 7 days" removed, because collection started
