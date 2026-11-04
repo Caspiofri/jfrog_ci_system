@@ -319,25 +319,4 @@ Each UI round changed display only; nothing measured moved.
 
 ## Stage 2
 
-**Fix lodash, not moment (D30).**
-- **What:** remediate lodash CVE-2018-16487 (4.17.4 to 4.17.21), not moment CVE-2022-31129. Each of the two
-  applicable Highs is High on one scale only.
-- **Why:** lodash: an unauthenticated route passes unvalidated input into `_.merge`, and prototype pollution was
-  shown over a real HTTP request; one upgrade also closes CVE-2020-28500. moment: every flagged call is in a function
-  that is never called, so no user input reaches it. Contextual Analysis marking dead code Applicable is a talking
-  point: Applicable narrows, it does not prove.
-
-**Harden the app on top of the upgrade (D64).**
-- **What:** the update route builds from an allowed-field list with type checks, and a middleware rejects JSON
-  bodies with `__proto__`, `constructor` or `prototype` keys at any depth. Each guard was tested with the vulnerable
-  lodash, alone and together.
-- **Why:** the upgrade fixes only that version's CVEs; the guards stop prototype pollution on this route whatever
-  the library version.
-
-**Publish with the JFrog CLI, not GitHub Actions with OIDC (D65).**
-- **What:** the image is pushed with `jf docker push` and Build Info published with `jf rt build-publish`. The image
-  is linux/arm64, built on the Pi. The adapted workflow stays in the repo, described as prepared, not run.
-- **Why:** the brief allows the CLI. A blocked UI login stopped the OIDC setup; OIDC stays the production
-  recommendation.
-
-**Stage 2 is finalized on the fork's main at `7e9d10b` (D121).**
+Stage 2 is a separate submission, with its own decisions and report: https://github.com/Caspiofri/jfrog-stage2-assessment, docs/stage2-report.md.
