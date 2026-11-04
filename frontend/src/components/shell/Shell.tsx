@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Activity, BarChart3, CheckCircle2, FileText, List, Map, Newspaper } from "lucide-react";
 import { ItemDrawerProvider } from "@/components/ItemDrawer";
 import { useApi } from "@/lib/api";
@@ -69,11 +69,35 @@ function ReviewCount() {
   );
 }
 
+/** D113: the header (with the demo line) stays at the top; on narrow screens the nav row stays under it. Their heights
+ *  go to --head-h and --nav-h on <html>, which sets scroll-padding-top, so anchor jumps land below them. */
+function useFixedHeights() {
+  const head = useRef<HTMLDivElement>(null);
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const set = () => {
+      root.style.setProperty("--head-h", `${head.current?.offsetHeight ?? 0}px`);
+      // the nav row is fixed only while it sits under the header (narrow screens); beside the content it adds nothing
+      const n = nav.current;
+      root.style.setProperty("--nav-h", `${n && getComputedStyle(n).position === "sticky" ? n.offsetHeight : 0}px`);
+    };
+    set();
+    const ro = new ResizeObserver(set);
+    if (head.current) ro.observe(head.current);
+    if (nav.current) ro.observe(nav.current);
+    window.addEventListener("resize", set);
+    return () => { ro.disconnect(); window.removeEventListener("resize", set); };
+  }, []);
+  return { head, nav };
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
+  const { head, nav } = useFixedHeights();
   return (
     <div className="grid min-h-screen grid-cols-1 grid-rows-[auto_auto_1fr] md:grid-cols-[12.25rem_minmax(0,1fr)] md:grid-rows-[auto_1fr]">
-      <div className="col-span-full">
+      <div ref={head} className="sticky top-0 z-40 col-span-full" data-fixed-head>
       <header className="flex h-14 items-center gap-3.5 bg-navy px-5 text-[#e8edf5]">
         <Link href="/brief" className="flex items-center" aria-label="Jessi home">
           {/* public/brand/jessi-mark.svg: splash + wordmark, viewBox 1332 x 405, transparent; 40px high on navy */}
@@ -87,8 +111,8 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
       <DemoLine />
       </div>
-      <aside className="border-t border-[#1e2f55] bg-navy px-2 py-2.5">
-        <nav aria-label="Screens" className="sticky top-2 flex flex-row flex-wrap gap-0.5 md:flex-col">
+      <aside ref={nav} className="sticky top-[var(--head-h,3.5rem)] z-30 border-t border-[#1e2f55] bg-navy px-2 py-2.5 md:static md:z-auto" data-fixed-nav>
+        <nav aria-label="Screens" className="flex md:sticky md:top-[calc(var(--head-h,3.5rem)+0.5rem)] flex-row flex-wrap gap-0.5 md:flex-col">
           {NAV.map((g) => (
             <div key={g.group} className="contents md:block">
               <span className="mx-2.5 mb-1.5 mt-3.5 hidden text-[0.6875rem] uppercase tracking-[.06em] text-[#7f8eac] md:block">{g.group}</span>

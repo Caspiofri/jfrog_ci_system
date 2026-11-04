@@ -31,3 +31,17 @@ test("Brief: 'Items in this Brief'; Cleared and High score scroll to the cleared
   assert.match(m[0], /<button type="button"[\s\S]*document\.getElementById\(CLEARED_ID\)\?\.scrollIntoView/);
   assert.doesNotMatch(m[0], /set\(|router|href=/);
 });
+
+test("the header stays fixed with the nav; anchors land below it; logo and header content unchanged", () => {
+  const sh = src("components/shell/Shell.tsx");
+  assert.match(sh, /<div ref=\{head\} className="sticky top-0 z-40 col-span-full" data-fixed-head>\s*<header className="flex h-14 items-center gap-3\.5 bg-navy px-5 text-\[#e8edf5\]">/);
+  assert.match(sh, /<Image src="\/brand\/jessi-mark\.svg" alt="Jessi" width=\{132\} height=\{40\} priority unoptimized className="h-10 w-auto" \/>/);
+  assert.match(sh, /<\/header>\s*<DemoLine \/>\s*<\/div>/); // the demo line stays fixed with the header
+  // narrow: the nav row sticks under the header; wide: the sidebar nav sticks below it
+  assert.match(sh, /<aside ref=\{nav\} className="sticky top-\[var\(--head-h,3\.5rem\)\] z-30 [^"]* md:static md:z-auto"/);
+  assert.match(sh, /<nav aria-label="Screens" className="flex [^"]*md:sticky md:top-\[calc\(var\(--head-h,3\.5rem\)\+0\.5rem\)\]/);
+  assert.match(sh, /setProperty\("--head-h"/);
+  assert.match(sh, /getComputedStyle\(n\)\.position === "sticky" \? n\.offsetHeight : 0/);
+  const css = src("app/globals.css");
+  assert.match(css, /scroll-padding-top: calc\(var\(--head-h, 3\.5rem\) \+ var\(--nav-h, 0px\) \+ 0\.5rem\);/);
+});
