@@ -99,8 +99,13 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   capability sheet and checked in code. It never changes a score.
 - **Why:** the eval showed a capability baseline did not improve scores (D40), but the brief asks how JFrog compares.
   The lens adds that meaning without touching what was measured.
-- **Result and display:** axis right 10 of 10, relation right 0 of 8 where claimed (n = 15 items). The UI shows the
-  capability and hides the relation.
+- **Result and display:** one manual check of one daily run (1 Nov, n = 15 items): axis right 10 of 10, capability quote right 5 of 9,
+  not_related right 6 of 6, relation right 0 of 8 where claimed. The UI shows the capability and hides the relation, so
+  the capability shown can still be wrong.
+- **Limits:** this is a small, single-day check, an indication and not a rate. The lens has no golden-set labels,
+  because axis and gap labels need product experts (future work, D31). The code check proves a quote exists on the
+  capability sheet, not that it is the right capability. The prompts were frozen before the check, so no fix followed
+  it (D57, D58).
 
 **Head-to-head values stay, captioned as unverified (D87, D88, D95).**
 - **What:** values extracted by an AI model from linked public pages, shown with a caption that no person reviewed
@@ -208,7 +213,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   submission day.
 - **Why:** a reviewer must see the product in one command, without a key. Read-only "does not look good and the
   system cannot really be experienced" (the author, 4 Nov); the copy is isolated, so actions cannot pollute measured data.
-- **Considered:** read-only (D110), reversed the same day under a time box with `d4e219b` as the fallback. The final freeze is `fbc9677` (D115).
+- **Considered:** read-only (D110), reversed the same day under a time box with `d4e219b` as the fallback. It was frozen at `fbc9677` (D115).
 - **Conditions:** allowed only with proofs: a guard showing that startup changes 0 rows on the copy, no write
   leaving the copy, live behaviour unchanged, and Health and evaluation numbers reading saved summaries.
 
@@ -230,8 +235,13 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   clean clone, LOCK OK. From then: documents, the repro pack and cleanup that touches nothing measured, each followed
   by tests and lock_check.
 - **Why:** freeze what was checked, on the artifact that will be submitted.
-- **Final freeze (D115):** `fbc9677` (the D113 and D114 display rounds merged), after a Windows check of its bundle.
-  The live API was restarted on it after a backup, with 0 existing rows changed. Only documents change after it.
+- **Freeze (D115):** `fbc9677` (the D113 and D114 display rounds merged), after a Windows check of its bundle.
+  The live API was restarted on it after a backup, with 0 existing rows changed.
+- **Name and path removal (D120):** a deliberate exception to D99, D109 and D115: the author's name, home path and
+  the real private address are removed from the published tree wherever nothing frozen changes, on a branch from
+  `fbc9677`, followed by proof and a new freeze. Fingerprinted files, the demo snapshot, evaluation and held-out
+  files, the live store and git history are not changed without a separate decision. Final commit: [TODO: final
+  commit after D120].
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in

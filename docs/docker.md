@@ -2,7 +2,7 @@
 
 One image, three services: `ci` runs the collectors (`python -m ci.run`), `eval` scores the rules against the
 golden set (`python -m ci.eval_golden`), and `labeling` serves the labeling page (`python -m ci.labeling`, port
-8000, on 127.0.0.1 and optionally the Tailscale address; see below). None needs an API key (`eval --live` does). Images are built locally and pushed nowhere.
+8000, on 127.0.0.1). None needs an API key (`eval --live` does). Images are built locally and pushed nowhere.
 
 ## Setup (once)
 
@@ -65,22 +65,7 @@ Docker publishes ports with its own iptables rules, which run before ufw's: a po
 interfaces. Inside the container the app binds `0.0.0.0` (`--host 0.0.0.0`, which it warns about; expected there,
 since the published port arrives on the container's interface), and the host side is limited to:
 
-- `127.0.0.1` always (`docker-compose.yml`);
-- the Tailscale address, only with the override file `docker-compose.tailscale.yml`. It is a separate file rather
-  than part of `docker-compose.yml` so that compose still works on a machine without Tailscale (a reviewer's
-  laptop); with the override, a missing `TAILSCALE_IP` is an error, never a fallback to all interfaces.
-
-On the Pi:
-
-```sh
-export TAILSCALE_IP=$(tailscale ip -4)
-docker compose -f docker-compose.yml -f docker-compose.tailscale.yml up -d labeling
-# http://127.0.0.1:8000/ on the Pi, http://$TAILSCALE_IP:8000/ from the tailnet; not the LAN address
-```
-
-To avoid repeating `-f`, put `COMPOSE_FILE=docker-compose.yml:docker-compose.tailscale.yml` and
-`TAILSCALE_IP=100.x.y.z` in `.env`. `TAILSCALE_IP` must be the address at start time; if it changes, recreate the
-container (`up -d --force-recreate labeling`), or Docker cannot bind it.
+- `127.0.0.1` only (`docker-compose.yml`).
 
 ## Tests in the container
 

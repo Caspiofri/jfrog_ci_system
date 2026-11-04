@@ -24,7 +24,7 @@ git clone <this repo> jessi && cd jessi
 docker compose up --build
 ```
 
-This README describes the frozen commit `fbc9677` (D115). Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+This README describes the frozen commit [TODO: final commit after D120]. Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
 
 - The first build takes a few minutes: 7:21 min on a Windows clean clone of `d4e219b`, the earlier freeze.
 - No `.env` and no key are needed. The demo calls no model.
@@ -262,6 +262,15 @@ test split is spent and the fix could not be measured before submission (D70).
 citations right), and the synthesis overstates: "escalating" without a trend, a vendor added to a convergence it is
 not part of. The lens shows the same split. The UI says so, and nothing was tuned on it (D60, D61, D73).
 
+**Lens.** Result and display: one manual check of one daily run (1 Nov, n = 15 items): axis right 10 of 10, capability quote right 5 of 9,
+not_related right 6 of 6, relation right 0 of 8 where claimed. The UI shows the capability and hides the relation, so
+the capability shown can still be wrong.
+
+Limits: this is a small, single-day check, an indication and not a rate. The lens has no golden-set labels,
+because axis and gap labels need product experts (future work, D31). The code check proves a quote exists on the
+capability sheet, not that it is the right capability. The prompts were frozen before the check, so no fix followed
+it (D57, D58).
+
 **Fingerprints of the measured system.** classify_rank `99b79890ceea` (the eval report shows `9c39b7d25f65` because
 it also hashes one mention side file; both are quoted), portable `e04716a2a1d6`, lens `1692c04ba7df`, insights
 `e99d23e4edcf`, capability sheet `e7f13e0b3456`; `gemini-3.6-flash`, temperature 0; measured on `ae8fbb5` (D67). In a clean clone the legacy
@@ -274,8 +283,8 @@ classify_rank differs, because it hashes absolute paths; the portable fingerprin
 - Not measured: ranking precision@k (not in this harness) and the faithfulness judge (D17, not built).
 - All marks are by one labeler.
 
-**Tests.** 1,239 Python tests and 275 frontend tests pass at `fbc9677` (BE, 4 Nov 19:33). [TODO BE: update for the
-final commit.]
+**Tests.** 1,239 Python tests and 275 frontend tests pass at `fbc9677` (BE, 4 Nov 19:33). [TODO BE: final commit and
+test counts after D120.]
 
 ## Pitfalls and known limits
 
