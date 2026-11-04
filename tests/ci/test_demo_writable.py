@@ -96,8 +96,10 @@ def test_the_guard_passes_on_the_real_snapshot_and_actions_write_only_the_copy(t
     assert all(v == 200 for v in codes.values()), codes
     assert c.post("/api/v1/items/x/approve").json()["meta"]["mode"] == "demo"  # every meta block says demo
     assert frozen(c) == frozen_before  # Health, evaluation and run numbers do not move
-    log = c.get("/api/v1/log", params={"limit": 200}).json()
-    assert any(r["flagged"] for r in log["items"])  # the actions are visible where they belong
+    total = c.get("/api/v1/log", params={"limit": 1}).json()["total"]  # every page: the checkout's output/runs
+    log = [r for o in range(0, total, 200)  # adds dropped rows, so the flagged item can be past the first page
+           for r in c.get("/api/v1/log", params={"limit": 200, "offset": o}).json()["items"]]
+    assert any(r["flagged"] for r in log)  # the actions are visible where they belong
 
     assert tree_sha(SNAPSHOT) == before_snapshot  # byte-identical
     assert tree_sha(EVALS_DIR) == before_evals  # Edit's candidate label went to the copy, not evals/
