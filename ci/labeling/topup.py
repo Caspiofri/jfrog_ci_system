@@ -42,7 +42,7 @@ TARGET = 30
 COMPETITOR_MIN = 4
 FOCUS_COMPETITORS = ("aws", "snyk")
 IMPORTANT_TARGET = 10
-UNFLAGGED_SAMPLE = 10  # Ofri raised it from 4
+UNFLAGGED_SAMPLE = 10  # raised from 4 in a manual review
 EXTRACTION, PRICING, FUNDING, IMPORTANT = "extraction_check", "pricing", "funding_ma", "likely_important"
 
 EVENT_RE = re.compile(r"\b(?:launch(?:es|ed)?|generally available|ga|acquir(?:es|ed|e)|acquisition|pricing|prices?|"

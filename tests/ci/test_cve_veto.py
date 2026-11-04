@@ -1,4 +1,4 @@
-"""D38 CVE veto, pinned on the two false merges of Ofri's cluster review (D24): events 6 and 8 of run 389e71.
+"""D38 CVE veto, pinned on the two false merges of the manual cluster review (D24): events 6 and 8 of run 389e71.
 
 The fake embedding gives texts that start with the same word the same vector (similarity 1.0), so only the veto can
 keep these apart: exactly the case D38 is for (different GitLab CVEs, near-identical wording)."""
@@ -9,12 +9,12 @@ from ci.dedupe import EmbeddingDeduper, cve_ids, cve_veto
 from ci.packet import Packet
 from tests.ci.test_dedupe import fake_embed
 
-# Event 6 (Ofri: "different vulnerabilities and security releases despite shared GitLab regex-engine context")
+# Event 6 (manual review: "different vulnerabilities and security releases despite shared GitLab regex-engine context")
 E6 = [("6a7e0fe1cff862af", "GitLab RCE Hits CVSS 10.0, 7 Branches Patched [2026]",
        "GitLab fixed CVE-2026-110264 on October 21; an earlier flaw, CVE-2026-97229, was patched before."),
       ("1a425a273e291b93", "GitLab Patches Two Critical 9.9 RCE Flaws in Regex Engine",
        "GitLab patched CVE-2026-93577 and CVE-2026-89078 (CVSS 9.9) on September 23.")]
-# Event 8 (Ofri: "different security incidents, CVEs, release versions, and remediation actions")
+# Event 8 (manual review: "different security incidents, CVEs, release versions, and remediation actions")
 E8 = [("9c3fe8f01f4a5c7a", "GitLab Critical Patch Release: 19.5.1, 19.4.3, 19.3.6, 19.2.9, 19.1.9, 19.0.10, 18.11.13",
        "This release fixes CVE-2026-110264, CVE-2026-105777 and CVE-2026-112212."),
       ("e30ab49652d6854c", "GitLab Patch Release and Security Update: 19.5.3, 19.4.5, 19.3.7, 19.2.10, 19.1.10, "

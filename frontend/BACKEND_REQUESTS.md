@@ -1,7 +1,7 @@
 # Backend requests from the frontend
 
 Fields or endpoints the UI needs that the API contract (`docs/plans/2026-10-31-api-contract.md`) doesn't provide yet.
-The frontend never edits backend code; each request waits here for Ofri.
+The frontend never edits backend code; each request waits here for the author's decision.
 
 ## 1. Brief: mark a backfill (import-anchored) Brief — done (fd6e933, `anchor_kind`)
 

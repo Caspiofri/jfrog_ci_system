@@ -17,7 +17,7 @@ LEVEL = "/api/v1/settings/autonomy-level"
     ({"sec-fetch-site": "cross-site", "origin": "https://evil.example"}, True),
     ({"sec-fetch-site": "same-site", "origin": "http://localhost:9999"}, True),
     ({"origin": "http://localhost:3011", "host": "127.0.0.1:8011"}, False),  # dev proxy, no Sec-Fetch-Site
-    ({"origin": "http://pi:8000", "host": "pi:8000"}, False),                # same host as the request
+    ({"origin": "http://ci-host:8000", "host": "ci-host:8000"}, False),                # same host as the request
     ({"origin": "https://evil.example", "host": "127.0.0.1:8011"}, True),
     ({"origin": "null"}, True),                                      # sandboxed iframe or file:// page
 ])
@@ -27,9 +27,9 @@ def test_refusal_rules(headers, refused):
 
 
 def test_extra_origins_come_from_the_env():
-    extra = csrf.allowed_origins({"CI_ALLOWED_ORIGINS": "http://pi:3011/, http://100.1.2.3:3011"})
-    assert extra == {"http://pi:3011", "http://100.1.2.3:3011"}
-    assert csrf.refusal("PUT", {"sec-fetch-site": "cross-site", "origin": "http://pi:3011"}, extra) is None
+    extra = csrf.allowed_origins({"CI_ALLOWED_ORIGINS": "http://ci-host:3011/, http://100.1.2.3:3011"})
+    assert extra == {"http://ci-host:3011", "http://100.1.2.3:3011"}
+    assert csrf.refusal("PUT", {"sec-fetch-site": "cross-site", "origin": "http://ci-host:3011"}, extra) is None
 
 
 def test_the_api_refuses_a_cross_site_write_and_changes_nothing(env):  # noqa: F811
@@ -58,8 +58,8 @@ def test_host_of(header, name):
 
 def test_trusted_hosts_are_loopback_plus_what_the_server_listens_on_plus_the_env():
     assert csrf.trusted_hosts(env={}) == {"localhost", "127.0.0.1", "::1"}
-    assert csrf.trusted_hosts(["100.1.2.3", "0.0.0.0", "pi"], env={"CI_TRUSTED_HOSTS": "api, ui"}) == {
-        "localhost", "127.0.0.1", "::1", "100.1.2.3", "pi", "api", "ui"}  # a wildcard is never a name
+    assert csrf.trusted_hosts(["100.1.2.3", "0.0.0.0", "ci-host"], env={"CI_TRUSTED_HOSTS": "api, ui"}) == {
+        "localhost", "127.0.0.1", "::1", "100.1.2.3", "ci-host", "api", "ui"}  # a wildcard is never a name
 
 
 def _api(tmp_path, hosts):
@@ -92,7 +92,7 @@ def test_the_compose_ui_reaches_the_api_by_its_service_name(tmp_path):
 
 def test_the_labeling_and_review_server_allows_the_addresses_it_listens_on(tmp_path):
     c = TestClient(create_labeling_app(runs_dir=tmp_path / "runs", labels_path=tmp_path / "l.jsonl", competitors=[],
-                                       hosts=["127.0.0.1", "100.103.185.9", "pi"]))
-    assert c.get("/reliability", headers={"Host": "100.103.185.9:8765"}).status_code == 200
-    assert c.get("/reliability", headers={"Host": "pi:8765"}).status_code == 200
+                                       hosts=["127.0.0.1", "100.64.0.10", "ci-host"]))
+    assert c.get("/reliability", headers={"Host": "100.64.0.10:8765"}).status_code == 200
+    assert c.get("/reliability", headers={"Host": "ci-host:8765"}).status_code == 200
     assert c.get("/reliability", headers={"Host": "evil.example:8765"}).status_code == 400

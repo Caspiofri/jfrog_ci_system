@@ -3,7 +3,7 @@
     python -m ci.api [--port 8010]     binds 127.0.0.1 only (no auth in the demo, contract 2.1)
 
 Competitors and Health come in the next step. Insights are served when stored; "Refresh insights" (D37) answers 409
-until the setting insights_enabled is "true" (D37: not before Ofri's expected-insights file is saved).
+until the setting insights_enabled is "true" (D37: not before the reviewer's expected-insights file is saved).
 """
 import json
 from collections import Counter
@@ -34,7 +34,7 @@ from config.settings import DATA_DIR, EVALS_DIR, OUTPUT_DIR
 
 API_VERSION = "1"
 CHANGES_PATH = DATA_DIR / "ci" / "changes.sqlite"
-ANALYST_LABELS_PATH = EVALS_DIR / "analyst_labels.jsonl"  # candidates Ofri merges by hand (D31 Q4)
+ANALYST_LABELS_PATH = EVALS_DIR / "analyst_labels.jsonl"  # candidates the reviewer merges by hand (D31 Q4)
 MAX_LIMIT = 200
 FLAGGABLE = ("awaiting_review", "auto_published", "approved")  # D107: the flag is a marker on any of these
 Multi = Annotated[list[str] | None, Query()]  # a repeatable query filter (?competitor=a&competitor=b)
@@ -609,7 +609,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                   lambda st, _: {f"edit_{k}": v for k, v in fields.items()}, if_match, note=body.note,
                   measures=lambda it: "label_candidate", extra=extra)
         labels_out.parent.mkdir(parents=True, exist_ok=True)
-        with labels_out.open("a", encoding="utf-8") as f:  # candidates for Ofri to merge by hand, never labels
+        with labels_out.open("a", encoding="utf-8") as f:  # candidates for the reviewer to merge by hand, never labels
             for ch in changes:  # one entry per changed field, all from the same action
                 f.write(json.dumps({"id": item_id, **ch, "source": "analyst", "action_id": res["action_id"],
                                     "at": res["at"]}, ensure_ascii=False) + "\n")

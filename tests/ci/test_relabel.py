@@ -64,7 +64,7 @@ def env(tmp_path):
     con.close()
     out = tmp_path / "relabel"
     q = relabel.build(labels, runs, CUTOFF, first=["Sonatype pricing", "Late but wanted"],
-                      include=["Late but wanted"], include_reason="Ofri wants it", queue_id="v2")
+                      include=["Late but wanted"], include_reason="the reviewer wants it", queue_id="v2")
     relabel.write(q, out)
     client = TestClient(create_app(runs_dir=runs, labels_path=labels, competitors=COMPETITORS, relabel_dir=out,
                                    changes_db=db))
@@ -79,7 +79,7 @@ def test_selection_cutoff_extra_and_noise(env):
     *_, q = env
     assert set(_ids(q)) == {"a1", "a2", "a3", "a4", "a5", "a6", "a8"}  # a7 is late and not asked for
     reasons = {e["id"]: e["reason"] for e in q["entries"]}
-    assert reasons["a6"] == "included: Ofri wants it" and reasons["a4"] == "labeled before the cutoff"
+    assert reasons["a6"] == "included: the reviewer wants it" and reasons["a4"] == "labeled before the cutoff"
     assert {e["id"]: e["run_id"] for e in q["entries"]}["a3"] == "r2"
 
 
@@ -126,7 +126,7 @@ def test_no_prediction_fields_in_the_payload(env):
     for k in ("mentions", "mentions_jfrog", "extraction_reasons", "prefilter", "teaser", "competitor"):
         assert k not in card
     assert set(card) <= set(relabel.ITEM_FIELDS) | {"label", "done", "jfrog", "issues"}
-    assert set(card["issues"]) <= set(audit.ISSUES)  # audit of Ofri's own label, not a prediction
+    assert set(card["issues"]) <= set(audit.ISSUES)  # audit of the reviewer's own label, not a prediction
 
 
 def test_jfrog_cell_only_on_scores_3_and_4(env):

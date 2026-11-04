@@ -196,7 +196,7 @@ def test_rejects_unknown_category(tmp_path):
         load_events(bad)
 
 
-def test_curated_list_reflects_ofris_oct_30_review():
+def test_curated_list_reflects_the_oct_30_review():
     import yaml
 
     by_id = {e.id: e for e in load_events(EVENTS_PATH)}
@@ -204,7 +204,7 @@ def test_curated_list_reflects_ofris_oct_30_review():
     assert by_id["aws-inspector-ecr-rescan-default"].competitor == "aws"
     assert raw["aws-inspector-ecr-rescan-default"]["competitor"] == "aws"
     assert "aws-nitro-supply-chain-attestation" not in by_id  # removed under rubric v2: a blog post, not an event
-    # rubric v2 decisions (Ofri, Oct 30 evening)
+    # rubric v2 decisions (manual review, Oct 30 evening)
     expected = {"industry-emudhra-ca-compromise": 3, "industry-php2shell": 3, "sonatype-emudhra-assessment": 2,
                 "snyk-evo-remediation-agent": 3, "gitlab-orbit-ga": 3, "industry-litellm-pypi-compromise": 4,
                 "gitlab-patch-19-5-3": 1, "snyk-python-3-15": 1, "github-package-firewall-preview": 5}

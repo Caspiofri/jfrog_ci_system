@@ -1,6 +1,6 @@
 """Change detection end to end, offline: HTML fixtures behind an injected fetch, FakeLLM for extraction (PRD D13).
 
-Ofri's required cases: an unchanged page (same hash, no LLM call, no item), a real change (a price edited: diff and
+Required cases: an unchanged page (same hash, no LLM call, no item), a real change (a price edited: diff and
 a Changes item) and a cosmetic change (a footer date edited: the LLM is called, the fields are equal, no item).
 """
 import json

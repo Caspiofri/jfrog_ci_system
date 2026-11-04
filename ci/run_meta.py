@@ -41,8 +41,8 @@ FINGERPRINT_CHANGES = (
                      "differences": 0, "batches_identical": True, "control_poisoned_prompt_differs": True},
      "lens_unchanged": "1692c04ba7df",
      "portable": "e04716a2a1d6",  # D59: the same setup without paths; equal on the Pi, in a worktree, in a clone
-     "portable_note": "the legacy value also hashes 4 absolute paths, so it is 99b79890ceea only at "
-                      "/home/ofri/jfrog_project/agent_backbone"},
+     "portable_note": "the legacy value also hashes 4 absolute paths, so it is 99b79890ceea only in "
+                      "the main checkout on the deployment host"},
 )
 
 

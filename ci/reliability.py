@@ -1,5 +1,5 @@
 """Reliability check of a daily run (PRD D41): every held item plus a fixed-seed sample of auto-published items, for
-Ofri to mark competitor, category and score right or wrong. The answers live in the review file (output/reviews/),
+a human to mark competitor, category and score right or wrong. The answers live in the review file (output/reviews/),
 never in the golden set.
 
     python -m ci.reliability make [--run RUN_ID] [--sample 20] [--seed 20261101]   (default: today's daily run)
@@ -167,7 +167,7 @@ def score(path: Path) -> dict:
 
 # ---- the review page (ci.labeling /reliability): every field of a review file's items, marked right or wrong ------
 
-# (key, label) of every field Ofri marks. The labels are the ones of the first HTML sheet, so marks it autosaved in
+# (key, label) of every field a human marks. The labels are the ones of the first HTML sheet, so marks it autosaved in
 # the browser (keyed "<item id>|<label>") can be imported by label.
 SHEET_FIELDS = (
     ("id", "ID"), ("title", "Title"), ("url", "URL"), ("source", "Source"), ("vetted", "Vetted state"),

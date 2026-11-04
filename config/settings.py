@@ -47,7 +47,7 @@ DEDUPE_NEAR_MISS_MIN = 0.70  # cosine similarity; dedupe matches at or above thi
 SNIPPET_SCORE_CAP = 6  # an article we could only read a teaser of cannot score above this
 
 # Model names (PRD D5), each overridable in .env. Gemini writes and ranks, on the API-key and the Vertex route alike
-# (modules.llm_clients); gemini-3.6-flash is Ofri's Oct 30 choice. Rank baselines measured on 2.5-flash need a rerun.
+# (modules.llm_clients); gemini-3.6-flash is the Oct 30 choice. Rank baselines measured on 2.5-flash need a rerun.
 GEMINI_MODEL = os.getenv("GEMINI_MODEL") or "gemini-3.6-flash"
 # LLM judge models (Claude, so the judge is not the same family as the ranker and writer)
 JUDGE_MODEL_DAILY = os.getenv("JUDGE_MODEL_DAILY") or "claude-haiku-4-5"  # per-run trace judge: cheap, every run
