@@ -89,10 +89,12 @@ def test_the_guard_passes_on_the_real_snapshot_and_actions_write_only_the_copy(t
     assert copy_dir.parent == tmp_root and m["store_path"].parent == copy_dir
 
     c = TestClient(create_app(demo=m))
-    assert c.get("/api/v1/meta").json()["demo_writable"] is True
+    meta = c.get("/api/v1/meta").json()
+    assert meta["demo_writable"] is True and meta["meta"]["mode"] == "demo" and meta["meta"]["snapshot"]["date"]
     frozen_before = frozen(c)
     codes = do_actions(c)
     assert all(v == 200 for v in codes.values()), codes
+    assert c.post("/api/v1/items/x/approve").json()["meta"]["mode"] == "demo"  # every meta block says demo
     assert frozen(c) == frozen_before  # Health, evaluation and run numbers do not move
     log = c.get("/api/v1/log", params={"limit": 200}).json()
     assert any(r["flagged"] for r in log["items"])  # the actions are visible where they belong
@@ -169,7 +171,8 @@ def test_the_guard_fails_and_the_demo_falls_back_to_read_only_when_startup_would
     assert m["guard"]["changed"] == ["ci.sqlite:items"]
     assert list(tmp_root.iterdir()) == []  # the failed copy is removed
     c = TestClient(create_app(cfg=CFG, demo=m))
-    assert c.get("/api/v1/meta").json()["demo_writable"] is False
+    meta = c.get("/api/v1/meta").json()
+    assert meta["demo_writable"] is False and meta["meta"]["mode"] == "demo"
     r = c.post("/api/v1/items/pub1/approve", json={})
     assert r.status_code == 403 and r.json()["error"]["code"] == "demo_read_only"
     assert tree_sha(small_snapshot) == before
@@ -206,7 +209,8 @@ def test_live_mode_says_not_writable(tmp_path):
     store_path, runs_dir, split = build(tmp_path)
     c = TestClient(create_app(store_path=store_path, runs_dir=runs_dir, split_path=split, cfg=CFG,
                               labels_out=tmp_path / "labels.jsonl", changes_path=tmp_path / "none.sqlite"))
-    assert c.get("/api/v1/meta").json()["demo_writable"] is False
+    meta = c.get("/api/v1/meta").json()
+    assert meta["demo_writable"] is False and meta["meta"]["mode"] == "live" and "snapshot" not in meta["meta"]
 
 
 def test_a_changed_cell_decided_in_the_demo_writes_only_the_copy(tmp_path, tmp_root):

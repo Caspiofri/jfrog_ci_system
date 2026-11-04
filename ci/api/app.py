@@ -190,7 +190,7 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
     snapshot = None if demo is None else {k: demo.get(k) for k in ("date", "as_of", "label", "built_at", "commit")}
 
     def meta() -> dict:
-        out = {"mode": "demo" if read_only else "live", "now": svc.iso(now()), "api_version": API_VERSION}
+        out = {"mode": "demo" if demo is not None else "live", "now": svc.iso(now()), "api_version": API_VERSION}
         return out | ({"snapshot": snapshot} if snapshot else {})
 
     def open_store() -> Store:
