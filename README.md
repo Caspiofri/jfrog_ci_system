@@ -24,7 +24,7 @@ git clone <this repo> jessi && cd jessi
 docker compose up --build
 ```
 
-This README describes the frozen commit [FINAL_COMMIT]. Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+This README describes the frozen commit `22b45b6` (tag `freeze-20261105`, D128). Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
 
 - The first build takes a few minutes: 7:21 min on a Windows clean clone of `d4e219b`, the earlier freeze.
 - No `.env` and no key are needed. The demo calls no model.
@@ -283,7 +283,7 @@ classify_rank differs, because it hashes absolute paths; the portable fingerprin
 - Not measured: ranking precision@k (not in this harness) and the faithfulness judge (D17, not built).
 - All marks are by one labeler.
 
-**Tests.** [FINAL_TEST_COUNTS] pass at [FINAL_COMMIT].
+**Tests.** 1,239 pytest and 275 frontend tests passed at `22b45b6`, the frozen commit (per BE, D128).
 
 ## Security scans
 
@@ -295,8 +295,12 @@ not proven, it is stated as not shown to be reachable.
 - **Python dependencies (`jf audit`, at `017e26b`):** 18 findings, 0 Applicable. `chromadb` has 1 Critical and 5
   High, with no fixed version, and the scanner does not cover them. Per a reading of the code, they are in the
   Chroma HTTP server, and Jessi runs no Chroma server. Not shown to be reachable.
-- **Docker images:** the API image has 206 findings, 1 Applicable, which per BE is a scanner false positive. The UI
-  image has 257 findings, 4 Applicable, all in the base image. [UI_IMAGE_RESULT]
+- **API image:** 206 findings, 1 Applicable, which per BE is a scanner false positive.
+- **UI image, measured on `4a82f28` after moving the base to `node:22-trixie-slim`:** 227 findings (1 Critical, 87
+  High, 79 Medium, 60 Low), 2 Applicable. Before the move: 257 findings (4 Critical, 75 High, 98 Medium, 80 Low), 4
+  Applicable. The move removed CVE-2026-5450 and CVE-2026-41992, and added 18 finding IDs. The 2 Applicable
+  findings, CVE-2026-85091 and CVE-2026-119379, are evidenced in libraries bundled with Node and are not shown to be
+  reachable. The one remaining Critical, postcss CVE-2026-45623, is marked Not Applicable.
 - **Secrets:** no real secret in git history, the images or the demo snapshot, as reported by BE. Next.js generates
   3 random keys inside the built UI image on each build; these are not in git.
 - **SAST:** 14 findings, 6 Medium and 8 Low, all in `ci/`, none in `frontend/src`.

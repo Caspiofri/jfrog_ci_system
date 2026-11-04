@@ -242,7 +242,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   the real private address are removed from the published tree wherever nothing frozen changes, on a branch from
   `fbc9677`, followed by proof and a new freeze. Fingerprinted files, the demo snapshot, evaluation and held-out
   files, the live store and git history are not changed without a separate decision. Final commit:
-  [FINAL_COMMIT].
+  `22b45b6` (D128).
 - **Code freeze (D122):** `017e26b`, local annotated tag `freeze-20261104c`, per BE at 22:44: `fbc9677` plus
   the D120 cleanup, 21 files, not pushed. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank
   `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences; a Docker clean clone passes,
@@ -274,7 +274,8 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   as measured and as not shown to be reachable.
   - **Why:** per BE's scan (23:40), these findings have no fixed version listed and the evidence is not in our
     code, but a path was not disproven. Keeping this separate from the merge keeps a verified fallback.
-- **Current code freeze (D127):** `f73b549`, local annotated tag `freeze-20261104d`, per BE at 23:47, unless a D125
+  - **Result:** the fix was merged.
+- **Code freeze (D127):** `f73b549`, local annotated tag `freeze-20261104d`, per BE at 23:47, unless a D125
   fix is merged. A normal merge of `bfbd6ac` into main; compared with `017e26b`, only `frontend/package.json` and
   `frontend/package-lock.json` changed. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank
   `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences. The Windows check of `bfbd6ac`
@@ -282,6 +283,9 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   was not restarted, and nothing is pushed. Replaces D122 as the code freeze.
   - **Why:** per BE, the upgrade changes only the two package files and no fingerprinted file, so the measured
     system is unchanged. The Windows check covered the bundle a reviewer would clone.
+  - **Later:** replaced as the code freeze by D128.
+- **Final code freeze (D128):** `22b45b6`, tag `freeze-20261105`, per BE. 1,239 pytest and 275 frontend tests
+  passed. From here only documents change.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in
