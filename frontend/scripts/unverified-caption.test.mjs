@@ -15,8 +15,7 @@ test("rendered as visible text, not a title or hover", () => {
   assert.match(src("components/ci.tsx"), /export function UnverifiedNote[\s\S]*?<span>\{UNVERIFIED_VALUES\}<\/span>/);
 });
 
-test("on JFrog vs competitors, the profile's head-to-head table and the Health change-detection panel", () => {
-  assert.match(src("components/competitors/Matrix.tsx"), /<Panel title="JFrog vs competitors"[\s\S]*?<UnverifiedNote/);
+test("on the profile's head-to-head table and the Health change-detection panel (JFrog vs competitors has its own box, D113)", () => {
   assert.match(src("components/competitors/HeadToHead.tsx"), /<UnverifiedNote[\s\S]*?<table/);
   assert.match(src("app/health/page.tsx"), /<Panel title="Did the tracked pages change\?"[^>]*>\s*<UnverifiedNote/);
 });

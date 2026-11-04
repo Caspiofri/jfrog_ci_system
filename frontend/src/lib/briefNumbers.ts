@@ -1,4 +1,4 @@
-// The Brief's "Today in numbers" tiles. Every number is a field the API returns for that Brief:
+// The Brief's "Items in this Brief" tiles. Every number is a field the API returns for that Brief:
 // "Collected" is items.new of the Brief run's metrics row (GET /run-metrics/{anchor_run_id}); its hover is that run's funnel
 // from the row, with the values after analyst actions and the reconstructed note (D74, D78). The rest is the Brief's summary.
 // No count of low-score items (published_below is left out on purpose). No imports besides types, so `npm test` runs it.

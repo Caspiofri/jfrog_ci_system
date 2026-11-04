@@ -4,8 +4,8 @@
 // not tracked yet fold into two muted lines. No comparison, no verdict: colour only marks the data state.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, ChevronRight, Clock } from "lucide-react";
-import { ArticleLink, ErrorNote, Panel, UnverifiedNote } from "@/components/ci";
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, Clock, Map as MapIcon } from "lucide-react";
+import { ArticleLink, ErrorNote, Panel } from "@/components/ci";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
@@ -17,9 +17,11 @@ import type { CompetitorProfile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const CAPTION = "What was found on public pages, not a verdict.";
-/** D95: under the D88 caption, visible without hovering; the date is Ofri's hand check, as written. */
-export const HAND_CHECK_LINE = "Checked once by hand against the live pages on 3 Nov 2026. See the README for results.";
-export const MATRIX_INFO = "A direct comparison of JFrog's capabilities with each competitor's, one capability at a time, from each vendor's public pages.";
+/** D113: one warning box replaces the D88 caption and the D95 hand-check line here (profile and Health keep the caption). */
+export const INTERIM_NOTE = "Interim view: values are AI-extracted from public pages, with no automatic verification or evaluation. Checked manually on 3 Nov 2026 (see README).";
+export const MATRIX_INFO = "A direct comparison of JFrog's capabilities with each competitor's, one capability at a time, from each vendor's public pages. The planned view needs more collected items and a further processing step, so it is not built in this submission. Check the source before relying on a value.";
+/** The Roadmap concept this interim view stands in for. */
+export const FUTURE_VIEW_HREF = "/roadmap#topics";
 export const NOT_STATED_LINE = "Their page says nothing:";
 export const NOT_TRACKED_LINE = "Not tracked yet:";
 
@@ -134,13 +136,22 @@ export function CapabilityMatrix() {
   const cur = rows[Math.min(sel, Math.max(0, rows.length - 1))];
   return (
     <Panel title="JFrog vs competitors" info={MATRIX_INFO}
-      right={rows.length ? (
-        <button type="button" aria-pressed={all} onClick={() => setAll(!all)} className="inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d hover:underline">
-          {all ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}{all ? "Show one capability" : "Expand all"}
-        </button>
-      ) : null}>
-      <UnverifiedNote />
-      <p className="m-0 mb-3 mt-1 text-xs text-[#5c4300]" data-hand-check>{HAND_CHECK_LINE}</p>
+      right={
+        <span className="inline-flex items-center gap-3">
+          {rows.length ? (
+            <button type="button" aria-pressed={all} onClick={() => setAll(!all)} className="inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d hover:underline">
+              {all ? <ChevronDown className="size-3.5" aria-hidden /> : <ChevronRight className="size-3.5" aria-hidden />}{all ? "Show one capability" : "Expand all"}
+            </button>
+          ) : null}
+          <Link href={FUTURE_VIEW_HREF} data-future-view className="inline-flex items-center gap-1 text-xs font-semibold text-jgreen-d hover:underline">
+            <MapIcon className="size-3.5" aria-hidden />Future view
+          </Link>
+        </span>
+      }>
+      <p className="m-0 mb-3 flex items-start gap-1.5 rounded border border-[#f3d9a4] bg-[#fffaf0] px-2.5 py-1.5 text-xs text-[#5c4300]" data-interim-note>
+        <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+        <span>{INTERIM_NOTE}</span>
+      </p>
       {errors.length ? <div className="mb-2"><ErrorNote error={errors[0].error!} onRetry={() => errors.forEach((x) => x.mutate())} /></div> : null}
       {loading ? <div className="py-4 text-xs text-mute" role="status">Loading the head-to-head data…</div> : !rows.length ? (
         <div className="py-3 text-xs text-mute">No head-to-head data yet.</div>

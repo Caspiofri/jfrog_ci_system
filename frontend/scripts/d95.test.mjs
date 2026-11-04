@@ -26,8 +26,9 @@ test("the matrix and the profile table use it; the stored cell is not changed", 
   assert.match(h2h, /<CellView c=\{a\.competitor\} axis=\{a\.axis\} \/>/);
 });
 
-test("the hand-check line, as written, right after the D88 caption, visible", () => {
+test("D113: one interim warning box replaces the caption and the hand-check line, keeping the 3 Nov date", () => {
   const m = src("components/competitors/Matrix.tsx");
-  assert.match(m, /HAND_CHECK_LINE = "Checked once by hand against the live pages on 3 Nov 2026\. See the README for results\.";/);
-  assert.match(m, /<UnverifiedNote \/>\s*<p [^>]*data-hand-check>\{HAND_CHECK_LINE\}<\/p>/);
+  assert.match(m, /INTERIM_NOTE = "Interim view: values are AI-extracted from public pages, with no automatic verification or evaluation\. Checked manually on 3 Nov 2026 \(see README\)\.";/);
+  assert.match(m, /data-interim-note>\s*<AlertTriangle [^>]*\/>\s*<span>\{INTERIM_NOTE\}<\/span>/);
+  assert.doesNotMatch(m, /Checked once by hand|UnverifiedNote|data-hand-check/);
 });

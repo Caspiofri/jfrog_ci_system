@@ -66,11 +66,11 @@ export function UnverifiedNote({ className }: { className?: string }) {
   );
 }
 
-export function Panel({ title, cap, children, className, right, big, info }: {
-  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean; info?: ReactNode;
+export function Panel({ title, cap, children, className, right, big, info, id }: {
+  title?: ReactNode; cap?: ReactNode; children: ReactNode; className?: string; right?: ReactNode; big?: boolean; info?: ReactNode; id?: string;
 }) {
   return (
-    <section className={cn("min-w-0 rounded-md border border-line bg-card px-[1.125rem] py-4", className)}>
+    <section id={id} className={cn("min-w-0 scroll-mt-4 rounded-md border border-line bg-card px-[1.125rem] py-4", className)}>
       {title || cap || right ? (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           {title ? <h2 className={cn("m-0 flex items-center gap-1.5 font-semibold", big ? "text-lg" : "text-sm")}>{title}<InfoHint text={info} /></h2> : <span />}
