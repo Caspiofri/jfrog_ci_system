@@ -24,7 +24,7 @@ git clone <this repo> jessi && cd jessi
 docker compose up --build
 ```
 
-This README describes the frozen commit `017e26b` (tag `freeze-20261104c`, D122). Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+This README describes the frozen commit [FINAL_COMMIT]. Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
 
 - The first build takes a few minutes: 7:21 min on a Windows clean clone of `d4e219b`, the earlier freeze.
 - No `.env` and no key are needed. The demo calls no model.
@@ -283,7 +283,24 @@ classify_rank differs, because it hashes absolute paths; the portable fingerprin
 - Not measured: ranking precision@k (not in this harness) and the faithfulness judge (D17, not built).
 - All marks are by one labeler.
 
-**Tests.** 1,239 Python tests and 275 frontend tests pass at `017e26b`, the frozen commit (BE, 4 Nov 22:44, D122).
+**Tests.** [FINAL_TEST_COUNTS] pass at [FINAL_COMMIT].
+
+## Security scans
+
+Measured on `bfbd6ac` with the JFrog CLI, per BE, unless a line names another commit. Where a path to a finding was
+not proven, it is stated as not shown to be reachable.
+
+- **Frontend dependencies (`jf audit`):** 15 findings, 0 Applicable (6 Not Applicable, 9 Not Covered). No finding
+  is left in `next`.
+- **Python dependencies (`jf audit`, at `017e26b`):** 18 findings, 0 Applicable. `chromadb` has 1 Critical and 5
+  High, with no fixed version, and the scanner does not cover them. Per a reading of the code, they are in the
+  Chroma HTTP server, and Jessi runs no Chroma server. Not shown to be reachable.
+- **Docker images:** the API image has 206 findings, 1 Applicable, which per BE is a scanner false positive. The UI
+  image has 257 findings, 4 Applicable, all in the base image. [UI_IMAGE_RESULT]
+- **Secrets:** no real secret in git history, the images or the demo snapshot, as reported by BE. Next.js generates
+  3 random keys inside the built UI image on each build; these are not in git.
+- **SAST:** 14 findings, 6 Medium and 8 Low, all in `ci/`, none in `frontend/src`.
+- **Exposure:** the demo binds the UI to 127.0.0.1.
 
 ## Pitfalls and known limits
 
