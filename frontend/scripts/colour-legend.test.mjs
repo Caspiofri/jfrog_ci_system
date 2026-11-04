@@ -11,8 +11,8 @@ const h2h = read("components/competitors/HeadToHead.tsx");
 const chart = read("components/competitors/ActivityChart.tsx");
 const ci = read("components/ci.tsx");
 
-test("overview: the legends stay; the cards no longer use the category bar (D112)", () => {
-  assert.match(overview, /<ColourLegends \/>/);
+test("overview: no colour legend under the cards, and the cards no longer use the category bar (D112)", () => {
+  assert.doesNotMatch(overview, /<ColourLegends\b|<CategoryColours\b|<ImportanceLegend\b/);
   assert.doesNotMatch(parts.slice(parts.indexOf("export function CompetitorCardView")), /<MixBar/);
 });
 
@@ -34,7 +34,7 @@ test("the legend names each colour in text, and score legend uses the rubric's o
 });
 
 test("every item view shows both legends, Importance (1–5) and Category, outside any hover", () => {
-  for (const f of ["app/review/page.tsx", "app/log/page.tsx", "app/competitors/page.tsx"]) {
+  for (const f of ["app/review/page.tsx", "app/log/page.tsx"]) { // Competitors overview: removed (Ofri, 4 Nov)
     assert.match(read(f), /<ColourLegends\b[^>]*\/>/, f);
   }
   const fn = ci.slice(ci.indexOf("export function ColourLegends"), ci.indexOf("/** \"n=12\""));
@@ -55,12 +55,6 @@ test("Brief: Importance (1–5) once, directly under the title; no category lege
   assert.doesNotMatch(brief, /<CategoryColours\b|<ColourLegends\b|<ScoreLegend\b|<CategoryLegend\b|<ColorLegend\b/);
   assert.match(brief, /<PageHead[\s\S]*?\/>\s*<ImportanceLegend /);
   assert.match(ci, /export function ImportanceLegend[\s\S]*?title="Importance \(1–5\)"/);
-});
-
-test("Competitors overview: the legends sit under the competitor cards, not above them", () => {
-  const i = overview.indexOf("<ColourLegends />"), cards = overview.indexOf("<CompetitorCardView");
-  assert.ok(i > cards && cards > -1);
-  assert.equal((overview.match(/<ColourLegends \/>/g) ?? []).length, 1);
 });
 
 test("Importance legend names every score, 2 and 1 in the rubric's own words", async () => {

@@ -9,7 +9,7 @@ import { Async, Empty, HBars, KpiTile, Loading, Panel, ScoreBadge } from "@/comp
 import { ItemRow } from "@/components/ItemRow";
 import { ActivityChart } from "@/components/competitors/ActivityChart";
 import { HeadToHead } from "@/components/competitors/HeadToHead";
-import { DealsTable, MixBar, Trend } from "@/components/competitors/parts";
+import { DealsTable, MixBar } from "@/components/competitors/parts";
 import { path, useRecord } from "@/lib/api";
 import { CATEGORY_COLOR, fmtDate } from "@/lib/format";
 import { useUrlState } from "@/lib/useParams";
@@ -53,7 +53,7 @@ function Profile() {
               </div>
 
               <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))]">
-                <KpiTile value={c.items_7d} label="Cleared in 7 days" sub={<Trend t={c.trend} prev={c.items_prev_7d} />} />
+                <KpiTile value={c.items_7d} label="Cleared in 7 days" />
                 <KpiTile value={c.items_today} label="In this Brief" />
                 <KpiTile value={c.pending_review} label="Awaiting review" sub={c.pending_max_score ? <span className="text-mute">highest score {c.pending_max_score}</span> : undefined} />
                 <KpiTile future value={c.head_to_head_changes ?? "—"} label="Head-to-head changes" sub={<span className="text-mute">{c.tracked_changes ?? 0} tracked-page changes</span>} />

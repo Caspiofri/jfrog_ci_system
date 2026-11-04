@@ -11,8 +11,11 @@ test("header above the cards: title, window and how to open a profile; the spark
   assert.doesNotMatch(page, /Weekly/);
   assert.doesNotMatch(page, /Published competitor items/);
   assert.doesNotMatch(page, /cardTotals|across the six competitors/);
-  assert.match(page, /const CARDS_EXPLAIN = "Only cleared items \(passed routing, or approved by an analyst\)\. Click a card for the competitor's full details\.";/);
-  assert.match(page, /<InfoHint text=\{CARDS_EXPLAIN\} label="What the cards count" \/>/);
+  assert.match(page, /const CARDS_EXPLAIN = "Each card shows the items awaiting review, the items that mention JFrog, cleared items per day and the week's top cleared item\. Cleared means passed routing, or approved by an analyst\.";/);
+  assert.match(page, /<InfoHint text=\{CARDS_EXPLAIN\} label="What the cards show" \/>/);
+  // the (i) texts name nothing the cards lost, and do not repeat "Select a card" (D112)
+  const info = page.slice(page.indexOf("const PAGE_INFO"), page.indexOf("export default"));
+  assert.doesNotMatch(info, /per card|Click a card|Select a card|in this Brief|previous 7 days|category bar/i);
   assert.doesNotMatch(page, /All published and awaiting-review items/);
   assert.ok(page.indexOf("data-cards-header") < page.indexOf("<CompetitorCardView"), "above the cards");
 });

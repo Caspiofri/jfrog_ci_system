@@ -123,3 +123,11 @@ test("D89: no \"published items found\" and no \"last 7 days\" label on the Comp
   const visible = (s) => s.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "");
   for (const s of [parts, comp, page]) assert.doesNotMatch(visible(s), /published items found|last 7 days/i);
 });
+
+test("D112: the always-held hover on Pricing & Packaging and Funding/M&A/Partnerships only, no caption", () => {
+  const src = readFileSync(new URL("../src/components/competitors/Heatmap.tsx", import.meta.url), "utf8");
+  assert.match(src, /export const ALWAYS_HELD_TIP = "Always held for review, so these items count only after approval\.";/);
+  assert.match(src, /export const ALWAYS_HELD_CATEGORIES = \["Pricing & Packaging", "Funding\/M&A\/Partnerships"\];/);
+  assert.match(src, /\{ALWAYS_HELD_CATEGORIES\.includes\(cat\) \? <Hint text=\{ALWAYS_HELD_TIP\}[^>]*>\{cat\}<\/Hint> : cat\}/);
+  assert.equal((src.match(/ALWAYS_HELD_TIP/g) ?? []).length, 2, "defined once, used once: no caption");
+});

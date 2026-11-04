@@ -3,7 +3,7 @@
 // Log rows; click a cell to list its items (the title opens the drawer).
 import { useState } from "react";
 import useSWR from "swr";
-import { Empty, ErrorNote, ItemTitle, Panel, ScoreBadge } from "@/components/ci";
+import { Empty, ErrorNote, Hint, ItemTitle, Panel, ScoreBadge } from "@/components/ci";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { ApiError, get, path, useApi } from "@/lib/api";
@@ -14,6 +14,9 @@ import { remainingOffsets } from "@/lib/reviewQueue";
 import type { Competitors, Log, LogRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/** D112: these two categories are always held for review, so an item counts here only once approved. */
+export const ALWAYS_HELD_TIP = "Always held for review, so these items count only after approval.";
+export const ALWAYS_HELD_CATEGORIES = ["Pricing & Packaging", "Funding/M&A/Partnerships"];
 export const HEATMAP_CAPTION = "By category, in the same week as the cards below.";
 /** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
 export const HEATMAP_COUNTS = "Cleared items (passed routing, or approved by an analyst), counted by the date collected, in the same week as the cards. The Total row is each competitor's count. Items awaiting review are not in this grid; each card shows them.";
@@ -72,7 +75,9 @@ export function ActivityHeatmap() {
               <tbody>
                 {cats.map((cat) => (
                   <tr key={cat}>
-                    <th scope="row" className="sticky left-0 z-10 w-[11rem] border-b border-line bg-card px-2 py-1.5 text-left text-xs font-semibold">{cat}</th>
+                    <th scope="row" className="sticky left-0 z-10 w-[11rem] border-b border-line bg-card px-2 py-1.5 text-left text-xs font-semibold">
+                      {ALWAYS_HELD_CATEGORIES.includes(cat) ? <Hint text={ALWAYS_HELD_TIP} className="underline decoration-dotted underline-offset-2" >{cat}</Hint> : cat}
+                    </th>
                     {keys.map((k) => {
                       const cell = hm.cells[k][cat];
                       const col = heatColor(cell.count, hm.max);

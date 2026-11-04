@@ -39,3 +39,22 @@ test("in every card, from the profile's activity, the Brief date from the API; D
   assert.match(spark, /<Line type="linear" dataKey="items"/);
   assert.doesNotMatch(spark, /monotone|natural|basis|cardinal|step/);
 });
+
+test("cards: sparkline and top item sit at the bottom; the top item is exactly 3 lines, title cut with … and in full on hover", () => {
+  const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
+  const card = parts.slice(parts.indexOf("export function CompetitorCardView"), parts.indexOf("export function DealsTable"));
+  assert.match(card, /<div className="mt-auto flex flex-col gap-2\.5" data-card-bottom>\s*<CardSparkline k=\{c\.key\} \/>/);
+  assert.match(card, /data-top-item>/);
+  assert.match(card, /<p className="m-0 line-clamp-2 h-8" title=\{c\.top_item\.title\}>/);
+  assert.match(card, /<p className="m-0 h-4 truncate text-mute" data-top-item-meta>[\s\S]*?c\.top_item\.score[\s\S]*?c\.top_item\.published_at/);
+  assert.match(card, /<p className="m-0 h-12 text-mute">No cleared items this week\.<\/p>/);
+  assert.match(card, /text-xs leading-4/);
+});
+
+test("profile: no 'vs previous 7 days' (D112, same reason as the cards)", () => {
+  const profile = readFileSync(new URL("../src/app/competitors/[key]/page.tsx", import.meta.url), "utf8");
+  const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(profile, /<Trend|previous 7 days|items_prev_7d/);
+  assert.doesNotMatch(parts, /function Trend|vs previous 7 days/);
+  assert.match(profile, /<KpiTile value=\{c\.items_7d\} label="Cleared in 7 days" \/>/);
+});
