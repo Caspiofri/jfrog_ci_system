@@ -160,7 +160,8 @@ system accurate and measurable (D15, D21).
 
 ## How it works
 
-[ARCHITECTURE.md follows ARCH's design; this section stays short until then.]
+The full picture is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how Jessi works today (flow, components, data
+model) and the AWS production design, which is design only and not built.
 
 ```
 collectors (Google News, vendor blogs and changelogs, GitHub releases, Hacker News)
@@ -370,7 +371,8 @@ docs/           api-contract.md, docker.md, ARCHITECTURE.md, DECISIONS.md
 main.py, modules/   origin, legacy code (see above)
 ```
 
-- `docs/ARCHITECTURE.md` [pending ARCH's design]
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how Jessi works today, and the AWS production design (design only,
+  not built)
 - `docs/DECISIONS.md`: the main decisions, each with why and what else was considered
 - `docs/api-contract.md`: endpoints per screen
 - `docs/docker.md`: every Compose command
