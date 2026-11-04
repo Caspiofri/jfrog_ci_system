@@ -183,7 +183,8 @@ function SummaryBlock({ date, s, runId }: { date: string; s: BriefSummary; runId
               ) : null}
             </>
           );
-          const box = "block rounded-md border border-line bg-card px-4 py-3 text-left";
+          // flex column, top-aligned: a <button> (Cleared, High score) would centre its content in the stretched grid cell
+          const box = "flex flex-col justify-start rounded-md border border-line bg-card px-4 py-3 text-left";
           return t.key === "review" && t.value ? (
             <Hint key={t.key} text={<>{t.hint} Click to review them.</>} asChild>
               <Link href={`/review?brief=${encodeURIComponent(date)}`} data-tile={t.key} className={cn(box, "transition-colors hover:border-jgreen")}>{body}</Link>
