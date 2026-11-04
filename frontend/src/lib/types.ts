@@ -18,6 +18,7 @@ export interface ApiMeta {
   now: string;
   api_version: string;
   snapshot?: { date: string } | null; // demo mode: the day the snapshot was taken (not served yet)
+  demo_writable?: boolean; // D111: demo actions write to a temporary copy (also accepted at the top of /meta)
 }
 
 export interface Page<T> {
@@ -124,6 +125,7 @@ export interface Meta {
   insights_enabled: boolean;
   rubric?: RubricLine[]; // request 3f
   meta: ApiMeta;
+  demo_writable?: boolean; // D111
 }
 
 // ---- Brief ----

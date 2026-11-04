@@ -21,6 +21,7 @@ import { runCountsFor, todayTiles } from "@/lib/briefNumbers";
 import { CAPABILITY_ROWS } from "@/lib/capabilityRows";
 import { CAPABILITY_NAME, claimCapability, insightCapabilities } from "@/lib/capabilitySheet";
 import { insightsTitle } from "@/lib/insightsTitle";
+import { INSIGHTS_FROZEN } from "@/lib/demo";
 import { CONTINUITY_TIP, NEW_SOURCE_TIP, continuityBadge, goneLine, newCitedIds } from "@/lib/continuity";
 
 const TOP = 5;
@@ -308,8 +309,15 @@ function InsightsPanel({ date, insights, hl, setHl, onRefreshed }: {
           </div>
         </>
       )}
-      {/* directly under the insights; never in demo mode, where the API refuses writes */}
-      {demo ? null : (
+      {/* directly under the insights; in demo mode (writable or not) disabled, with the reason (D111) */}
+      {demo ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3" data-refresh data-insights-frozen>
+          <Button variant="outline" size="sm" className="h-7 text-xs" disabled>
+            <RefreshCw className="size-3" /> Refresh insights
+          </Button>
+          <p className="m-0 text-xs text-mute">{INSIGHTS_FROZEN}</p>
+        </div>
+      ) : (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3" data-refresh>
           {err?.code === "llm_unavailable" ? (
             <p className="m-0 text-xs text-mute" data-refresh-unavailable>{REFRESH_UNAVAILABLE}</p>
