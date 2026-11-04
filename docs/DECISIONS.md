@@ -237,12 +237,12 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   clean clone, LOCK OK. From then: documents, the repro pack and cleanup that touches nothing measured, each followed
   by tests and lock_check.
 - **Why:** freeze what was checked, on the artifact that will be submitted.
-- Cleanup (D120): personal details and local paths were removed from the current published files where no frozen file changes. Frozen and measured files and git history were left as they are.
-- Next.js upgrade (D123, D124): `jf audit` found 3 Applicable findings in next 15.5.4, one of them Critical. We made one exception to the code freeze and upgraded next to 15.5.28, which also closes the next findings the scanner could not decide on. Only `frontend/package.json` and `frontend/package-lock.json` changed, and nothing fingerprinted.
-  - Why: the UI binds to 127.0.0.1, so the practical risk today is low, but the production design exposes it behind an ALB.
-- UI base image (D125): we moved the UI image from node:22-slim to node:22-trixie-slim, changing only `docker/ui.Dockerfile`. Findings in the UI image: Critical 4 to 1, High 75 to 87, total 257 to 227, Applicable 4 to 2, with 18 new finding IDs.
-  - Why: it removes two Applicable system-package findings, including a Critical one, at the cost of more High findings. The API image already uses the same Debian release, and the client files are identical.
-- Final code freeze (D128): `22b45b6`, tag `freeze-20261105`, a normal merge of `4a82f28`, with an identical tree. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences. The Windows check of `4a82f28` passed. Earlier freezes: `fbc9677` (D115), `017e26b` (D122), `f73b549` (D127). Only documents change from here.
+- **Cleanup (D120):** personal details and local paths were removed from the current published files where no frozen file changes. Frozen and measured files and git history were left as they are.
+- **Next.js upgrade (D123, D124):** `jf audit` found 3 Applicable findings in next 15.5.4, one of them Critical. We made one exception to the code freeze and upgraded next to 15.5.28, which also closes the next findings the scanner could not decide on. Only `frontend/package.json` and `frontend/package-lock.json` changed, and nothing fingerprinted.
+  - **Why:** the UI binds to 127.0.0.1, so the practical risk today is low, but the production design exposes it behind an ALB.
+- **UI base image (D125):** we moved the UI image from node:22-slim to node:22-trixie-slim, changing only `docker/ui.Dockerfile`. Findings in the UI image: Critical 4 to 1, High 75 to 87, total 257 to 227, Applicable 4 to 2, with 18 new finding IDs.
+  - **Why:** it removes two Applicable system-package findings, including a Critical one, at the cost of more High findings. The API image already uses the same Debian release, and the client files are identical.
+- **Final code freeze (D128):** `22b45b6`, tag `freeze-20261105`, a normal merge of `4a82f28`, with an identical tree. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences. The Windows check of `4a82f28` passed. Earlier freezes: `fbc9677` (D115), `017e26b` (D122), `f73b549` (D127). Only documents change from here.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in
@@ -276,12 +276,12 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   why `ci/` was built without LangGraph, so no reason is stated.
 
 **Video on Thu 5 Nov at 08:00, submission after it (D119).**
-- **What:** tonight: documents, the docs-only merge, a last clean clone and a push with the repo still Private.
+- **What:** the evening before submission: documents, the docs-only merge, a last clean clone and a push with the repo still Private.
   Thu: check the 06:00 run, back up, record the video on the live system, add the video link and the 5 Nov run row
   (docs only), a last clean clone, push without force, make the repo Public, run the final check, send both links.
   The one approved item in the video comes from the Thu 5 Nov run, which is in no measurement (updates D106).
 - **Why:** recording tomorrow shows the first 06:00 run on the frozen commit and leaves Thursday with only the video
-  and the submission. A Private push tonight keeps a safe copy on GitHub.
+  and the submission. A Private push that evening keeps a safe copy on GitHub.
 
 **Jessi is a GenAI pipeline, not an agent (D118).**
 - **What:** fixed steps, validation and human review. The freeze stays, and the submission goes ahead as built. The
