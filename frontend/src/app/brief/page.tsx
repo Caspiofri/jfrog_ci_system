@@ -98,14 +98,6 @@ function BriefScreen() {
             {backfill ? <Tag className="bg-[#e8eefb] font-semibold text-[#3f5b8f]">Initial import: previous 14 days</Tag> : null}
           </span>
         }
-        tools={
-          <>
-            <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
-              options={competitorFilterOptions(meta)} />
-            <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
-              options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
-          </>
-        }
       />
 
       <ImportanceLegend className="-mt-2" />
@@ -138,6 +130,13 @@ function BriefScreen() {
                   cap={`Sorted by importance · ${b.items.total} ${b.items.total === 1 ? "item" : "items"}${competitor || category ? " match the filters" : ""}`}
                   info={`The items found in this Brief's window and rated ${b.brief_min_score ?? 3} or higher on importance, cleared by routing or approved by an analyst. Items still waiting in the Review queue aren't listed.`}
                 >
+                  {/* the filters apply to this list only: the numbers above and the insights do not change with them */}
+                  <div className="mb-3 flex flex-wrap items-center gap-2" data-brief-filters>
+                    <FilterSelect ariaLabel="Competitor" allLabel="All competitors" value={competitor} onChange={(v) => set({ competitor: v, offset: null })}
+                      options={competitorFilterOptions(meta)} />
+                    <FilterSelect ariaLabel="Category" allLabel="All categories" value={category} onChange={(v) => set({ category: v, offset: null })}
+                      options={(meta?.categories ?? []).map((c) => ({ value: c, label: c }))} />
+                  </div>
                   {b.items.items.length ? (
                     b.items.items.map((it) => <BriefCard key={it.item_id} item={it} showLate={!backfill} highlight={highlighted.has(it.item_id)} />)
                   ) : (
