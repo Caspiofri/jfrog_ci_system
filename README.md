@@ -368,6 +368,8 @@ freeze keeps the measured system unchanged (D99).
 | Fixes known, not applied | — | Publisher dates instead of feed dates; JFrog mention from stored text only; hiring signals (D12, dropped) |
 | Screen speed (not measured) | — | Competitors takes about a second to appear by eye on the Windows demo, and the Review page makes one item request per decided row |
 
+**Where this goes next: from a daily feed to an analysis partner.** The collected items, citations and JFrog comparison can power a chat assistant that helps analysts investigate a question, compare competitors and draft their analysis, with every answer tied to its sources. None of this is built. The first step is to learn from the analysts where their work is slowest and which decisions they need help with, so that the assistant solves real pain points. Article text is untrusted input, so the assistant also needs protection against prompt injection.
+
 ## Origin, legacy code
 
 Jessi is based on `newsletter_agent`, a personal daily digest pipeline (D8). What Jessi reused is code and ideas: the
