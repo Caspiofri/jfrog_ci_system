@@ -19,6 +19,7 @@ import { LOG_STATUSES, SCORE_OPTIONS, SORT_LINES, SORT_OPTIONS, decidedIds, deci
 import { HOLD_LABEL, LEVEL_LABEL, STATUS_LABEL, fmtDate, fmtDateTime, fmtLongDate, label } from "@/lib/format";
 import { useMeta } from "@/lib/meta";
 import { useUrlState } from "@/lib/useParams";
+import { approvedMessage } from "@/lib/approvedWhere";
 import type { HoldReason, ItemDetail, Level, Log, LogRow, Page, Review, ReviewChangeRow, ReviewItemRow, SourceRow, TrustResult } from "@/lib/types";
 import { alwaysReviewedHint, holdChip } from "@/lib/holdReasons";
 import { HOLD_RULES, HOLD_RULES_INTRO } from "@/lib/holdRulesText";
@@ -83,13 +84,15 @@ function ReviewScreen() {
   }, [search, urlQ, set]);
   const q = useSWR<Review, ApiError>(path("/review", queueQuery({ level: preview, reason, competitor, brief })), getWholeQueue,
     { revalidateOnFocus: false, keepPreviousData: true });
-  const briefs = useApi<Page<{ date: string }>>(path("/briefs", { limit: 200 }));
+  const briefs = useApi<Page<{ date: string; anchor_run_id?: string | null }>>(path("/briefs", { limit: 200 }));
   const decided = useSWR<ReviewItemRow[], ApiError>(path("/log", { status: LOG_STATUSES, competitor, limit: 200, offset: 0 }), getDecided,
     { revalidateOnFocus: false, keepPreviousData: true });
   const current = meta?.level;
   const shown = q.data?.level;
   const previewing = Boolean(preview && current && preview !== current);
   const [trustMsg, setTrustMsg] = useState<TrustResult | null>(null);
+  const [approvedMsg, setApprovedMsg] = useState<string | null>(null);
+  const onApproved = (it: ReviewItemRow["item"]) => setApprovedMsg(approvedMessage(it.score, it.run_id, briefs.data?.items ?? [], fmtLongDate));
   const local = { q: urlQ, score, category };
   const windows = windowOptions((briefs.data?.items ?? []).map((b) => b.date).concat(brief ? [brief] : []), fmtLongDate);
 
@@ -97,6 +100,7 @@ function ReviewScreen() {
     <>
       <PageHead title="Review queue" info="Items held by the routing rules, each with the reason it was held." />
       {trustMsg ? <TrustToast res={trustMsg} onDone={() => setTrustMsg(null)} /> : null}
+      {approvedMsg ? <ApprovedNote text={approvedMsg} onDone={() => setApprovedMsg(null)} /> : null}
 
       <Async {...q} retry={() => q.mutate()} rows={6}>
         {(r) => {
@@ -206,7 +210,7 @@ function ReviewScreen() {
                     row.kind === "item" && row.item.status !== "awaiting_review" ? (
                       <DecidedItem key={row.item.item_id} row={row} level={r.level} />
                     ) : row.kind === "item" ? (
-                      <QueueItem key={row.item.item_id} row={row} level={r.level} disabled={previewing} onTrusted={setTrustMsg} />
+                      <QueueItem key={row.item.item_id} row={row} level={r.level} disabled={previewing} onTrusted={setTrustMsg} onApproved={onApproved} />
                     ) : (
                       <ChangeRow key={`c${row.change_id}`} row={row} disabled={previewing} />
                     ),
@@ -354,7 +358,9 @@ function DecidedItem({ row, level }: { row: ReviewItemRow; level: Level }) {
   );
 }
 
-function QueueItem({ row, level, disabled, onTrusted }: { row: ReviewItemRow; level: Level; disabled: boolean; onTrusted: (r: TrustResult) => void }) {
+function QueueItem({ row, level, disabled, onTrusted, onApproved }: {
+  row: ReviewItemRow; level: Level; disabled: boolean; onTrusted: (r: TrustResult) => void; onApproved: (it: ReviewItemRow["item"]) => void;
+}) {
   const [err, setErr] = useState<ApiError | null>(null);
   const it = row.item;
   const ts = row.trust_source;
@@ -363,7 +369,7 @@ function QueueItem({ row, level, disabled, onTrusted }: { row: ReviewItemRow; le
     <ItemRow
       item={it}
       showBadge={false}
-      actions={<ItemActions item={it} disabled={disabled} onError={setErr} />}
+      actions={<ItemActions item={it} disabled={disabled} onError={setErr} onApproved={onApproved} />}
       extra={
         <>
           <ReasonChips reasons={it.hold_reasons} level={level} />
@@ -408,6 +414,17 @@ function TrustButton({ host, fromItem, suggest, approved, dismissed, disabled, o
         <ShieldCheck className="size-3" /> Trust this source{suggest ? " (suggested)" : ""}
       </Button>
     </span>
+  );
+}
+
+/** After Approve: where the item went (lib/approvedWhere.ts). The row itself leaves the queue, so this sits at the top. */
+function ApprovedNote({ text, onDone }: { text: string; onDone: () => void }) {
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border border-jgreen bg-[#f3fbf4] px-4 py-2.5" data-approved-note>
+      <Check className="size-4 text-jgreen-d" />
+      <span className="flex-1">{text}</span>
+      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onDone}>Close</Button>
+    </div>
   );
 }
 
