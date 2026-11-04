@@ -76,7 +76,7 @@ the hold reasons and the current autonomy level (`ci/route.py`); analyst decisio
 | Reproducibility | `ci/repro.py`, `repro/` | Recomputes every reported eval number from saved reports, with no model call | D59 |
 | Fingerprints | `tools/lock_check.py` | Proves the measured prompts, rules and config are unchanged | D59, D99 |
 
-**Runs today, on the Pi** (from the AWS design, section 1):
+**Runs today, on the Pi**
 
 | Part | What runs | Decision |
 |---|---|---|
