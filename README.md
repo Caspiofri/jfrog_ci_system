@@ -24,7 +24,7 @@ git clone <this repo> jessi && cd jessi
 docker compose up --build
 ```
 
-This README describes the frozen commit [TODO: final commit after D120]. Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+This README describes the frozen commit `017e26b` (tag `freeze-20261104c`, D122). Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
 
 - The first build takes a few minutes: 7:21 min on a Windows clean clone of `d4e219b`, the earlier freeze.
 - No `.env` and no key are needed. The demo calls no model.
@@ -283,8 +283,7 @@ classify_rank differs, because it hashes absolute paths; the portable fingerprin
 - Not measured: ranking precision@k (not in this harness) and the faithfulness judge (D17, not built).
 - All marks are by one labeler.
 
-**Tests.** 1,239 Python tests and 275 frontend tests pass at `fbc9677` (BE, 4 Nov 19:33). [TODO BE: final commit and
-test counts after D120.]
+**Tests.** 1,239 Python tests and 275 frontend tests pass at `017e26b`, the frozen commit (BE, 4 Nov 22:44, D122).
 
 ## Pitfalls and known limits
 

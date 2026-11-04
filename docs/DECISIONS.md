@@ -236,12 +236,21 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   by tests and lock_check.
 - **Why:** freeze what was checked, on the artifact that will be submitted.
 - **Freeze (D115):** `fbc9677` (the D113 and D114 display rounds merged), after a Windows check of its bundle.
+  Replaced as the final code freeze by D122.
   The live API was restarted on it after a backup, with 0 existing rows changed.
 - **Name and path removal (D120):** a deliberate exception to D99, D109 and D115: the author's name, home path and
   the real private address are removed from the published tree wherever nothing frozen changes, on a branch from
   `fbc9677`, followed by proof and a new freeze. Fingerprinted files, the demo snapshot, evaluation and held-out
-  files, the live store and git history are not changed without a separate decision. Final commit: [TODO: final
-  commit after D120].
+  files, the live store and git history are not changed without a separate decision. Final commit: `017e26b`
+  (D122).
+- **Final code freeze (D122):** `017e26b`, local annotated tag `freeze-20261104c`, per BE at 22:44: `fbc9677` plus
+  the D120 cleanup, 21 files, not pushed. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank
+  `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences; a Docker clean clone passes,
+  including an action and the reset. The live API on 8011 is not restarted: its old note with the home path
+  appears only in JSON, on no screen, and stored run records hold it anyway. The Windows check waits for the
+  clone from GitHub on Thu. Replaces D115 as the final code freeze.
+  - **Why:** the cleanup changed comments, default strings and tests, and BE reports identical client bundles, so
+    one more Windows check tonight would add little. A restart would change nothing a reviewer sees.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in
