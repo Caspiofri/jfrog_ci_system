@@ -15,6 +15,11 @@ Decision IDs (Dnn) refer to [DECISIONS.md](DECISIONS.md) and the PRD's decision 
 
 > **Status: Runs today**, on one Raspberry Pi. The demo runs the same API and UI with `docker compose up`.
 
+Jessi is a GenAI pipeline with fixed steps, validation and human review. `run_daily()` in `ci/daily.py` calls the
+steps in order, in plain Python: collect, store, classify, rank, validate and route, lens, then insights if enabled.
+Thread pools run only during collection. LangGraph is imported only in `modules/graph.py`, used by the legacy
+newsletter path; `ci/` does not use it (D117).
+
 ### 1.1 Flow
 
 ```mermaid
@@ -75,7 +80,7 @@ the hold reasons and the current autonomy level (`ci/route.py`); analyst decisio
 
 | Part | What runs | Decision |
 | --- | --- | --- |
-| Pipeline | Python [OPEN, reported to orch: the design file says "Python and LangGraph"; the code in `ci/` does not import LangGraph, which only the legacy `modules/graph.py` uses]: collect → dedupe → full text → classify (rules first, then Gemini Flash) → rank → route → JFrog lens → insights. The collectors run in parallel | D5, D25 |
+| Pipeline | Plain Python: `run_daily()` calls collect → store → classify (rules first, then Gemini Flash) → rank → validate and route → JFrog lens → insights, if enabled. Thread pools run only during collection. LangGraph is imported only in `modules/graph.py` (legacy newsletter path) | D5, D25, D117 |
 | Store | SQLite files on the Pi's disk: `ci.sqlite`, `changes.sqlite`, `seen_urls.sqlite`. ChromaDB, also on disk, holds the dedupe embeddings and is used only by the run, never by the API | D6 |
 | Live API and UI | They run outside Docker: `python -m ci.api --port 8011` and `next start` on port 3017, both on 127.0.0.1 | D3 |
 | Demo | `docker compose up` serves a frozen snapshot with no API key. Actions write to a temporary copy. The Compose `api` and `ui` services are demo-only | D2, D111 |
@@ -252,6 +257,8 @@ the much heavier first run described at the top of this part, so it starts from 
 | Fresher items: hourly or continuous collection | This is the intended future direction, not a step 1 requirement. A separate short check at hourly frequency comes first: overlapping runs, incremental processing, source rate limits, backlog and cost. The Brief still forms once a day, and the missed-run alarm window drops from 26 hours to about 2. Items sent to the model grow with new items, not with runs, because URLs already seen are skipped |
 | LLM provider | Preferred long-term direction: **Amazon Bedrock**, subject to JFrog's AI infrastructure and security policies, for managed infrastructure, access through IAM and central governance. Step 1 keeps direct calls to keep the move small. The LLM clients are created in one module (`modules/llm_clients.py`), and the provider-specific calls sit in three files (`ci/llm.py`, `modules/nodes.py`, `modules/judge_llm.py`), so a switch touches those four files. Gemini's results so far are preliminary and not checked against analyst-reviewed ground truth. Any model change is validated on a representative, analyst-reviewed evaluation set first |
 | Readers beyond analysts (D19) | Slack, email and the usual news feeds, as agreed with the CI team |
+
+**Not built:** add agents for small, bounded processes inside the pipeline (D118).
 
 Left out of the design: Kubernetes, ECS and Step Functions, because they could not be defended for this workload
 (D116).

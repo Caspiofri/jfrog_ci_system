@@ -78,10 +78,19 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   feed vs keep in the competitor's timeline. Fewer levels label more consistently than a 0-10 scale (D14).
 - **Considered:** Noise counted as 1 (D28), reversed by D29.
 
-**Model split: Gemini writes and ranks, Claude judges (D5).**
-- **Why:** already proven in the origin project; a judge from another family does not grade its own work. A gateway
-  such as Bedrock is a config change for production.
+**Model split: Gemini writes and ranks, Claude judges (D5, corrected by D116 and D117).**
+- **Why:** already proven in the origin project; a judge from another family does not grade its own work.
+- **Corrected:** D5 said Bedrock or an LLM gateway is a config change for production. The AWS design (D116) finds a
+  switch touches four files, and D117 replaces D5's future infra list with D116's growth triggers: no Kubernetes,
+  queues or workers.
 - **Note:** the faithfulness judge was not built for this submission (D17).
+
+**Stack: Next.js UI, FastAPI backend, Docker Compose (D3, corrected by D117).**
+- **What:** Next.js with Tailwind, shadcn/ui and Recharts for the UI; FastAPI for the API; Docker Compose for the
+  demo.
+- **Corrected:** D3 said "FastAPI over the LangGraph pipeline". The `ci/` pipeline is plain Python: `run_daily()`
+  calls the steps in order, with thread pools during collection. LangGraph is imported only in `modules/graph.py`,
+  used by the legacy newsletter path (per BE on `fbc9677`, D117). No reason for building it this way is recorded.
 
 ## The JFrog comparison
 
@@ -246,6 +255,19 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 - **Considered:** Kubernetes, ECS and Step Functions; left out because they could not be defended.
 
 **Product name Jessi (D46).** JFrog's Engine for Strategic Signals & Intelligence.
+
+**The documents describe what was built (D117).**
+- **What:** the documents state that `ci/` is plain Python and does not use LangGraph, and the future infra list
+  follows D116's growth triggers.
+- **Why:** a reviewer opening the code would see that the earlier claim was false. Neither git nor the docs record
+  why `ci/` was built without LangGraph, so no reason is stated.
+
+**Jessi is a GenAI pipeline, not an agent (D118).**
+- **What:** fixed steps, validation and human review. The freeze stays, and the submission goes ahead as built. The
+  documents say what was reused from the newsletter agent: code and ideas, not the LangGraph orchestration.
+- **Future, not built:** add agents for small, bounded processes inside the pipeline.
+- **Why:** the brief asks for a working GenAI tool, not an agent. Moving to an agent now would reopen the freeze, and
+  the checks would no longer describe what is submitted.
 
 ## Screens
 

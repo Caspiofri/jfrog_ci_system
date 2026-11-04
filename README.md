@@ -2,8 +2,8 @@
 
 **JFrog's Engine for Strategic Signals & Intelligence.** Jessi keeps JFrog's competitive-intelligence team updated
 every day on what six competitors (Cloudsmith, Sonatype, GitHub, GitLab, Snyk, AWS) and the wider industry ship and
-say, and shows how JFrog compares. Every item and every insight links to its source, and every number in this README
-is reported with its n.
+say, and shows how JFrog compares. It is a GenAI pipeline with fixed steps, validation and human review. Every item
+and every insight links to its source, and every number in this README is reported with its n.
 
 [Screenshot placeholder: Daily Brief, top of the page — `docs/screenshots/brief.png`]
 
@@ -160,7 +160,8 @@ system accurate and measurable (D15, D21).
 
 ## How it works
 
-The full picture is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how Jessi works today (flow, components, data
+A daily run calls fixed steps in order, in plain Python (`run_daily()` in `ci/daily.py`). The model answers inside
+those steps; it does not choose them. The full picture is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how Jessi works today (flow, components, data
 model) and the AWS production design, which is design only and not built.
 
 ```
@@ -343,19 +344,24 @@ freeze keeps the measured system unchanged (D99).
 | Quality | Golden set with a frozen split, held-out coverage, daily checks, a reproducibility pack | A faithfulness judge (D17); ranking precision@k; continuous eval from analyst actions; capture–recapture coverage; a "Missed event" button; JFrog's own blog as a "self" source (D43) |
 | Observability | `run_metrics`, run status, Health | LangSmith tracing of the daily run (off now, D48, D57) |
 | Readers | CI analysts | Role-based digests, an internal MCP server (D19) |
-| Infra | Docker Compose, SQLite, ChromaDB, one daily scheduler, a writable demo | Queue + workers, Postgres, Kubernetes, an LLM gateway such as Bedrock (D5); see ARCHITECTURE.md |
+| Infra | Docker Compose, SQLite, ChromaDB, one daily scheduler, a writable demo | Not built: RDS when more than one API instance or a smaller loss window is needed; a bigger instance for more sources; hourly collection after its own check; Amazon Bedrock, subject to JFrog's policies (D116, D117); see ARCHITECTURE.md |
+| Agents | — | Not built: add agents for small, bounded processes inside the pipeline (D118) |
 | Fixes known, not applied | — | Publisher dates instead of feed dates; JFrog mention from stored text only; hiring signals (D12, dropped) |
 | Screen speed (not measured) | — | Competitors takes about a second to appear by eye on the Windows demo, and the Review page makes one item request per decided row |
 
 ## Origin, legacy code
 
-Jessi grew out of `newsletter_agent`, a personal multi-source digest pipeline (LangGraph, Gemini, a Claude judge),
-and ports its collectors, dedupe, reader, ranker and ranking eval harness (D8).
+Jessi is based on `newsletter_agent`, a personal daily digest pipeline (D8). What Jessi reused is code and ideas: the
+reader, the LLM clients, the models and the ranking funnel. It did not reuse the newsletter's LangGraph orchestration:
+Jessi's pipeline in `ci/` is plain Python (D117).
 
-The remaining newsletter code is **origin, legacy code**: `main.py`, `modules/`, and the ranking-label tools in
-`evals/` (`rank_eval.py`, `label_hub.py`, `import_labels.py` and their helpers). It is not part of Jessi, does not
-run in the demo or the daily run, and is not covered by the evaluation above. It stays until after submission so the
-frozen commit hashes do not change.
+Jessi still imports a few files from the origin code: `modules/reader.py` (page fetch and text extraction),
+`modules/llm_clients.py` (LLM clients) and `evals/rank_split.py` (the split percentage).
+
+The rest of the newsletter code is **origin, legacy code**: `main.py`, the LangGraph graph in `modules/graph.py` and
+the other newsletter files in `modules/`, and the ranking-label tools in `evals/` (`rank_eval.py`, `label_hub.py`,
+`import_labels.py` and their helpers). That legacy path is not part of Jessi, does not run in the demo or the daily
+run, and is not covered by the evaluation above. It stays until after submission so the frozen commit hashes do not change.
 
 ## Repository
 
@@ -368,7 +374,7 @@ repro/          reproducibility pack: labels without article text, the split, sa
 tests/          Python tests (pytest)
 tools/          lock_check.py (fingerprints of the measured system), demo_snapshot.py
 docs/           api-contract.md, docker.md, ARCHITECTURE.md, DECISIONS.md
-main.py, modules/   origin, legacy code (see above)
+main.py, modules/   origin code: mostly legacy; Jessi uses modules/reader.py and modules/llm_clients.py (see above)
 ```
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how Jessi works today, and the AWS production design (design only,
