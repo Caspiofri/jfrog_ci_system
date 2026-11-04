@@ -1,7 +1,7 @@
 # Decisions
 
 The main design decisions behind Jessi, each with what was decided, why, and what else was considered. The full log
-(D1 to D113, newest first, with dates) is the PRD's decision log; numbers here are copied from it. IDs match the PRD,
+(D1 to D128, newest first, with dates) is the PRD's decision log; numbers here are copied from it. IDs match the PRD,
 so a reader can look each one up.
 
 BE is the coding agent that ran the checks and reported these results.
