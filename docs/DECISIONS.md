@@ -251,7 +251,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   clone from GitHub on Thu. Replaces D115 as the final code freeze.
   - **Why:** the cleanup changed comments, default strings and tests, and BE reports identical client bundles, so
     one more Windows check tonight would add little. A restart would change nothing a reviewer sees.
-  - **Later:** replaced as the code freeze by [FINAL_COMMIT].
+  - **Later:** replaced as the code freeze by D127, unless a D125 fix is merged.
 - **Next.js exception (D123):** one exception to the freeze for the Next.js findings: upgrade next from 15.5.4 to
   15.5.21 on a branch from `017e26b`, cutoff 00:00. Per `jf audit`, 3 Applicable findings were in next@15.5.4, one
   of them Critical. Merging requires a repeat audit, all tests and proofs, a clean clone and a Windows check. If it
@@ -274,6 +274,14 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   as measured and as not shown to be reachable.
   - **Why:** per BE's scan (23:40), these findings have no fixed version listed and the evidence is not in our
     code, but a path was not disproven. Keeping this separate from the merge keeps a verified fallback.
+- **Current code freeze (D127):** `f73b549`, local annotated tag `freeze-20261104d`, per BE at 23:47, unless a D125
+  fix is merged. A normal merge of `bfbd6ac` into main; compared with `017e26b`, only `frontend/package.json` and
+  `frontend/package-lock.json` changed. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank
+  `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences. The Windows check of `bfbd6ac`
+  passed at about 23:31. The video UI on 127.0.0.1:3018 serves Next.js 15.5.28 from `f73b549`. The live API on 8011
+  was not restarted, and nothing is pushed. Replaces D122 as the code freeze.
+  - **Why:** per BE, the upgrade changes only the two package files and no fingerprinted file, so the measured
+    system is unchanged. The Windows check covered the bundle a reviewer would clone.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in
