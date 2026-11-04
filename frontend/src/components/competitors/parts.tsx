@@ -2,7 +2,6 @@
 // Pieces shared by the Competitors overview and profile.
 import { CompetitorAvatar, CompetitorLabel } from "@/components/CompetitorAvatar";
 import Link from "next/link";
-import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { Hint, ItemTitle, ScoreBadge, StatusDot, Tag } from "@/components/ci";
 
 export const TOP_SCORE_LABEL = "Top score this week";
@@ -10,16 +9,6 @@ import { useItemDrawer } from "@/components/ItemDrawer";
 import { CardSparkline } from "@/components/competitors/Sparkline";
 import { CATEGORY_COLOR, SOURCE_LABEL, fmtDate, label } from "@/lib/format";
 import type { CompetitorCard, Deal } from "@/lib/types";
-
-export function Trend({ t, prev }: { t: CompetitorCard["trend"]; prev: number }) {
-  const Icon = t.direction === "up" ? ArrowUpRight : t.direction === "down" ? ArrowDownRight : ArrowRight;
-  return (
-    <span className="inline-flex items-center gap-0.5 text-xs text-mute" title={`Previous 7 days: ${prev}`}>
-      <Icon className="size-3.5" />
-      {t.delta > 0 ? "+" : ""}{t.delta} vs previous 7 days
-    </span>
-  );
-}
 
 /** The category mix bar (prototype .mix), with a legend under it so color is never the only cue. */
 export function MixBar({ mix, legend = false }: { mix: CompetitorCard["category_mix"]; legend?: boolean }) {
@@ -60,30 +49,36 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
           <span data-top-score><ScoreBadge score={c.threat} /></span>
         </Hint>
       </div>
-      <div className="flex items-baseline gap-2">
-        <b className="text-[1.75rem] font-semibold leading-none tabular-nums">{c.items_7d}</b>
-        <span className="text-mute">· {c.items_today} in this Brief</span>
-      </div>
-      <Trend t={c.trend} prev={c.items_prev_7d} />
-      <CardSparkline k={c.key} />
-      <MixBar mix={c.category_mix} />
-      <div className="flex flex-wrap gap-1.5 text-xs">
-        {c.pending_review ? (
-          <Tag className="bg-[#fffaf0] text-[#8a5a00]">{c.pending_review} awaiting review{c.pending_max_score ? ` (max ${c.pending_max_score})` : ""}</Tag>
-        ) : null}
-        {c.head_to_head_changes ? <Tag className="bg-[#fff7e6] text-[#8a5a00]">{c.head_to_head_changes} head-to-head changes</Tag> : null}
-        {c.tracked_changes ? <Tag>{c.tracked_changes} tracked-page changes</Tag> : null}
-        {c.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">{c.mentions_jfrog} mention JFrog</Tag> : null}
-      </div>
-      {c.top_item ? (
-        <div className="border-t border-line pt-2 text-xs">
-          <span className="text-mute">Top item: </span>
-          <span className="font-medium">{c.top_item.title}</span>
-          {c.top_item.score ? <span className="text-mute"> · {c.top_item.score}</span> : null}
+      {/* D112: what is waiting, then what happened; the heatmap above carries the counts */}
+      {c.pending_review || c.mentions_jfrog ? (
+        <div className="flex flex-wrap gap-1.5 text-xs" data-card-tags>
+          {c.pending_review ? (
+            <Tag className="bg-[#fffaf0] text-[#8a5a00]">{c.pending_review} awaiting review{c.pending_max_score ? ` (max ${c.pending_max_score})` : ""}</Tag>
+          ) : null}
+          {c.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">{c.mentions_jfrog} mention JFrog</Tag> : null}
         </div>
-      ) : (
-        <div className="border-t border-line pt-2 text-xs text-mute">No cleared items this week.</div>
-      )}
+      ) : null}
+      {/* bottom of the card, fixed height, so the sparkline and the divider line up across cards whatever the title */}
+      <div className="mt-auto flex flex-col gap-2.5" data-card-bottom>
+        <CardSparkline k={c.key} />
+        {/* one top item: GET /competitors sends only top_item, so up to 3 would need an API change (D112). Exactly 3
+            lines: the title in 2 (cut with "…", in full on hover), then score and article date */}
+        <div className="border-t border-line pt-2 text-xs leading-4" data-top-item>
+          {c.top_item ? (
+            <>
+              <p className="m-0 line-clamp-2 h-8" title={c.top_item.title}>
+                <span className="text-mute">Top item: </span>
+                <span className="font-medium">{c.top_item.title}</span>
+              </p>
+              <p className="m-0 h-4 truncate text-mute" data-top-item-meta>
+                {[c.top_item.score ? `Score ${c.top_item.score}` : null, c.top_item.published_at ? fmtDate(c.top_item.published_at) : null].filter(Boolean).join(" · ")}
+              </p>
+            </>
+          ) : (
+            <p className="m-0 h-12 text-mute">No cleared items this week.</p>
+          )}
+        </div>
+      </div>
     </Link>
   );
 }

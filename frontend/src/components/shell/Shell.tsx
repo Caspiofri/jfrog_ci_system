@@ -8,6 +8,7 @@ import { ItemDrawerProvider } from "@/components/ItemDrawer";
 import { useApi } from "@/lib/api";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { runTime, useMeta } from "@/lib/meta";
+import { SANDBOX_NOTE, demoState } from "@/lib/demo";
 import type { Review } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +51,7 @@ function DemoLine() {
   return (
     <div className="border-b border-[#f59e0b]/50 bg-[#fff7e6] px-5 py-1 text-xs text-[#5c4300]" role="note" data-demo-line>
       Demo snapshot of {fmtDate(d, true)}. The live system keeps running daily at 06:00.
+      {demoState(data) === "demo_writable" ? <> {SANDBOX_NOTE}</> : null}
     </div>
   );
 }

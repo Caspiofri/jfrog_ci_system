@@ -5,13 +5,17 @@ import { test } from "node:test";
 
 const page = readFileSync(new URL("../src/app/competitors/page.tsx", import.meta.url), "utf8");
 
-test("header above the cards: title and window; no totals line; the (i) says the big number is published only", () => {
-  // D89: title "Weekly", the API's week on a line under it
-  assert.match(page, /<h2[^>]*>\s*Weekly\s*<InfoHint[^>]*\/>\s*<\/h2>\s*<p[^>]*data-week-range>\{fmtDate\(d\.week\.start\)\}–\{fmtDate\(d\.week\.end\)\}<\/p>/);
+test("header above the cards: title, window and how to open a profile; the sparkline line once; no totals line", () => {
+  // D112: title "Competitor overview" (was "Weekly", D89), the API's week and "Select a card" under it
+  assert.match(page, /<h2[^>]*>\s*Competitor overview\s*<InfoHint[^>]*\/>\s*<\/h2>\s*<p[^>]*data-week-range>\{fmtDate\(d\.week\.start\)\}–\{fmtDate\(d\.week\.end\)\} · Select a card for the full profile<\/p>\s*<p[^>]*data-spark-line>\{SPARK_LINE\}<\/p>/);
+  assert.doesNotMatch(page, /Weekly/);
   assert.doesNotMatch(page, /Published competitor items/);
   assert.doesNotMatch(page, /cardTotals|across the six competitors/);
-  assert.match(page, /const CARDS_EXPLAIN = "Only cleared items \(passed routing, or approved by an analyst\)\. Click a card for the competitor's full details\.";/);
-  assert.match(page, /<InfoHint text=\{CARDS_EXPLAIN\} label="What the cards count" \/>/);
+  assert.match(page, /const CARDS_EXPLAIN = "Each card shows the items awaiting review, the items that mention JFrog, cleared items per day and the week's top cleared item\. Cleared means passed routing, or approved by an analyst\.";/);
+  assert.match(page, /<InfoHint text=\{CARDS_EXPLAIN\} label="What the cards show" \/>/);
+  // the (i) texts name nothing the cards lost, and do not repeat "Select a card" (D112)
+  const info = page.slice(page.indexOf("const PAGE_INFO"), page.indexOf("export default"));
+  assert.doesNotMatch(info, /per card|Click a card|Select a card|in this Brief|previous 7 days|category bar/i);
   assert.doesNotMatch(page, /All published and awaiting-review items/);
   assert.ok(page.indexOf("data-cards-header") < page.indexOf("<CompetitorCardView"), "above the cards");
 });

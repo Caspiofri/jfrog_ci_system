@@ -5,11 +5,11 @@ import { test } from "node:test";
 
 const src = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), "utf8");
 
-test("Refresh insights sits under the insights, never in demo mode, and says why when no model is configured", () => {
+test("Refresh insights sits under the insights, disabled in demo mode (D111), and says why when no model is configured", () => {
   const brief = src("app/brief/page.tsx");
   const panel = brief.slice(brief.indexOf("function InsightsPanel"), brief.indexOf("function windowText"));
   assert.doesNotMatch(panel, /right=\{\s*<Button/);
-  assert.match(panel, /\{demo \? null : \([\s\S]*?data-refresh[\s\S]*?Refresh insights[\s\S]*?<\/Panel>/);
+  assert.match(panel, /\{demo \? \([\s\S]*?data-insights-frozen[\s\S]*?<Button[^>]*\bdisabled>[\s\S]*?Refresh insights[\s\S]*?\{INSIGHTS_FROZEN\}[\s\S]*?\) : \([\s\S]*?data-refresh[\s\S]*?Refresh insights[\s\S]*?<\/Panel>/);
   assert.match(panel, /err\?\.code === "llm_unavailable" \?[\s\S]*?\{REFRESH_UNAVAILABLE\}/);
   assert.match(brief, /const REFRESH_UNAVAILABLE = "Refresh needs a configured model, so it is not available here\.";/);
   for (const f of ["app/review/page.tsx", "app/health/page.tsx", "app/competitors/page.tsx", "app/log/page.tsx"]) assert.doesNotMatch(src(f), /Refresh insights|insights\/refresh/, f);

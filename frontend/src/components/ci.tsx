@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ApiError } from "@/lib/api";
+import { errorText } from "@/lib/demo";
 import { CATEGORY_COLOR, RUBRIC, SCORE_COLOR, STATUS_COLOR, STATUS_LABEL, UNVERIFIED_VALUES, CLEARED_TIP, label, publisherName, safeHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -266,12 +267,13 @@ export function Empty({ children }: { children: ReactNode }) {
 
 export function ErrorNote({ error, onRetry }: { error: ApiError | Error; onRetry?: () => void }) {
   const code = "code" in error ? (error as ApiError).code : undefined;
+  const { text, showCode } = errorText({ status: "status" in error ? (error as ApiError).status : undefined, code, message: error.message });
   return (
     <div role="alert" className="flex flex-wrap items-center gap-2 rounded border-l-[3px] border-[#d14343] bg-[#fff5f5] px-3 py-2">
       <AlertTriangle className="size-4 shrink-0 text-[#d14343]" />
       <span className="flex-1">
-        {error.message}
-        {code ? <span className="ml-2 text-xs text-mute">({code})</span> : null}
+        {text}
+        {code && showCode ? <span className="ml-2 text-xs text-mute">({code})</span> : null}
       </span>
       {onRetry ? (
         <Button size="sm" variant="outline" onClick={onRetry} className="h-7 text-xs">

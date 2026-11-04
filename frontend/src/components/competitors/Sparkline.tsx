@@ -3,7 +3,7 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useRecord } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
-import { SPARK_CAPTION, SPARK_TITLE, lastDays, type DayRow } from "@/lib/sparkline";
+import { SPARK_TITLE, lastDays, type DayRow } from "@/lib/sparkline";
 import type { CompetitorProfile } from "@/lib/types";
 
 function Tip({ active, payload }: { active?: boolean; payload?: { payload: DayRow }[] }) {
@@ -38,7 +38,6 @@ export function CardSparkline({ k }: { k: string }) {
       ) : (
         <div className="h-10 w-full" role="status" aria-label="Loading" />
       )}
-      <span className="text-[0.625rem] text-mute">{SPARK_CAPTION}</span>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 // Log rows; click a cell to list its items (the title opens the drawer).
 import { useState } from "react";
 import useSWR from "swr";
-import { Empty, ErrorNote, ItemTitle, Panel, ScoreBadge } from "@/components/ci";
+import { Empty, ErrorNote, Hint, ItemTitle, Panel, ScoreBadge } from "@/components/ci";
 import { CompetitorAvatar } from "@/components/CompetitorAvatar";
 import { useItemDrawer } from "@/components/ItemDrawer";
 import { ApiError, get, path, useApi } from "@/lib/api";
@@ -14,9 +14,12 @@ import { remainingOffsets } from "@/lib/reviewQueue";
 import type { Competitors, Log, LogRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+/** D112: these two categories are always held for review, so an item counts here only once approved. */
+export const ALWAYS_HELD_TIP = "Always held for review, so these items count only after approval.";
+export const ALWAYS_HELD_CATEGORIES = ["Pricing & Packaging", "Funding/M&A/Partnerships"];
 export const HEATMAP_CAPTION = "By category, in the same week as the cards below.";
 /** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
-export const HEATMAP_COUNTS = "Cleared items (passed routing, or approved by an analyst), counted as on the competitor cards: by the date collected, in the same week. Items awaiting review are not in this grid; each card shows them.";
+export const HEATMAP_COUNTS = "Cleared items (passed routing, or approved by an analyst), counted by the date collected, in the same week as the cards. The Total row is each competitor's count. Items awaiting review are not in this grid; each card shows them.";
 
 async function getAllRows(url: string): Promise<{ rows: LogRow[]; now: string }> {
   const first = await get<Log>(url);
@@ -72,7 +75,9 @@ export function ActivityHeatmap() {
               <tbody>
                 {cats.map((cat) => (
                   <tr key={cat}>
-                    <th scope="row" className="sticky left-0 z-10 w-[11rem] border-b border-line bg-card px-2 py-1.5 text-left text-xs font-semibold">{cat}</th>
+                    <th scope="row" className="sticky left-0 z-10 w-[11rem] border-b border-line bg-card px-2 py-1.5 text-left text-xs font-semibold">
+                      {ALWAYS_HELD_CATEGORIES.includes(cat) ? <Hint text={ALWAYS_HELD_TIP} className="underline decoration-dotted underline-offset-2" >{cat}</Hint> : cat}
+                    </th>
                     {keys.map((k) => {
                       const cell = hm.cells[k][cat];
                       const col = heatColor(cell.count, hm.max);
@@ -91,12 +96,20 @@ export function ActivityHeatmap() {
                     })}
                   </tr>
                 ))}
+                {/* D112 (reverses D86): each competitor's count, the number its card used to show */}
+                <tr data-total-row>
+                  <th scope="row" className="sticky left-0 z-10 border-t-2 border-line bg-card px-2 py-1.5 text-left text-xs font-semibold">Total</th>
+                  {keys.map((k) => (
+                    <td key={k} className="border-l border-t-2 border-line px-2 py-1.5 text-center text-sm font-semibold tabular-nums" data-total={hm.colTotals[k]}>
+                      {hm.colTotals[k]}
+                    </td>
+                  ))}
+                </tr>
               </tbody>
             </table>
           </div>
           <p className="m-0 mt-2 flex flex-wrap items-baseline gap-x-3 text-sm" data-heat-totals>
-            <span><b className="font-semibold tabular-nums">{hm.published}</b> cleared</span>
-            <span className="text-xs text-mute">across the six competitors, the same as the cards below</span>
+            <span><b className="font-semibold tabular-nums">{hm.published}</b> cleared across the six competitors</span>
           </p>
           {picked && sel ? (
             <div className="mt-3 rounded border border-line px-3 py-2" data-heat-items>

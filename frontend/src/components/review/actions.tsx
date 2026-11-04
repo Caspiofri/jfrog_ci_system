@@ -25,18 +25,21 @@ const btn = "h-7 px-2.5 text-xs";
 
 const UNFLAG_TIP = "Removes the important mark. The item's status does not change.";
 
-export function ItemActions({ item, disabled, onError }: { item: Item; disabled?: boolean; onError: (e: ApiError | null) => void }) {
+export function ItemActions({ item, disabled, onError, onApproved }: {
+  item: Item; disabled?: boolean; onError: (e: ApiError | null) => void; onApproved?: (item: Item) => void;
+}) {
   const refresh = useRefreshAll();
   const { data: meta } = useMeta();
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const id = encodeURIComponent(item.item_id);
 
-  const run = async (fn: () => Promise<unknown>) => {
+  const run = async (fn: () => Promise<unknown>, done?: () => void) => {
     setBusy(true);
     onError(null);
     try {
       await fn();
+      done?.();
       await refresh();
     } catch (e) {
       onError(e as ApiError);
@@ -49,7 +52,7 @@ export function ItemActions({ item, disabled, onError }: { item: Item; disabled?
   return (
     <>
       <Button size="sm" variant="outline" className={`${btn} border-jgreen text-jgreen-d hover:bg-jgreen hover:text-white`} disabled={off}
-        onClick={() => run(() => send("POST", `/api/v1/items/${id}/approve`, {}, item.version))}>
+        onClick={() => run(() => send("POST", `/api/v1/items/${id}/approve`, {}, item.version), () => onApproved?.(item))}>
         <Check className="size-3.5" /> Approve
       </Button>
       <DropdownMenu>

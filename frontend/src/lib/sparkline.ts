@@ -4,6 +4,8 @@
 export const SPARK_DAYS = 14;
 export const SPARK_TITLE = "Cleared Items per Day · Last 14 Days";
 export const SPARK_CAPTION = "By article date. Items that passed routing or were approved.";
+/** Shown once above the competitor cards (D112), not inside each card. */
+export const SPARK_LINE = `Sparklines: ${SPARK_CAPTION.charAt(0).toLowerCase()}${SPARK_CAPTION.slice(1)}`;
 
 export interface DayRow { date: string; items: number }
 

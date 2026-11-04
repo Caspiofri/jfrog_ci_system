@@ -21,3 +21,8 @@ export function reviewedHint(it: ReviewedFields): string | null {
   const said = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
   return `${said[0].toUpperCase()}${said.slice(1)} by an analyst${fields.length ? ` (${fields.join(", ")})` : ""}`;
 }
+
+/** Daily Brief only: an item an analyst approved. Items cleared automatically get no badge. */
+export const APPROVED_LABEL = "Approved";
+export const APPROVED_HINT = "Held for review, then approved by an analyst.";
+export const isAnalystApproved = (it: { status: string }) => it.status === "approved";
