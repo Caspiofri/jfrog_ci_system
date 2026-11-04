@@ -215,8 +215,10 @@ the eval numbers from saved reports with no model call: `python -m ci.repro reco
 a web search and has no 4+ event, so it says nothing about important events. The missed event (VOLTA) was not covered
 by any followed source (D101, D102).
 
-**Which category number to read.** 0.71 is the harness's definition, the same as on train; 0.58 counts a noise
-prediction as a wrong category. Both are reported (D67). [Open: which leads.]
+**Which category number to read.** The lead number is **0.71** (n = 24), the harness's definition, the same one the
+train reports use: it compares the predicted category with the label on every non-noise test item, including the 3
+items the model predicted as noise. Beside it, **0.58** (14 of 24) counts a noise prediction as a wrong category
+(D67).
 
 **The clearest finding.** Rules were meant to settle only safe cases (D24, D25). For competitor they did (9 of 9);
 for category they did not (3 of 9), almost always setting Security or AI & Agents to Product & Features. The fix is
@@ -331,8 +333,7 @@ freeze keeps the measured system unchanged (D99).
 ## Origin, legacy code
 
 Jessi grew out of `newsletter_agent`, a personal multi-source digest pipeline (LangGraph, Gemini, a Claude judge),
-and ports its collectors, dedupe, reader, ranker and ranking eval harness (D8). [Placeholder: link to
-newsletter_agent.]
+and ports its collectors, dedupe, reader, ranker and ranking eval harness (D8).
 
 The remaining newsletter code is **origin, legacy code**: `main.py`, `modules/`, and the ranking-label tools in
 `evals/` (`rank_eval.py`, `label_hub.py`, `import_labels.py` and their helpers). It is not part of Jessi, does not

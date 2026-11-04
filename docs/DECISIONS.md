@@ -4,8 +4,10 @@ The main design decisions behind Jessi, each with what was decided, why, and wha
 (D1 to D113, newest first, with dates) is the PRD's decision log; numbers here are copied from it. IDs match the PRD,
 so a reader can look each one up.
 
-[DRAFT, 4 Nov. Started from the PRD after D113. Still to add: the delivery decisions (D57, D59, D99, D109, D111) in
-full, Stage 2 (D30, D64, D65), and a line per UI round (D72, D89, D104, D112, D113).]
+Sections: [Product](#product) · [Routing and analyst actions](#routing-and-analyst-actions) ·
+[Classification and scoring](#classification-and-scoring) · [The JFrog comparison](#the-jfrog-comparison) ·
+[Pipeline and safety](#pipeline-and-safety) · [Insights](#insights) · [Evaluation](#evaluation) ·
+[Demo and delivery](#demo-and-delivery) · [Screens](#screens) · [Stage 2](#stage-2)
 
 ## Product
 
@@ -99,6 +101,71 @@ full, Stage 2 (D30, D64, D65), and a line per UI round (D72, D89, D104, D112, D1
   keeps the comparison the brief asks for and stays honest.
 - **Considered:** removing the comparison (D87), reversed the same evening.
 
+## Pipeline and safety
+
+**Article text is untrusted input (D32, D51).**
+- **What:** guards in layers, each built with the code it protects: output validation (score, competitor, category
+  and item ids checked, rejects routed to review); article text in delimited tags, with case-insensitive escaping;
+  HTML escaping in the UI; insight citations checked against the stored text. Synthetic poisoned articles are pinned
+  as regression tests.
+- **Why:** pages we do not control feed the LLM, and a page can hide instructions that inflate a score or plant a
+  false claim. JFrog sells AI-agent security, so this will come up. The LLM has no tools, so the worst case is wrong
+  output, not an action; review routing is the backstop.
+- **Stated openly:** the quote check proves a quote exists in the stored text, not that it is true, so a planted
+  sentence passes it. The problem is narrowed, not solved.
+
+**One event, one story: 0.82 similarity with a CVE-ID veto (D33, D38).**
+- **What:** items about the same event link at the 0.82 rule. Two items that name different CVE IDs never merge.
+- **Why:** a manual review of the 14-day import found 2 of 9 multi-item events mixed, both GitLab security releases
+  with different CVEs that embeddings could not tell apart. Merging two vulnerabilities hides one from the Brief.
+- **Considered:** a looser 0.75 link. Dropped: it did not fix the case it was meant for, and it would have been wrong
+  on 5 of 12 near-miss pairs.
+
+**Vetted means trusted, not readable (D39, D53).**
+- **What:** sites that block our fetcher (0 of 15 items extracted) stay vetted. We never get around a challenge.
+  Their important items are held as teaser-only, and every item records why its text is missing. On vetted hosts
+  only releases, tags, code and changelog pages are vetted; issues and pull requests are not.
+- **Why:** mixing trust with readability would hold reputable items for the wrong reason. A repository on a vetted
+  host can be anyone's. Unvetted means held for review, not dropped, so narrowing vetting costs review time, not
+  coverage.
+
+**Observability lives in the repo (D48).**
+- **What:** a `run_metrics` row per run, including degraded and failed runs; stale and overdue detection; the API
+  log on disk; Health shows run history and the eval with n. LangSmith tracing is off by default, and off in every
+  eval run.
+- **Why:** a run that never started looked like yesterday's success. Reviewers run without our accounts, so
+  everything they must see is in the repo and on Health.
+
+## Insights
+
+**Insights cite stories, and every claim quotes its source (D37).**
+- **What:** at least 2 different stories per insight; each claim carries a quote checked against the stored text;
+  any failed quote rejects the insight. Insights read only published items, over a 7-day window (14 with fewer than
+  15 stories) plus anything found since the previous Brief.
+- **Why:** near-duplicates in the data would turn one story into "momentum". Insights on unreviewed items could
+  spread a wrong claim.
+
+**Expected patterns are written before the generator runs (D43, D60).**
+- **What:** four patterns in `evals/expected_insights_389e71.yaml`, written by Ofri from a neutral listing and
+  checked by a second reader. Any later generator change is tuning on this file and is reported as such.
+- **Why:** a recall number needs a reference the generator never shaped. Result on 1 Nov: 0 of 4 found fully, 3
+  partly, 1 not found; two patterns were found only by being merged.
+
+**Continuity from shared sources, not wording (D63).**
+- **What:** each insight is marked new, continuing or strengthened by the stories it shares with the previous
+  Brief's insights, with no LLM call.
+- **Why:** the generator starts fresh every morning on windows that overlap by 6 of 7 days, so the same pattern came
+  back under a new title. Matching on shared sources is deterministic and checkable.
+- **Future:** insights with a lifecycle, created once and updated, which changes the generator.
+
+**Insights lead the Brief, labelled as AI-generated (D61, D73).**
+- **What:** insights stay first. One AI icon, "AI-generated — check the cited sources", with the measurement in the
+  hover.
+- **Why:** insights are what turns a news feed into intelligence. Leading with the least reliable part is acceptable
+  only because the screen says how far to trust it.
+- **Considered:** an "Experimental" label. Removed: it read as "not reliable" for the whole section, more than 11 of
+  12 supported claims shows.
+
 ## Evaluation
 
 **Tune on train, report test, once (D17, D23, D66).**
@@ -133,8 +200,70 @@ full, Stage 2 (D30, D64, D65), and a line per UI round (D72, D89, D104, D112, D1
 - **Why:** a reviewer must see the product in one command, without a key. Read-only "does not look good and the
   system cannot really be experienced" (Ofri, 4 Nov); the copy is isolated, so actions cannot pollute measured data.
 - **Considered:** read-only (D110), reversed the same day under a time box with the frozen commit as the fallback.
+- **Conditions:** allowed only with proofs: a guard showing that startup changes 0 rows on the copy, no write
+  leaving the copy, live behaviour unchanged, and Health and evaluation numbers reading saved summaries.
+
+**Build first, then verify the exact system that is submitted (D47, D57).**
+- **What:** build days ended with a code freeze, a clean-clone test and a demo snapshot freeze. After that: fixes
+  found in verification, docs, screenshots and video. No new features, and no change to classify, rank, lens or
+  insights prompts and rules.
+- **Why:** with the test eval one day away, finishing and verifying was worth more than any further change.
+
+**A portable fingerprint beside the legacy one (D59).**
+- **What:** the legacy classify_rank fingerprint hashes absolute paths, so a fresh clone gets a different value. A
+  portable fingerprint hashes content only: rubric, config, capability sheet, model and call settings. Both are
+  reported; no recorded fingerprint changed.
+- **Why:** a reviewer must be able to check the evidence on a clone. A reproducibility pack recomputes every
+  reported number from saved reports with no LLM call, kept separate from rerunning the evaluation.
+
+**Freeze at a checked commit (D109).**
+- **What:** tagged after every planned check passed on the bundle a reviewer would clone: review actions, a Windows
+  clean clone, LOCK OK. From then: documents, the repro pack and cleanup that touches nothing measured, each followed
+  by tests and lock_check.
+- **Why:** freeze what was checked, on the artifact that will be submitted.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in ARCHITECTURE.md.
 
 **Product name Jessi (D46).** JFrog's Engine for Strategic Signals & Intelligence.
+
+## Screens
+
+Each UI round changed display only; nothing measured moved.
+
+- **D44, D45:** the Brief separates what is known (published items scored 3+), what is pending (held items, shown
+  only as counts) and what cannot be concluded yet (insight states, evidence basis).
+- **D72:** an outside review: tiles on the Brief, explanations moved to hover, continuity badges, one link convention
+  (the title opens the drawer, an icon opens the article), letter avatars instead of logos, a heatmap of where
+  competitor activity lands.
+- **D89:** Ofri's review of the merged demo: new articles marked as new, fewer repeated labels.
+- **D104:** no raw errors, no false affordances, no duplicate panels; concept images labelled "Concept, sample data".
+- **D112:** Competitors cards answer what happened and what is waiting; the heatmap already answers how much, so it
+  gets a Total row and the cards lose the repeated counts. "+N vs previous 7 days" removed, because collection started
+  on 30 Oct and it read as a surge.
+- **D113:** from an outside reader: "Items in this Brief" instead of "Today in numbers" (wrong on a past Brief),
+  "Cumulative insights" instead of "Weekly", JFrog vs competitors marked as an interim view, "Checked manually" with
+  its date.
+
+## Stage 2
+
+**Fix lodash, not moment (D30).**
+- **What:** remediate lodash CVE-2018-16487 (4.17.4 to 4.17.21), not moment CVE-2022-31129. Each of the two
+  applicable Highs is High on one scale only.
+- **Why:** lodash: an unauthenticated route passes unvalidated input into `_.merge`, and prototype pollution was
+  shown over a real HTTP request; one upgrade also closes CVE-2020-28500. moment: every flagged call is in a function
+  that is never called, so no user input reaches it. Contextual Analysis marking dead code Applicable is a talking
+  point: Applicable narrows, it does not prove.
+
+**Harden the app on top of the upgrade (D64).**
+- **What:** the update route builds from an allowed-field list with type checks, and a middleware rejects JSON
+  bodies with `__proto__`, `constructor` or `prototype` keys at any depth. Each guard was tested with the vulnerable
+  lodash, alone and together.
+- **Why:** the upgrade fixes only that version's CVEs; the guards stop prototype pollution on this route whatever
+  the library version.
+
+**Publish with the JFrog CLI, not GitHub Actions with OIDC (D65).**
+- **What:** the image is pushed with `jf docker push` and Build Info published with `jf rt build-publish`. The image
+  is linux/arm64, built on the Pi. The adapted workflow stays in the repo, described as prepared, not run.
+- **Why:** the brief allows the CLI. A blocked UI login stopped the OIDC setup; OIDC stays the production
+  recommendation.
