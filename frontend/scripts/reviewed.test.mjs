@@ -38,3 +38,13 @@ test("the label and where it shows: Brief cards and Review rows, with the pencil
     assert.match(readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8"), /<ReviewedMark item=\{item\} \/>/, f);
   }
 });
+
+test("Daily Brief: an Approved badge only on items an analyst approved, with the hover", async () => {
+  const { APPROVED_HINT, APPROVED_LABEL, isAnalystApproved } = await import("../src/lib/reviewed.ts");
+  assert.equal(APPROVED_LABEL, "Approved");
+  assert.equal(APPROVED_HINT, "Held for review, then approved by an analyst.");
+  assert.equal(isAnalystApproved({ status: "approved" }), true);
+  assert.equal(isAnalystApproved({ status: "auto_published" }), false);
+  const card = readFileSync(new URL("../src/components/brief/BriefCard.tsx", import.meta.url), "utf8");
+  assert.match(card, /\{isAnalystApproved\(item\) \? <Tag [^>]*title=\{APPROVED_HINT\}[^>]*>\{APPROVED_LABEL\}<\/Tag> : null\}/);
+});
