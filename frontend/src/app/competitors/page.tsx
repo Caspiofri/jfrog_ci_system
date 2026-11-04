@@ -5,6 +5,7 @@ import { CapabilityMatrix } from "@/components/competitors/Matrix";
 import { ActivityHeatmap } from "@/components/competitors/Heatmap";
 import { useApi } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { SPARK_LINE } from "@/lib/sparkline";
 import type { Competitors } from "@/lib/types";
 
 const PAGE_INFO =
@@ -22,12 +23,13 @@ export default function CompetitorsPage() {
       <Async {...q} retry={() => q.mutate()} rows={6} isEmpty={(d) => !d.items.length} empty="No competitors in the config.">
         {(d) => (
           <>
-            <section className="flex flex-col gap-0.5" aria-label="Weekly" data-cards-header>
+            <section className="flex flex-col gap-0.5" aria-label="Competitor overview" data-cards-header>
               <h2 className="m-0 flex flex-wrap items-center gap-1.5 text-lg font-semibold">
-                Weekly
+                Competitor overview
                 <InfoHint text={CARDS_EXPLAIN} label="What the cards count" />
               </h2>
-              <p className="m-0 text-sm text-mute" data-week-range>{fmtDate(d.week.start)}–{fmtDate(d.week.end)}</p>
+              <p className="m-0 text-sm text-mute" data-week-range>{fmtDate(d.week.start)}–{fmtDate(d.week.end)} · Select a card for the full profile</p>
+              <p className="m-0 mt-1 text-xs text-mute" data-spark-line>{SPARK_LINE}</p>
             </section>
             <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
               {d.items.map((c) => <CompetitorCardView key={c.key} c={c} />)}

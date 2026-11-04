@@ -11,9 +11,9 @@ const h2h = read("components/competitors/HeadToHead.tsx");
 const chart = read("components/competitors/ActivityChart.tsx");
 const ci = read("components/ci.tsx");
 
-test("overview: importance colours and the cards' category bar have a visible legend", () => {
+test("overview: the legends stay; the cards no longer use the category bar (D112)", () => {
   assert.match(overview, /<ColourLegends \/>/);
-  assert.match(parts, /<MixBar mix=\{c\.category_mix\} \/>/, "the cards use the category bar");
+  assert.doesNotMatch(parts.slice(parts.indexOf("export function CompetitorCardView")), /<MixBar/);
 });
 
 test("profile: score colours, the category bar, the activity chart and the head-to-head highlight have legends", () => {

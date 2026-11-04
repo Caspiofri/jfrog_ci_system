@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 export const HEATMAP_CAPTION = "By category, in the same week as the cards below.";
 /** What a cell counts, said on screen, since the cards above count something else (D31: by the date found). */
-export const HEATMAP_COUNTS = "Cleared items (passed routing, or approved by an analyst), counted as on the competitor cards: by the date collected, in the same week. Items awaiting review are not in this grid; each card shows them.";
+export const HEATMAP_COUNTS = "Cleared items (passed routing, or approved by an analyst), counted by the date collected, in the same week as the cards. The Total row is each competitor's count. Items awaiting review are not in this grid; each card shows them.";
 
 async function getAllRows(url: string): Promise<{ rows: LogRow[]; now: string }> {
   const first = await get<Log>(url);
@@ -91,12 +91,20 @@ export function ActivityHeatmap() {
                     })}
                   </tr>
                 ))}
+                {/* D112 (reverses D86): each competitor's count, the number its card used to show */}
+                <tr data-total-row>
+                  <th scope="row" className="sticky left-0 z-10 border-t-2 border-line bg-card px-2 py-1.5 text-left text-xs font-semibold">Total</th>
+                  {keys.map((k) => (
+                    <td key={k} className="border-l border-t-2 border-line px-2 py-1.5 text-center text-sm font-semibold tabular-nums" data-total={hm.colTotals[k]}>
+                      {hm.colTotals[k]}
+                    </td>
+                  ))}
+                </tr>
               </tbody>
             </table>
           </div>
           <p className="m-0 mt-2 flex flex-wrap items-baseline gap-x-3 text-sm" data-heat-totals>
-            <span><b className="font-semibold tabular-nums">{hm.published}</b> cleared</span>
-            <span className="text-xs text-mute">across the six competitors, the same as the cards below</span>
+            <span><b className="font-semibold tabular-nums">{hm.published}</b> cleared across the six competitors</span>
           </p>
           {picked && sel ? (
             <div className="mt-3 rounded border border-line px-3 py-2" data-heat-items>

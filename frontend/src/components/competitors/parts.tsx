@@ -60,26 +60,23 @@ export function CompetitorCardView({ c }: { c: CompetitorCard }) {
           <span data-top-score><ScoreBadge score={c.threat} /></span>
         </Hint>
       </div>
-      <div className="flex items-baseline gap-2">
-        <b className="text-[1.75rem] font-semibold leading-none tabular-nums">{c.items_7d}</b>
-        <span className="text-mute">· {c.items_today} in this Brief</span>
-      </div>
-      <Trend t={c.trend} prev={c.items_prev_7d} />
+      {/* D112: what is waiting, then what happened; the heatmap above carries the counts */}
+      {c.pending_review || c.mentions_jfrog ? (
+        <div className="flex flex-wrap gap-1.5 text-xs" data-card-tags>
+          {c.pending_review ? (
+            <Tag className="bg-[#fffaf0] text-[#8a5a00]">{c.pending_review} awaiting review{c.pending_max_score ? ` (max ${c.pending_max_score})` : ""}</Tag>
+          ) : null}
+          {c.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">{c.mentions_jfrog} mention JFrog</Tag> : null}
+        </div>
+      ) : null}
       <CardSparkline k={c.key} />
-      <MixBar mix={c.category_mix} />
-      <div className="flex flex-wrap gap-1.5 text-xs">
-        {c.pending_review ? (
-          <Tag className="bg-[#fffaf0] text-[#8a5a00]">{c.pending_review} awaiting review{c.pending_max_score ? ` (max ${c.pending_max_score})` : ""}</Tag>
-        ) : null}
-        {c.head_to_head_changes ? <Tag className="bg-[#fff7e6] text-[#8a5a00]">{c.head_to_head_changes} head-to-head changes</Tag> : null}
-        {c.tracked_changes ? <Tag>{c.tracked_changes} tracked-page changes</Tag> : null}
-        {c.mentions_jfrog ? <Tag className="bg-[#eef7f0] text-jgreen-d">{c.mentions_jfrog} mention JFrog</Tag> : null}
-      </div>
+      {/* one top item: GET /competitors sends only top_item, so up to 3 would need an API change (D112) */}
       {c.top_item ? (
-        <div className="border-t border-line pt-2 text-xs">
+        <div className="border-t border-line pt-2 text-xs" data-top-item>
           <span className="text-mute">Top item: </span>
           <span className="font-medium">{c.top_item.title}</span>
           {c.top_item.score ? <span className="text-mute"> · {c.top_item.score}</span> : null}
+          {c.top_item.published_at ? <span className="text-mute"> · {fmtDate(c.top_item.published_at)}</span> : null}
         </div>
       ) : (
         <div className="border-t border-line pt-2 text-xs text-mute">No cleared items this week.</div>

@@ -104,11 +104,12 @@ test("the heatmap ends where the competitor cards end (the latest Brief's run), 
   assert.doesNotMatch(comp + readFileSync(new URL("../src/lib/heatmap.ts", import.meta.url), "utf8"), /new Date\(\)|Date\.now\(\)/);
 });
 
-test("the heatmap counts as the cards and says so; no Total row (D86: the card shows it); the totals line matches the cards' header", () => {
-  assert.match(comp, /HEATMAP_COUNTS = "Cleared items \(passed routing, or approved by an analyst\), counted as on the competitor cards: by the date collected, in the same week\. Items awaiting review are not in this grid; each card shows them\.";/);
+test("D112 (reverses D86): a Total row per competitor; the (i) and the totals line no longer point at the cards' count", () => {
+  assert.match(comp, /HEATMAP_COUNTS = "Cleared items \(passed routing, or approved by an analyst\), counted by the date collected, in the same week as the cards\. The Total row is each competitor's count\. Items awaiting review are not in this grid; each card shows them\.";/);
   assert.match(comp, /<Panel title="Cleared items by category" info=\{HEATMAP_COUNTS\}>/);
-  assert.doesNotMatch(comp, /Total \(as on the card\)|data-total-row|hm\.colTotals/);
-  assert.match(comp, /\{hm\.published\}<\/b> cleared[\s\S]*?the same as the cards below/);
+  assert.match(comp, /<tr data-total-row>\s*<th scope="row"[^>]*>Total<\/th>\s*\{keys\.map\(\(k\) => \([\s\S]*?\{hm\.colTotals\[k\]\}/);
+  assert.match(comp, /\{hm\.published\}<\/b> cleared across the six competitors<\/span>/);
+  assert.doesNotMatch(comp, /the same as the cards|as on the competitor cards/);
 });
 test("1 Nov demo: every column total equals its card's number", () => {
   // GET /competitors items_7d on the 1 Nov snapshot; checked live against the heatmap: all equal, 127 in all
@@ -118,7 +119,7 @@ test("1 Nov demo: every column total equals its card's number", () => {
 
 test("D89: no \"published items found\" and no \"last 7 days\" label on the Competitors view", () => {
   const parts = readFileSync(new URL("../src/components/competitors/parts.tsx", import.meta.url), "utf8");
-  assert.match(parts, /\{c\.items_7d\}<\/b>\s*<span className="text-mute">· \{c\.items_today\} in this Brief<\/span>/);
+  assert.doesNotMatch(parts, /items_7d|items_today|in this Brief/); // D112: the cards lost the count
   const visible = (s) => s.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "");
   for (const s of [parts, comp, page]) assert.doesNotMatch(visible(s), /published items found|last 7 days/i);
 });
