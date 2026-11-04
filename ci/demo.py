@@ -10,14 +10,26 @@ same; only these differ:
   mention snippet (D77, at most 280 characters) is computed from the full text before the cut;
 - local file paths (page snapshot files) are cleared;
 - a manifest (snapshot.json) names the snapshot's date, its source runs and the commit it was built from.
-The API in demo mode opens both files read-only, refuses every write with 403 demo_read_only, makes no LLM call,
-freezes its clock at the snapshot time, and says "demo" with the snapshot date in every meta block. No value is
-invented: everything in a snapshot comes from a real run.
+The API in demo mode makes no LLM call (Refresh insights answers 403 insights_frozen_demo), freezes its clock at
+the snapshot time, and says "demo" with the snapshot date in every meta block. No value is invented: everything in a
+snapshot comes from a real run.
+
+Writable demo (D111, the default): each start copies the snapshot stores into a new temporary folder (prepare()) and
+every action writes only there, so a restart resets every action and the snapshot itself is never written. A guard
+proves that opening the copy (the schema step and the store's repairs) changed 0 rows; if it cannot, or with
+CI_DEMO_READ_ONLY=1, the demo serves the snapshot read-only (immutable) and refuses every write with 403
+demo_read_only. Health, evaluation and run numbers always read the untouched snapshot, so actions never move them.
 """
 import argparse
+import hashlib
 import json
+import logging
+import os
+import re
+import shutil
 import sqlite3
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -36,6 +48,25 @@ ALLOWED_RAW = ("id", "run_id", "url", "title", "source", "origin", "competitor",
                "published_at_source", "date_precision", "collected_at", "url_resolved", "text_status",
                "text_source", "fetch_status", "fetch_http_status", "extraction_reasons", "mentions_jfrog")
 UNSAFE = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+COPY_PREFIX = "jessi-demo-"  # the per-start temporary copy: <tmp>/jessi-demo-XXXX/{ci,changes}.sqlite
+LABELS_FILE = "analyst_labels.jsonl"  # Edit's candidate labels, inside the copy (live: evals/analyst_labels.jsonl)
+READ_ONLY_ENV = "CI_DEMO_READ_ONLY"  # "1" / "true": serve the snapshot read-only, as before D111
+# D111: the only writes a writable demo lets through. Each writes the temporary copy only (store, changes store or
+# the copy's candidate-labels file); any other write answers 403 demo_read_only before a route runs.
+WRITE_ROUTES = (
+    ("POST", r"/api/v1/items/[^/]+/(approve|dismiss|reopen|flag)"),
+    ("DELETE", r"/api/v1/items/[^/]+/flag"),
+    ("PATCH", r"/api/v1/items/[^/]+"),
+    ("PUT", r"/api/v1/settings/autonomy-level"),
+    ("POST", r"/api/v1/sources/trust"),
+    ("DELETE", r"/api/v1/sources/trust/[^/]+"),
+    ("POST", r"/api/v1/changes/[^/]+/(approve|dismiss)"),
+    ("PATCH", r"/api/v1/changes/[^/]+"),
+)
+INSIGHTS_REFRESH = re.compile(r"/api/v1/brief/[^/]+/insights/refresh")
+INSIGHTS_FROZEN_MESSAGE = ("Insights are frozen in this demo: generating new ones needs a live LLM connection and API "
+                           "key. They do not reflect changes made here.")
+log = logging.getLogger("ci.demo")
 
 
 def snapshot_raw(raw: dict) -> dict:
@@ -126,22 +157,120 @@ def load(snapshot_dir: Path) -> dict:
     return {**manifest, "store_path": snapshot_dir / STORE_FILE, "changes_path": snapshot_dir / CHANGES_FILE}
 
 
+def read_only_requested(env: dict[str, str] | None = None) -> bool:
+    v = (os.environ if env is None else env).get(READ_ONLY_ENV, "")
+    return v.strip().lower() in ("1", "true", "yes")
+
+
+def table_digest(path: Path) -> dict[str, dict]:
+    """Every table of a sqlite file: {table: {"rows": n, "sha256": hash of its rows, order-free}}. Opened
+    immutable, so reading never writes the file."""
+    db = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True)
+    try:
+        names = [r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE "
+                                          "'sqlite_%' ORDER BY name")]
+        out = {}
+        for t in names:
+            cur = db.execute(f'SELECT * FROM "{t}"')
+            cols = [c[0] for c in cur.description]
+            rows = sorted(json.dumps([cols, list(r)], default=repr) for r in cur)
+            out[t] = {"rows": len(rows), "sha256": hashlib.sha256("\n".join(rows).encode()).hexdigest()}
+        return out
+    finally:
+        db.close()
+
+
+def changed_tables(before: dict[str, dict], after: dict[str, dict]) -> list[str]:
+    """Tables whose rows differ; a table the schema step created counts only when it holds rows."""
+    return sorted([t for t in before if after.get(t) != before[t]] +
+                  [t for t in after if t not in before and after[t]["rows"]])
+
+
+def guard(store_path: Path, changes_path: Path) -> dict:
+    """D111: open the copy writable exactly as the API does (Store: schema + _repair_future_published(); CellStore:
+    schema + legacy-key migrations) and prove it changed 0 rows. Returns {"ok", "tables", "rows", "changed"}."""
+    from ci.changes.diff import CellStore
+    from ci.store import Store
+
+    files = [(store_path, lambda p: Store(p))]
+    if changes_path.exists():
+        files.append((changes_path, lambda p: CellStore(p)))
+    report = {"ok": True, "tables": 0, "rows": 0, "changed": []}
+    for path, opener in files:
+        before = table_digest(path)
+        opener(path)._db.close()
+        after = table_digest(path)
+        bad = changed_tables(before, after)
+        report["tables"] += len(before)
+        report["rows"] += sum(t["rows"] for t in before.values())
+        report["changed"] += [f"{path.name}:{t}" for t in bad]
+    report["ok"] = not report["changed"]
+    return report
+
+
+def prepare(snapshot_dir: Path, read_only: bool | None = None, tmp_root: Path | None = None) -> dict:
+    """The demo manifest for create_app(demo=...). Writable (D111, default): a fresh copy of the snapshot stores in a
+    new temporary folder, proven unchanged by guard(); the snapshot is only ever read. Read-only when asked
+    (CI_DEMO_READ_ONLY=1) or when the copy or the guard fails: then it serves the snapshot itself, immutable."""
+    m = load(snapshot_dir)
+    m["snapshot_dir"] = Path(snapshot_dir)
+    if read_only is None:
+        read_only = read_only_requested()
+    if read_only:
+        log.info("demo: read-only, as set by %s", READ_ONLY_ENV)
+        return m | {"writable": False, "read_only_reason": "setting"}
+    try:
+        root = Path(tmp_root or tempfile.gettempdir())
+        for old in root.glob(COPY_PREFIX + "*"):  # earlier starts of this container: never reused
+            shutil.rmtree(old, ignore_errors=True)
+        copy_dir = Path(tempfile.mkdtemp(prefix=COPY_PREFIX, dir=root))
+        store_copy, changes_copy = copy_dir / STORE_FILE, copy_dir / CHANGES_FILE
+        shutil.copyfile(m["store_path"], store_copy)  # a byte copy: the source is opened for reading only
+        if Path(m["changes_path"]).exists():
+            shutil.copyfile(m["changes_path"], changes_copy)
+        report = guard(store_copy, changes_copy)
+    except Exception as e:  # noqa: BLE001 -- any failure falls back to the read-only demo, said in the log
+        log.warning("demo: READ-ONLY, the writable copy failed: %s: %s", type(e).__name__, e)
+        return m | {"writable": False, "read_only_reason": f"copy_failed: {type(e).__name__}"}
+    if not report["ok"]:
+        log.warning("demo: READ-ONLY, the startup guard found rows changed on the copy: %s", report["changed"])
+        shutil.rmtree(copy_dir, ignore_errors=True)
+        return m | {"writable": False, "read_only_reason": "guard_failed", "guard": report}
+    log.info("demo: writable copy in %s; guard: 0 rows changed in %d tables (%d rows); restart resets every action",
+             copy_dir, report["tables"], report["rows"])
+    return m | {"writable": True, "read_only_reason": None, "guard": report, "copy_dir": copy_dir,
+                "store_path": store_copy, "changes_path": changes_copy, "labels_out": copy_dir / LABELS_FILE}
+
+
 def clock(manifest: dict):
     """Demo time stands still at the snapshot: the latest Brief is 'today', and Health shows no overdue run."""
     frozen = svc.parse_ts(manifest["as_of"]) if manifest.get("as_of") else datetime.now(UTC)
     return lambda: frozen
 
 
-class ReadOnlyMiddleware:
-    """Demo mode: every write answers 403 demo_read_only, before any route runs."""
+def allowed_write(method: str, path: str) -> bool:
+    return any(m == method and re.fullmatch(p, path) for m, p in WRITE_ROUTES)
 
-    def __init__(self, app: ASGIApp, date: str | None = None):
-        self.app, self.date = app, date
+
+class ReadOnlyMiddleware:
+    """Demo mode, before any route runs: Refresh insights answers 403 insights_frozen_demo (no LLM call, D111); any
+    other write answers 403 demo_read_only, except, in a writable demo, the WRITE_ROUTES (they write the copy)."""
+
+    def __init__(self, app: ASGIApp, date: str | None = None, writable: bool = False):
+        self.app, self.date, self.writable = app, date, writable
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "http" and scope.get("method", "GET").upper() in UNSAFE:
-            body = {"error": {"code": "demo_read_only", "message": f"Demo snapshot {self.date}: read-only, writes are "
-                              "disabled", "details": {}}}
+        method = scope.get("method", "GET").upper()
+        if scope["type"] == "http" and method in UNSAFE:
+            path = scope.get("path", "")
+            if INSIGHTS_REFRESH.fullmatch(path):
+                code, msg = "insights_frozen_demo", INSIGHTS_FROZEN_MESSAGE
+            elif self.writable and allowed_write(method, path):
+                await self.app(scope, receive, send)
+                return
+            else:
+                code, msg = "demo_read_only", f"Demo snapshot {self.date}: read-only, writes are disabled"
+            body = {"error": {"code": code, "message": msg, "details": {}}}
             await JSONResponse(body, status_code=403)(scope, receive, send)
             return
         await self.app(scope, receive, send)

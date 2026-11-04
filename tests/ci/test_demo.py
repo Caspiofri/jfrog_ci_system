@@ -56,10 +56,11 @@ def test_the_demo_api_serves_the_snapshot_read_only_with_a_marker(snap):
         item = c.get("/api/v1/items/pub1").json()["item"]
         assert len(item["excerpt"]) <= svc.EXCERPT_CHARS
         for method, path in (("post", "/api/v1/items/pub1/approve"), ("put", "/api/v1/settings/autonomy-level"),
-                             ("post", f"/api/v1/brief/{manifest['date']}/insights/refresh"),
                              ("post", "/api/v1/sources/trust"), ("delete", "/api/v1/items/pub1/flag")):
             r = c.request(method.upper(), path, json={})
             assert r.status_code == 403 and r.json()["error"]["code"] == "demo_read_only", path
+        r = c.post(f"/api/v1/brief/{manifest['date']}/insights/refresh")  # D111: its own code, no LLM call
+        assert r.status_code == 403 and r.json()["error"]["code"] == "insights_frozen_demo"
     finally:
         os.chmod(out, 0o755)
     assert sorted(p.name for p in out.iterdir()) == [demo.STORE_FILE, demo.MANIFEST_FILE]  # nothing was written
