@@ -237,60 +237,12 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   clean clone, LOCK OK. From then: documents, the repro pack and cleanup that touches nothing measured, each followed
   by tests and lock_check.
 - **Why:** freeze what was checked, on the artifact that will be submitted.
-- **Freeze (D115):** `fbc9677` (the D113 and D114 display rounds merged), after a Windows check of its bundle.
-  Replaced as the final code freeze by D122.
-  The live API was restarted on it after a backup, with 0 existing rows changed.
-- **Name and path removal (D120):** a deliberate exception to D99, D109 and D115: the author's name, home path and
-  the real private address are removed from the published tree wherever nothing frozen changes, on a branch from
-  `fbc9677`, followed by proof and a new freeze. Fingerprinted files, the demo snapshot, evaluation and held-out
-  files, the live store and git history are not changed without a separate decision. Final commit:
-  `22b45b6` (D128).
-- **Code freeze (D122):** `017e26b`, local annotated tag `freeze-20261104c`, per BE at 22:44: `fbc9677` plus
-  the D120 cleanup, 21 files, not pushed. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank
-  `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences; a Docker clean clone passes,
-  including an action and the reset. The live API on 8011 is not restarted: its old note with the home path
-  appears only in JSON, on no screen, and stored run records hold it anyway. The Windows check waits for the
-  clone from GitHub on Thu. Replaces D115 as the final code freeze.
-  - **Why:** the cleanup changed comments, default strings and tests, and BE reports identical client bundles, so
-    one more Windows check tonight would add little. A restart would change nothing a reviewer sees.
-  - **Later:** replaced as the code freeze by D127, unless a D125 fix is merged.
-- **Next.js exception (D123):** one exception to the freeze for the Next.js findings: upgrade next from 15.5.4 to
-  15.5.21 on a branch from `017e26b`, cutoff 00:00. Per `jf audit`, 3 Applicable findings were in next@15.5.4, one
-  of them Critical. Merging requires a repeat audit, all tests and proofs, a clean clone and a Windows check. If it
-  did not pass by the cutoff, `017e26b` would stay and the README would state the findings.
-  - **Why:** the UI binds to 127.0.0.1, so the practical risk today is low, but the production design exposes it
-    behind an ALB, and JFrog may scan the repo. The change touches nothing fingerprinted.
-- **Target 15.5.28 (D124):** extends D123's target from 15.5.21 to 15.5.28, if BE confirms it exists and is the
-  lowest 15.5.x fixing CVE-2026-75604, CVE-2026-96889, XRAY-1061020 and CVE-2026-94482. A new commit on top of
-  `23ed39e`, cutoff 00:00, with every D123 check repeated and a new bundle. Per BE at 23:07, `23ed39e` passed all
-  checks; its audit showed 0 Applicable, with those 4 next findings open (Missing Context or Not Covered).
-  `23ed39e` stays the candidate if the retarget fails or the cutoff passes.
-  - **Why:** Missing Context and Not Covered mean the scanner could not decide, not that a finding does not apply.
-    The upgrade stays on the same version line, and doing it now means one Windows check instead of two.
-- **UI image exception (D125):** a narrow exception to the freeze for the UI image. The verified next 15.5.28
-  upgrade merges first. Then BE checks, read-only, whether a real path reaches the UI image's Applicable findings in
-  system packages (CVE-2026-5450, CVE-2026-85091, CVE-2026-41992), and tries the smallest image-only fix on a
-  separate branch, in the UI Dockerfile only, cutoff 00:30. Not touched: `ci/`, `frontend/src`, package files, the
-  API image, compose settings, anything fingerprinted. The perl-base finding stays: per BE, a scanner false
-  positive. A merged fix needs another Windows check. If nothing removes a finding, the README states the findings
-  as measured and as not shown to be reachable.
-  - **Why:** per BE's scan (23:40), these findings have no fixed version listed and the evidence is not in our
-    code, but a path was not disproven. Keeping this separate from the merge keeps a verified fallback.
-  - **Result:** the fix was merged.
-- **Code freeze (D127):** `f73b549`, local annotated tag `freeze-20261104d`, per BE at 23:47, unless a D125
-  fix is merged. A normal merge of `bfbd6ac` into main; compared with `017e26b`, only `frontend/package.json` and
-  `frontend/package-lock.json` changed. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank
-  `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences. The Windows check of `bfbd6ac`
-  passed at about 23:31. The video UI on 127.0.0.1:3018 serves Next.js 15.5.28 from `f73b549`. The live API on 8011
-  was not restarted, and nothing is pushed. Replaces D122 as the code freeze.
-  - **Why:** per BE, the upgrade changes only the two package files and no fingerprinted file, so the measured
-    system is unchanged. The Windows check covered the bundle a reviewer would clone.
-  - **Later:** replaced as the code freeze by D128.
-- **D128:** Final code freeze at `22b45b6`, local annotated tag `freeze-20261105`, per BE: a normal merge of
-  `4a82f28` (D125), changing only `docker/ui.Dockerfile` compared with `f73b549`. The UI image base is now
-  `node:22-trixie-slim`. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank `99b79890ceea`; 7
-  snapshot files identical; repro recomputes with 0 differences. The Windows check of `4a82f28` passed. Only
-  documents change from here. Replaces D127.
+- Cleanup (D120): personal details and local paths were removed from the current published files where no frozen file changes. Frozen and measured files and git history were left as they are.
+- Next.js upgrade (D123, D124): `jf audit` found 3 Applicable findings in next 15.5.4, one of them Critical. We made one exception to the code freeze and upgraded next to 15.5.28, which also closes the next findings the scanner could not decide on. Only `frontend/package.json` and `frontend/package-lock.json` changed, and nothing fingerprinted.
+  - Why: the UI binds to 127.0.0.1, so the practical risk today is low, but the production design exposes it behind an ALB.
+- UI base image (D125): we moved the UI image from node:22-slim to node:22-trixie-slim, changing only `docker/ui.Dockerfile`. Findings in the UI image: Critical 4 to 1, High 75 to 87, total 257 to 227, Applicable 4 to 2, with 18 new finding IDs.
+  - Why: it removes two Applicable system-package findings, including a Critical one, at the cost of more High findings. The API image already uses the same Debian release, and the client files are identical.
+- Final code freeze (D128): `22b45b6`, tag `freeze-20261105`, a normal merge of `4a82f28`, with an identical tree. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences. The Windows check of `4a82f28` passed. Earlier freezes: `fbc9677` (D115), `017e26b` (D122), `f73b549` (D127). Only documents change from here.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in
