@@ -45,3 +45,14 @@ test("the header stays fixed with the nav; anchors land below it; logo and heade
   const css = src("app/globals.css");
   assert.match(css, /scroll-padding-top: calc\(var\(--head-h, 3\.5rem\) \+ var\(--nav-h, 0px\) \+ 0\.5rem\);/);
 });
+
+test("the four tiles share one top-aligned box, so label and number sit at the same height in each", () => {
+  const b = src("app/brief/page.tsx");
+  assert.match(b, /const box = "flex flex-col justify-start rounded-md border border-line bg-card px-4 py-3 text-left";/);
+  // every tile uses that box: the Needs review link, the two scroll buttons and the plain tiles
+  assert.match(b, /<Link href=\{`\/review\?brief=[^>]*className=\{cn\(box, /);
+  assert.match(b, /<button type="button" data-tile=\{t\.key\} className=\{cn\(box, /);
+  assert.match(b, /className=\{box\}><span data-tile=\{t\.key\}>\{body\}<\/span><\/Hint>/);
+  // "Review these" stays under the number, inside the same tile body
+  assert.match(b, /\{t\.value \?\? [^}]*\}\s*<\/b>\s*\{t\.key === "review" && t\.value \? \(\s*<span [^>]*>[\s\S]*?Review these<\/span>/);
+});
