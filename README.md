@@ -1,517 +1,431 @@
 # Jessi
 
 **JFrog's Engine for Strategic Signals & Intelligence.** Jessi keeps JFrog's competitive-intelligence team updated
-daily on what the main competitors (GitHub, GitLab, Snyk, Sonatype, Cloudsmith, AWS) ship and say, and shows how
-JFrog compares. Every claim links to its source, and every number is reported with its n.
+every day on what six competitors (Cloudsmith, Sonatype, GitHub, GitLab, Snyk, AWS) and the wider industry ship and
+say, and shows how JFrog compares. It is a GenAI pipeline with fixed steps, validation and human review. Every item
+and every insight links to its source, and every number in this README is reported with its n.
 
-> This README is the short version for the release; the full one (results, limits, screenshots) follows.
+[Screenshot placeholder: Daily Brief, top of the page — `docs/screenshots/brief.png`]
+
+**Video:** [placeholder: demo video link]
+
+Contents: [Run the demo](#run-the-demo-no-api-key) · [The writable demo](#the-writable-demo-and-how-it-resets) ·
+[Frozen insights](#insights-are-frozen-in-the-demo) · [Snapshot and live system](#the-demo-is-a-snapshot-the-live-system-keeps-running) ·
+[Screens](#screens) · [How it works](#how-it-works) · [Evaluation](#evaluation) · [Pitfalls](#pitfalls-and-known-limits) ·
+[Now vs future](#now-vs-future) · [Origin, legacy code](#origin-legacy-code) · [Repository](#repository)
 
 ## Run the demo (no API key)
 
+You need Git and Docker (on Windows and macOS: Docker Desktop, and it must be running). Ports **3000** (UI) and
+**8011** (API) must be free.
+
 ```bash
-git clone <this repo> && cd agent_backbone
-docker compose up --build        # first build takes a few minutes
+git clone <this repo> jessi && cd jessi
+docker compose up --build
 ```
 
-Open **http://127.0.0.1:3000**. The UI runs on a **demo snapshot**: a frozen copy of a real daily run
-(`demo/snapshot/`), built by `python -m ci.demo build`. A "Demo snapshot" marker shows in the header. Nothing is
-simulated and no model is called. The actions work (approve, dismiss, edit, flag, reopen, trust, the autonomy level):
-each start copies the snapshot to a temporary folder inside the container, every action writes only there, and a
-restart resets them all; `demo/snapshot/` itself is never written. Health and evaluation numbers read the snapshot's
-saved summaries, so actions do not move them. Insights are frozen: Refresh insights needs a live LLM connection and is
-refused. For a read-only demo, start it with `CI_DEMO_READ_ONLY=1 docker compose up`. Full article text is never in
-the snapshot: items keep the D34 field allowlist and a 280-character excerpt. The API is on
-http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+This README describes the frozen commit `22b45b6` (tag `freeze-20261105`, D128). Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+
+- The first build takes a few minutes: 7:21 min on a Windows clean clone of `d4e219b`, the earlier freeze.
+- No `.env` and no key are needed. The demo calls no model.
+- On Windows the image user defaults to uid 1000. If you set it anyway, in CMD it is `set APP_UID=1000`, in
+  PowerShell `$env:APP_UID=1000`.
+- If a port is taken, set `UI_PORT` or `API_PORT` before `docker compose up`.
 
 Without Docker: `pip install -r requirements.txt`, then `python -m ci.api --demo demo/snapshot --port 8011`, and the
-UI from `frontend/` (`npm install && CI_API_URL=http://127.0.0.1:8011 npm run dev`).
+UI from `frontend/` with `npm install && CI_API_URL=http://127.0.0.1:8011 npm run dev`.
 
-The live system (a daily run that calls Gemini) needs `GOOGLE_API_KEY` in `.env`, the frozen split file and the
-pipeline services (`docker compose --profile pipeline ...`, with `APP_UID=$(id -u)`; see `docker-compose.yml`).
+## The writable demo and how it resets
 
-## What is built now
+The demo is a real system on a real day's data, and you can act on it (D111).
 
-- **Daily run at 06:00** (`ci/daily_cron.sh`, `python -m ci.daily`): collect, dedupe, read, classify, rank, route,
-  explain, summarize. Each run records its commit, its fingerprints and its counts (`run_metrics`).
-- **Daily Brief:** the published items scored 3+ for the day, what is held for review (counted by preliminary
-  score), and insights across items, each claim quoting its source.
-- **Review queue** with three autonomy levels (Strict by default): unvetted sources, pricing, M&A, JFrog mentions
-  and snippet-only high scores are held for an analyst.
-- **Competitors:** a head-to-head per competitor against JFrog's capability sheet (`config/jfrog_capabilities.md`),
-  with source and as-of date per cell; change detection on tracked pricing and product pages.
-- **Health:** run history with ok / degraded / failed / stale / overdue, the funnel, extraction success and the eval
-  numbers with n.
-- **Evaluation:** a labeled golden set with a frozen train/test split, a coverage check against known events,
-  reliability checks of daily runs marked field by field, and a reproducibility pack: `python -m ci.repro recompute
-  repro` recomputes every reported metric from saved reports with no model call.
+- **Every action works:** Approve, Dismiss with a reason, Edit, Flag, Re-open, trusting a source, and changing the
+  autonomy level.
+- **Your changes stay in your copy.** Each start copies the snapshot stores (`demo/snapshot/ci.sqlite`,
+  `changes.sqlite`) to a fresh temporary folder inside the container. Every action writes only there.
+- **A restart resets everything.** `docker compose down && docker compose up` starts again from the snapshot. The
+  screen says this in a line under the header.
+- **The snapshot itself is never written.** `demo/snapshot/` stays byte-identical, and the live store is never
+  opened in demo mode.
+- **A startup guard** proves that opening the copy changed 0 rows. If it cannot, the demo serves the snapshot
+  read-only instead.
+- **Health and evaluation numbers never move.** They read the snapshot's saved summaries (`demo/snapshot/health/`),
+  so your clicks change the Brief, Review and Log counts in your copy, and nothing that was measured.
+- **Read-only mode** is still available: `CI_DEMO_READ_ONLY=1 docker compose up`. Every write then answers
+  `403 demo_read_only`.
 
-## Architecture in short
+Full article text is never in the snapshot: items keep a field allowlist and a 280-character excerpt (D34).
+
+## Insights are frozen in the demo
+
+Insights need a live LLM, so the demo makes no model call even when a key is present. Refresh insights is disabled,
+and the Brief states:
+
+> Insights are frozen in this demo: generating new ones needs a live LLM connection and API key. They do not reflect
+> changes made here.
+
+Any other action that needs a model is disabled with a plain message. The insights you see are the ones the 1 Nov
+06:00 run produced, and they are the ones measured in [Evaluation](#evaluation).
+
+## The demo is a snapshot; the live system keeps running
+
+The demo serves the **1 Nov 2026 Brief** (run `20261101T0400Z-e9cae4`, D69). Under the header:
+"Demo snapshot of 1 Nov 2026. The live system keeps running daily at 06:00." (D106).
+
+Two analyst actions made after that Brief, on items of that day, are kept in the snapshot and listed in
+`demo/snapshot/snapshot.json` with their time (D69): the release of a held score-4 item by an analyst, and the
+reopening of an item dismissed by mistake (D62).
+
+**Real daily runs, up to submission day** (from the `run_metrics` table; D74, D79, D106):
+
+| Date | Run | Status | New items | Published | Held for review |
+| --- | --- | --- | --- | --- | --- |
+| 30 Oct | 20261030T1312Z-389e71 (14-day import) | ok, reconstructed | 282 | | |
+| 31 Oct | 20261031T1345Z-802913 | ok, reconstructed | 43 | | |
+| 1 Nov (demo day) | 20261101T0400Z-e9cae4 | ok | 26 | 4 | 11 |
+| 2 Nov | 20261102T0400Z-bed018 | ok | 13 | 1 | 5 |
+| 3 Nov | 20261103T0400Z-d03c41 | ok | 44 | 7 | 25 |
+| 4 Nov | 20261104T0400Z-20da28 | ok | 46 | 15 | 19 |
+| 5 Nov | [added Thu 5 Nov, after the 06:00 run] | | | | |
+
+- 30 and 31 Oct rows are reconstructed once from the per-item log, marked "Reconstructed from the item log" on
+  screen, and leave empty what the stored items cannot prove (D74). Published and held are empty there because
+  routing did not exist at those runs.
+- 1 Nov: 239 fetched, 11 removed as noise. 2 Nov: 237 fetched, 7 removed as noise (D74).
+- 3 and 4 Nov: published and held are run-time values.
+- 1 Nov: at run time 3 items were published and 12 held at Strict; an analyst approved 1 held item afterwards, so
+  the Brief shows 4 published and 11 held (D69).
+- 30 Oct had two collections: the 14-day import `389e71` that entered the product, and a 7-day labelling collection
+  `5d06a9` that was never imported. 3 of the 29 test-split items came only from `5d06a9` (26 skipped in `389e71`
+  + 3 = 29) (D79).
+
+**The demo's Health shows the 1 Nov run's fingerprint `c837f4fdaf70`.** The prompt-injection fix of D51 changed the
+classify_rank fingerprint to `99b79890ceea` later that day, with 0 differences in 1,374 rendered prompts (D57). Every
+later run and the test-split eval use `99b79890ceea`.
+
+### Run the live system with your own key
+
+A live run collects real news and calls Gemini. The free tier allows 20 requests a day, which a daily run exceeds, so
+use a paid key or Vertex AI.
+
+```bash
+export APP_UID=$(id -u)
+mkdir -p output data && touch evals/golden_set.jsonl
+cp repro/split_assignments.json evals/   # the frozen split; do not run ci.eval_golden to make a new one
+cp .env.example .env                     # then set GOOGLE_API_KEY in .env, before the first run
+docker compose --profile pipeline build ci
+docker compose --profile pipeline run --rm --entrypoint python ci -m ci.daily
+```
+
+- **Do not run the plain `ci` service first.** It only collects and marks every URL as seen, so a daily run after it
+  finds 0 new items and still reports ok.
+- **What was checked.** Without an API key, we checked these steps on a clean clone only through collecting and
+  storing articles (169 collected, 135 stored, Linux with Docker). Without a key the run does not stop: it writes
+  fallback rows, marked degraded, and ends with status degraded (exit 3). Classification, ranking and insights need
+  a key, so they were not run on a clean clone. The live system runs them every day.
+- **Insights are off on a fresh store.** To turn them on, run this from the repo root after the setup commands,
+  before the daily run:
+
+  ```bash
+  docker compose --profile pipeline run --rm --entrypoint python ci -c "from ci.store import Store; Store().set_setting('insights_enabled', 'true')"
+  ```
+
+  This command was checked on a scratch store. Insights generation after it was not run on a clean clone, because
+  that needs a key.
+- **Open the UI on the live store.** Run these from the repo root, after the daily run:
+
+  ```bash
+  docker compose --profile pipeline run -d --rm --name jessi-live-api -e CI_API_HOST=0.0.0.0 -e CI_TRUSTED_HOSTS=jessi-live-api -p 127.0.0.1:8011:8011 --entrypoint python ci -m ci.api --port 8011
+  docker compose build --build-arg CI_API_URL=http://jessi-live-api:8011 --build-arg CI_MODE=live ui
+  docker compose up -d --no-deps ui
+  ```
+
+  Open http://127.0.0.1:3000. To stop: `docker stop jessi-live-api && docker compose down`.
+  After this build, `jfrog-ci-ui:latest` points at the live API, so run `docker compose build ui` again before the
+  plain demo `docker compose up`.
+- **Only `GOOGLE_API_KEY` is needed.** Model settings come from the code. Other entries in `.env.example` and
+  `config/settings.py` are legacy from the newsletter, and `ci/` does not read them, including the Anthropic and
+  LangSmith entries and `SNIPPET_SCORE_CAP`.
+- The split file keeps the golden-set test items away from the model (D23). The scheduled run is
+  `ci/daily_cron.sh` at 06:00 Israel time.
+
+## Screens
+
+Everything is in English (D18). Two primary screens answer the brief's two needs; three supporting screens keep the
+system accurate and measurable (D15, D21).
+
+| Screen | Answers | What it shows |
+| --- | --- | --- |
+| **Daily Brief** | What happened since yesterday? | Insights first, each claim with its quote and source; "Items in this Brief"; the published items scored 3+ found since the previous Brief, filterable by competitor and category; past Briefs by date (D31, D44, D113) |
+| **Competitors** | Where does each competitor stand against JFrog? | A competitor-by-category heatmap with a Total row; one card per competitor (highest score, awaiting review, mentions JFrog, a sparkline, top items); a profile per competitor; JFrog vs competitors, an interim view (D112, D113) |
+| **Review queue** | Is this item right, and does it belong? | Items held by the routing rules, each with its reason; Approve, Dismiss with a reason, Edit, Flag, Re-open; the autonomy level (D9, D16, D34) |
+| **Log** | What was collected, and where did it stop? | Every collected item, dropped ones included, with status, reason and the stage it stopped at (D21) |
+| **Health** | Does the system work? | Run history, the funnel, extraction per source, the test-split eval and held-out coverage, each with n and "Measured on" (D48, D80, D83) |
+| **Roadmap** | What comes next? | 7 concept images, each labelled "Concept, sample data" (D105) |
+
+[Screenshot placeholder: Competitors — `docs/screenshots/competitors.png`]
+
+[Screenshot placeholder: Review queue — `docs/screenshots/review.png`]
+
+[Screenshot placeholder: Log — `docs/screenshots/log.png`]
+
+[Screenshot placeholder: Health — `docs/screenshots/health.png`]
+
+[Screenshot placeholder: Roadmap — `docs/screenshots/roadmap.png`]
+
+## How it works
+
+A daily run calls fixed steps in order, in plain Python (`run_daily()` in `ci/daily.py`). The model answers inside
+those steps; it does not choose them. The full picture is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how Jessi works today (flow, components, data
+model) and the AWS production design, which is design only and not built.
 
 ```
-collectors (Google News, vendor feeds, Hacker News, GitHub releases, tracked pages)
-  -> dedupe (URL, then embedding similarity)  -> full text + extraction check
-  -> classify (Gemini: competitor, category, noise)  -> rank (Gemini, rubric v2: score 1-5)
-  -> validate (schema + rules, D32)  -> route (hold reasons x autonomy level)
-  -> lens (closest JFrog capability, quote checked against the sheet)  -> insights (quotes checked in code)
+collectors (Google News, vendor blogs and changelogs, GitHub releases, Hacker News)
+  -> dedupe (URL, then embedding similarity, with a CVE-ID veto)  -> full text + extraction check
+  -> classify (rules for safe cases, Gemini for the rest: competitor, category, noise)
+  -> rank (Gemini, rubric v2: score 1-5)  -> validate (schema + rules)  -> route (hold reasons x autonomy level)
+  -> lens (closest JFrog capability, quote checked against the sheet)  -> insights (claims quote their source)
   -> SQLite store  -> FastAPI (ci/api)  -> Next.js UI (frontend/)
 ```
 
-Article text is untrusted: it reaches the model only inside delimited, defanged blocks, and every quoted claim is
-checked in code (see *prompt-injection defense* below). The API has no login and binds 127.0.0.1; it refuses
-cross-site writes and foreign Host headers.
-
-## Which items the insights look at
-
-Insights read only the published items: auto-published, approved or flagged at the Brief's autonomy level. Held and
-rejected items never reach them. Of those, an item is in the window when one of these holds:
-- it was published in the 7 days before the Brief's daily run started;
-- it was found since the previous Brief's run, whatever its date, so a late-found article still counts once.
-
-Items about the same story count as one story. With fewer than 15 stories in 7 days, the window widens to 14 days,
-once. It never widens further, and the window the insights used (dates, items, stories, late-found items) is stored
-with them. Insights are only proposed for groups of at least 2 stories: one competitor's moves, one category across
-2 or more competitors, or Security news across vendors.
-
----
-
-## Origin: the newsletter agent
-
-Jessi grew out of the newsletter agent below (collectors, dedupe, reader, ranker, eval harness). Its own setup still
-applies to `python main.py`.
-
-### Newsletter Agent
-
-An end-to-end multi-source AI pipeline. Parallel collectors gather articles from your Gmail newsletters, Medium tag feeds and Hacker News; a reader fetches the full text of a shortlist; an LLM ranker picks the best; and a personalized Hebrew digest is delivered to your inbox — fully automated, daily.
-
-Built with LangGraph and Google Gemini 2.5. Each run is judged by Claude Haiku 4.5, a different model family from the writer and ranker, and traced in LangSmith. A multi-criteria LLM-as-judge eval harness covers offline checks.
-
----
-
-## Demo
-
-| Top of digest | Full issue |
-|---|---|
-| ![Newsletter top](docs/demo_1.png) | ![Newsletter full](docs/demo_2.png) |
-
----
-
-## Architecture
-
-The pipeline is a **stateful LangGraph graph**. Three collectors run **in parallel** from `START` and join in `merge`; the rest is a sequential funnel that narrows hundreds of candidates to the few stories worth sending.
-
-The inbox collector keeps its retry loop. Two independent knobs control it: `max_days_back` (how far back in time to search) and `max_tries` (transient failure retries). If neither limit is reached and no emails are found, the window widens by one day and it retries. When the inbox stays empty the run continues with the other collectors instead of stopping.
-
-```mermaid
-flowchart TD
-    START --> fetch
-    START --> collect_medium
-    START --> collect_hackernews
-
-    fetch --> check{emails?}
-    check -->|yes or limits reached| extract
-    check -->|no, window not exhausted| expand_search
-    expand_search -->|days_back plus 1| fetch
-
-    extract --> merge
-    collect_medium --> merge
-    collect_hackernews --> merge
-
-    merge -->|links checked, bad links swapped| check2{any articles?}
-    check2 -->|no| no_content
-    check2 -->|yes| dedupe
-
-    dedupe -->|drop recently sent| check3{any unseen?}
-    check3 -->|no| no_content
-    check3 -->|yes| shortlist
-
-    shortlist -->|per-source title screen| reader
-    reader -->|full text| rank
-    rank -->|top_k by score| check4{any worth sending?}
-    check4 -->|no| no_content
-    check4 -->|yes| summarize
-
-    summarize -->|HTML and NewsletterData| send_email
-    send_email -->|success, store in ChromaDB| END
-    send_email -->|failed, skip store| END
-    no_content --> END
-```
-
-### Node responsibilities
-
-| Node | What it does |
-|---|---|
-| `fetch` | Gmail API → decode MIME parts → `list[Article]` (one per email) |
-| `extract` | Parallel Gemini calls — explodes each email into sub-articles. Links are read from the HTML in code and Gemini picks from a numbered list, so a URL can never be invented |
-| `expand_search` | Widens the inbox search window (`days_back + 1`) when no emails found |
-| `collect_medium` | Polls Medium tag RSS feeds (`medium.com/feed/tag/<tag>`); Medium has no API |
-| `collect_hackernews` | Recent, well-voted Hacker News stories for the configured queries (Algolia API) |
-| `merge` | Join point: de-duplicates by URL, classifies every link, and replaces a bad link with a direct link to the same story from another source |
-| `dedupe` | Drops articles already sent, before they can take a shortlist slot: the same URL at any age still stored (14 days), or a similar story by ChromaDB vector search within the last 7 days |
-| `shortlist` | Gemini title screen run separately per source (quota per source), so one noisy source cannot crowd out the others. Gemini picks articles by integer id, so a title can no longer be invented or mismatched. Each article also carries a short teaser of its text (`SHORTLIST_TEASER_CHARS`, 300) as a hint, so the screen does not judge on the title alone |
-| `reader` | Fetches full article text for the shortlist in parallel (`trafilatura`). Marks each `full`, `partial` or `snippet` |
-| `rank` | One Gemini call scores each candidate 0-10 on its content and source (curated newsletter, unvetted Medium feed, HN points). The ranker reads up to `RANK_TEXT_CHARS` (6000) characters of each article, HTML stripped. Articles read only as a snippet are capped at 6 in code |
-| `summarize` | Gemini reads up to `READ_MAX_CHARS` (6000) characters of each article (via the shared `article_text()`) and writes full newsletter JSON → rendered to HTML. Cards reference articles by integer id and `card_resolver.resolve_cards` maps each id to the real URL, so a URL cannot be invented. Cards of Medium or Hacker News articles that were only read as a snippet are demoted to one-line brief items (inbox articles are exempt). A link that is dead or cannot be verified renders as a gray, disabled button |
-| `send_email` | Gmail API sends the HTML digest; stores articles in ChromaDB only on success |
-| `no_content` | Terminal node when no sendable articles exist |
-
-### Link handling
-
-Every article link is classified in `merge`: `ok`, `dead` (404/410), or `unverified` (a Cloudflare bot challenge, so a script cannot tell). A story whose link is not `ok` gets the URL of the same story from another newsletter when one exists (embedding similarity, the same model as dedupe). The shortlist prefers stories with working links. If only a bad link remains, the card shows a gray "link unavailable" button instead of a link that may 404.
-
----
-
----
-
-## Newsletter structure
-
-Each digest is compiled into three sections by the LLM:
-
-- **עיקרי הגיליון** (Top stories) — articles scoring ≥ 6/10 relevance. Each card has:
-  - *השורה התחתונה* — 1–2 sentence factual summary, no fluff
-  - *איך זה פוגש אותך* — personalized angle connecting to the reader's stack (RAG, LangGraph, multi-agent)
-- **עוד כותרות בקצר** (Brief) — lower-relevance articles as one-liners
-- **המלצות לביצוע** (Actions) — 1–2 specific, executable recommendations grounded in today's articles
-
-The LLM is given a structured output schema (Pydantic → JSON) so the HTML renderer never touches raw prose.
-
----
-
-## Eval harness
-
-`evals/eval.py` runs three nodes against fixture data — **no Gmail required** — and produces a quality report.
-
-**Fixture set:** 6 AI-engineering articles + 2 deliberately off-topic (startup funding, health study) to test filter discrimination.
-
-### Structural checks (rule-based)
-
-| Check | What fails it |
-|---|---|
-| HTML parseable | BeautifulSoup parse error |
-| has header | `.header` class missing |
-| has full card | no `.card` element |
-| has brief section | no `.brief-section` element |
-| has actions section | no `.actions-section` element |
-| no `dir=ltr` elements | RTL layout broken |
-
-### LLM-as-judge scores (1–5 each)
-
-| Criterion | Rubric |
-|---|---|
-| **Faithfulness** | Every factual claim traceable to source articles; no hallucination |
-| **Hebrew quality** | Fluent prose; technical terms (RAG, LLM, API) kept in English |
-| **Personalization** | Advice is concrete and specific to the target audience's stack |
-| **Actionability** | 1–2 immediately executable actions tied to today's articles |
-
-The third eval suite covers the `dedupe` node — four cases: empty store passes all, seen articles are blocked, genuinely new articles pass through, and mixed batches return only the unseen subset.
-
-Run it:
-
-```bash
-python -m evals.eval
-# Results printed as a table and saved to output/eval_<timestamp>.json
-```
-
-### Ranking ground truth (labeling report)
-
-Every run writes `output/ranking_<profile>_<timestamp>.html` (plus a `.json`): every candidate the ranker scored, plus a seeded random sample of articles it never saw, so false negatives are visible. Open the page in a browser and rate each article **Must-read / Worth it / Skip** with an optional reason (including `full text mattered`, for articles whose title or opening did not show their value). It hides the ranker's scores until you tick "show ranker score and picks", so your labels are not anchored by them, and it shows the text snapshot the ranker saw. The random sample rows instead carry the article text fetched for the report (their `text:` chip shows full/partial/snippet), so labels for the sample can be judged from the article itself. Progress is kept in the browser. "Export labels" downloads a JSON file, which you merge into the golden set:
-
-```bash
-python -m evals.import_labels output/ranking_labels_ai_<run>.json
-# -> evals/ranking_golden.json (keyed by URL, with a text snapshot so labels survive link rot)
-```
-
-#### Labeling hub
-
-To grade articles from every report in one place instead of one page per run:
-
-```bash
-python -m evals.label_hub [--target 80] [--out output/label_hub.html]
-# -> "N items (M already labeled) -> output/label_hub.html"
-```
-
-The page gathers every `output/ranking_*.json` (the newest report wins when an article appears twice) plus the labels already in `evals/ranking_golden.json`. It shows one article at a time with its stored text; label with the buttons or the keys `1` must-read, `2` worth it, `3` skip, move with `n` / `p`, jump to the next unlabeled with `u`. Tick "I read the full article" when you judged from the article rather than the snapshot. A progress bar tracks labels against the target and warns when skips are under 15 percent or random-sample items under 25 percent of your labels. Labels are kept in the browser (regenerating the hub keeps them). "Export labels" downloads `ranking_labels_hub_<timestamp>.json`; "Load labels file" restores a previous export. Import it like any other export:
-
-```bash
-python -m evals.import_labels ~/Downloads/ranking_labels_hub_<timestamp>.json
-```
-
-If a loaded file holds labels that match no article in the page, a message says how many ("N loaded labels match no article in this page (their addresses may be old redirect links); run `python -m evals.canonicalize_labels` on the file first"). Old exports from the per-run pages may hold Substack redirect URLs; run `python -m evals.canonicalize_labels <file>` once on each before importing, so those labels match the real article URLs the hub shows. Keep the original exported file after canonicalising: loaded labels that match no article stay only in the browser and are not exported.
-
-Manual check (no automated test covers the page itself): label three articles with `1`, `2`, `3` and move with `n`, `p`, `u`; confirm the shortcuts do not fire while typing in the note or choosing a tag; export; clear the browser's site data for the page; load the file and confirm every label returns; load the same file a second time (it works again, the page resets the file input).
-
-#### Rating in Telegram
-
-After each run the bot posts about 8 articles to Telegram: the digest picks plus `TELEGRAM_EXTRA` (3) non-picks that fill the gaps in the golden set (a dropped article within 1 of `RANK_MIN_SCORE`, a low-scored drop, one from the random sample the ranker never saw; marked `🔍 not in today's digest`). Articles already in the golden set are not asked again. One tap on `⭐ Must-read` / `👍 Worth it` / `👎 Skip` labels the article: the message shows `✅ <label>` (tap again to change it), the tap is appended to `evals/telegram_labels.jsonl` and merged into `evals/ranking_golden.json` with `import_labels.merge` (`labeled_with: "snapshot"`). Reply to an article message to store a note; `/progress` answers `N / 80 · must a · worth b · skip c`. `/more` (or `/more N`, up to 20) sends more articles from all past reports, rotating picks, near-cutoff drops, low-scored drops and never-ranked samples; `/more low` (or `/more low N`) sends only dropped articles, lowest score first, the quickest way to collect 👎 skips. About once a week (`TELEGRAM_RECHECK_EVERY_DAYS`) one labeled article is re-sent as `🔁 re-check`; its answer goes to `evals/telegram_recheck.jsonl` and never changes the golden row. Only the chat in `TELEGRAM_CHAT_ID` is served.
-
-Setup, once:
-
-```bash
-# 1. In Telegram, message @BotFather: /newbot, then put the token in .env as TELEGRAM_BOT_TOKEN=<token>
-python -m evals.telegram_rater setup     # 2. press Start in the bot chat; the bot replies with your chat id
-# 3. put TELEGRAM_CHAT_ID=<id> in .env, then install the poller as a user service:
-mkdir -p ~/.config/systemd/user && cp deploy/telegram-rater.service ~/.config/systemd/user/
-systemctl --user daemon-reload && systemctl --user enable --now telegram-rater
-sudo loginctl enable-linger $USER        # keep it running without a login session
-journalctl --user -u telegram-rater -f   # logs
-```
-
-`main.py` posts the articles at the end of every run (skipped with one line when no token or chat id is set; a bot failure never fails the digest). `python -m evals.telegram_rater send` posts today's reports by hand; a run already sent is not sent again. The state (`evals/telegram_state.json`, sent message ids and the update offset) and both `.jsonl` files are your data: keep them out of git.
-
-A tap on a digest pick also posts your verdict on that run's picks to LangSmith, on its `digest_run` root run (the latest one started up to 60 minutes before the report was saved): `human.picks_precision` (share of rated picks labeled must or worth) and `count.human_picks_rated`. Each (run, key) has a fixed feedback id, so a later tap updates the score; skipped without `LANGSMITH_API_KEY`, and a LangSmith error never fails the tap. `python -m evals.human_feedback` backfills every run in the golden set that has rated picks.
-
-#### Ranking eval
-
-Once labels are in `evals/ranking_golden.json`, measure the ranker against them, in this order:
-
-```bash
-python -m evals.import_labels <export.json>          # 1. merge the labels into the golden set
-python -m evals.label_audit                          # 2. check the set is fit to measure with
-python -m evals.rank_eval                            # 3. dry run: prints the plan, calls no model
-python -m evals.rank_eval --run                      # 4. scores with Gemini -> output/rank_eval_<timestamp>.json
-python -m evals.rank_compare <baseline.json> <candidate.json>   # 5. did a change help?
-```
-
-- **Label audit** (`evals/label_audit.py`): counts by label, source, group, `labeled_with`, read status and report, the train/test split sizes, articles labeled twice (same normalized title and source), and warnings when skips are under 15 percent, random-sample rows under 25 percent, labels come from fewer than 4 reports, fewer than half were judged from the full article, the set is under the target (80, `--target`), or duplicates exist. `--relabel <export.json>` compares a later labeling of some of the same articles: the share with the same label (shown once at least 5 are compared; aim for at least 80 percent) and a must/worth/skip confusion matrix.
-- **Replay** (`evals/rank_eval.py`): for each report (`source_run`) in the golden set, all its labeled articles are the candidate pool. They are scored with the production ranker prompt (`modules.nodes.score_candidates`, the same prompt and snippet cap as `rank_articles`) from the stored text snapshot, `--repeats` times (default 3), because the ranker is not deterministic. Options: `--split train|test|all` (default `train`), `--k 5`, `--text-chars` (default `RANK_TEXT_CHARS`), `--golden`, `--profile AI` (reads `<PROFILE>_SUBJECT`, `_AUDIENCE`, `_EXPERIENCE` from the environment). It prints a table per report and overall (mean ± spread, the population standard deviation over repeats), and precision of the picks per source.
-- **Cost**: without `--run` nothing is called; it prints the number of reports, labeled articles, model calls (reports x repeats) and a rough input size in characters. `--run` makes exactly that many Gemini calls. A repeat whose reply is unusable or scores fewer articles than it was given is counted as failed and left out of the means, never as 0.
-- **Metrics**: precision@k = picks labeled must-read or worth it, divided by the labeled picks in the top k. Recall@k is capped by what k can hold: must-reads in the top k divided by min(k, must-reads in the report), so a perfect ranker scores 1.0 even when a report has more must-reads than k. When k exceeds the report's articles, all of them are picks. A metric that is undefined for a report (no must-reads, or no labeled picks) prints `n/a` and is skipped in the overall mean. Most reports hold 5 or fewer labeled articles, so with k=5 everything is picked and precision/recall cannot show a ranking change there. Two pooled metrics use every labeled article instead: **pairwise accuracy** (within each report, the share of pairs with different labels where the better label scored higher; a tie counts half, random is about 0.5), also shown without teaser-only (`snippet`) articles since the snippet cap holds their score down, and the **mean score per label** (teaser-only articles listed separately). Every article's score is saved per repeat in the result file, and `rank_compare` compares the pooled metrics too (an older result without them shows `n/a`).
-- **Train/test**: each label is assigned to train (75 percent) or test (25 percent; 60/20 of 80) by a stable hash of its normalized title and source, so the same article under two addresses stays on one side. Tune on `train` (the default). Score `--split test` once at the end of a tuning round, never to guide edits.
-- **Settings recorded**: each result file stores `settings` (k, repeats, text_chars, split, model, golden row count, profile, snippet cap, date). `rank_compare` prints, per metric, the difference of the overall means and whether it is `clear` (larger than the larger of the two spreads) or `within noise`, plus the settings that changed; it refuses two results with a different split, k or golden row count.
-
-### Live trace judging (`modules/trace_judge.py`)
-
-`evals/eval.py` tests nodes in isolation against fixtures. `modules/trace_judge.py` complements it by judging a **real pipeline run** end-to-end — called automatically after every successful `graph.ainvoke()`.
-
-The judge sees exactly the text the summarizer saw (the same `article_text()`), judges each card against its own source article by id, and runs on Claude (`JUDGE_MODEL_DAILY`, `claude-haiku-4-5`) rather than Gemini. Its scores and reasoning are posted to LangSmith as feedback (see Monitoring). `JUDGE_MODEL_EVAL` (`claude-sonnet-5-5`) is the stronger judge for on-demand evals.
-
-It scores three stages on a 1–5 scale:
-
-| Stage | Method | What it measures |
-|---|---|---|
-| `fetch_health` | Rule-based | Loop efficiency — how many retries before articles were found; penalises stagnation and hard-limit hits |
-| `filter_quality` | LLM judge | Whether the selected top-k articles are genuinely the most relevant to the configured subject |
-| `content_faithfulness` | LLM judge | Whether every factual claim in the generated cards is traceable to a source article — no hallucinated details |
-
-After each run the report is printed to stdout as a scored bar chart and saved to `output/trace_<profile>_<timestamp>.json`:
-
-```json
-{
-  "profile": "AI",
-  "overall": 4.3,
-  "stages": [
-    { "stage": "fetch_health",       "score": 5, "reasoning": "Fetched 24 articles on the first attempt." },
-    { "stage": "filter_quality",     "score": 4, "reasoning": "Selected articles closely match the AI engineering subject." },
-    { "stage": "content_faithfulness","score": 4, "reasoning": "All card claims supported by source snippets." }
-  ]
-}
-```
-
-> This pattern — attaching a lightweight LLM judge to every live trace rather than only to offline evals — aligns with LangChain's [Building a 100x Cheaper Trace Judge](https://blog.langchain.dev/building-a-100x-cheaper-llm-judge/) (June 15, 2025).
-
----
-
-## Reliability
-
-Every Gemini call is wrapped in **tenacity** — 3 retries with exponential backoff (2 s → 4 s → 8 s). The full graph execution runs inside a **600-second asyncio timeout** so a hanging API call never blocks the daily run.
-
----
-
-## Monitoring
-
-The pipeline runs unattended via cron (`0 7 * * *`, daily). Two layers catch failures:
-
-- **LangSmith tracing** — every graph run is traced end-to-end (`LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT` in `.env`; the legacy `LANGCHAIN_TRACING`, `LANGCHAIN_API_KEY` and `LANGCHAIN_PROJECT` names are still read by the SDK), so a run's node-by-node behavior is inspectable after the fact.
-- **healthchecks.io dead-man's-switch** — `main.py` pings `HEALTHCHECK_PING_URL` after every run: a plain ping on success, `/fail` (with the error or failed profile) on a crash, graph timeout, or `email_status == "failed"`. The check has a 60-minute grace period, so if the run never happens at all — for example the host machine is down — healthchecks.io alerts on the *missing* ping, which nothing running on the host itself could otherwise detect.
-
-### What you can see in LangSmith
-
-- **One `digest_run` trace per day**, tagged `digest_run` and the profile. It contains the node runs, the dedupe lookup (a retriever run named `dedupe_lookup`, with the matched sent titles and their similarity as documents), every `gemini` call, and the `trace_judge` run. The Claude call is the run named `judge_llm` (run type `llm`), tagged with the judge model id.
-- **Feedback on that root run:** `judge.filter_quality`, `judge.content_faithfulness`, `judge.fetch_health` (always posted) and `judge.overall` (the judge's scores, with reasoning as the comment), plus one entry per pipeline stage counter: `count.articles_collected_merged`, `count.articles_after_dedupe`, `count.articles_dedupe_dropped`, `count.dedupe_matches`, `count.dedupe_url_matches`, `count.dedupe_near_misses`, `count.dedupe_batch_duplicates`, `metric.dedupe_max_similarity`, `count.articles_shortlisted`, `count.articles_read_full`, `count.articles_read_partial`, `count.articles_read_snippet`, `count.articles_ranked`, `count.final_picked_articles`, `count.cards`, `count.brief_items`. Counts are `count.*` and similarity measurements `metric.*`, so they are not read as judge scores. Old runs keep their `stat.*` feedback (LangSmith cannot rename it), so dashboards must use the new names from the first run after this change. Add the feedback keys as columns in the runs table.
-- **Root run metadata `run_summary`:** the picked titles, the ranker's scores and reasons for every candidate, and the dedupe drops.
-
-`count.articles_dedupe_dropped` counts every article the dedupe step removed, including duplicates within one batch. `count.dedupe_matches` and `count.dedupe_near_misses` count the matches against sent stories (by URL or strictly above the threshold) and the near-misses (between 0.70 and the threshold), `count.dedupe_url_matches` the matches by exact URL, `count.dedupe_batch_duplicates` the duplicates within one batch, and `metric.dedupe_max_similarity` the highest similarity among the embedding matches (0.0 when there are none; URL matches are left out). `run_summary.dedupe_drops` lists only matches against previously sent stories and near-misses, each with its similarity, the matched sent article, its send date and `matched_by` (`url` or `embedding`); `dropped: true` means the URL matched or the similarity was strictly above the threshold. A URL match records similarity 1.0. Articles stored before URLs were kept match by embedding only.
-
-Prompts are recorded, so article and newsletter text is uploaded to LangSmith.
-
----
-
-## Jessi (`ci/`): prompt-injection defense
-
-Every article Jessi reads comes from a site JFrog doesn't control, and its text reaches four model prompts:
-classify, rank, the JFrog lens and the insights. The defense is a set of layers. Each one narrows what a poisoned
-article can do. None of them stops it alone, and the problem is not solved.
-
-1. **Delimited data.** Article text goes into the prompt inside `<item_text id="…">` tags. The prompt says that
-   everything inside them is data to analyze, never an instruction.
-2. **Tags defanged.** An `item_text` tag inside the article is rewritten (`item_text` → `item-text`), so the text
-   cannot close its own block or open a fake one for another item.
-   This covers any letter case and spacing, opening or closing tags, and titles and other fields too. It applies to
-   the insights prompt and to `ci.classify.delimited_items`, which classify, rank and lens share (D51).
-3. **Structured output.** Each answer must match a JSON schema. Unknown item ids, values outside the allowed sets
-   and malformed rows are rejected in code (D32).
-4. **Checked citations.**
-   - Every insight claim must quote its cited article word for word.
-   - Every claim about JFrog must quote the capability sheet word for word.
-   - Each lens must quote its axis row of the sheet.
-   - All of these are checked in code. A claim that fails is dropped and logged.
-5. **Human review.** Items from unvetted sources are held for review at Strict, along with pricing, M&A, JFrog
-   mentions and snippet-only items with high scores (D9, D34, D36). An insight shows the items it cites, so a
-   reviewer can open each source.
-6. **Regression set.** `tests/ci/test_injection.py` pins 7 synthetic poisoned articles: closing tags in any letter
-   case, a fake block for another id, a hidden instruction, a planted score and a planted claim.
-
-The classify guard fix changed the classify_rank fingerprint from `c837f4fdaf70` to `99b79890ceea`; the prompt text
-did not change. Every classify, rank and lens prompt for the 351 stored items and the 107 golden-set rows was
-rendered with the old and the new code: 0 differences in 1,374 prompts. The mapping is recorded in every run's
-metadata (`ci/run_meta.py`).
-
-**Still open:**
-- **A planted sentence passes the quote check.** The check proves the words are in the stored article, not that they
-  are true. A test pins this gap.
-- **Ignoring instructions is up to the model.** Code can't verify that the model ignored an instruction it read.
-  Layers 3 to 5 limit the damage when it doesn't.
-- **No classifier for injected text.** Nothing detects or strips injection attempts before the prompt.
-
-Traces: LangSmith tracing is off in every eval run, whatever the environment says, which `ci/tracing.py` enforces
-with a test. No Jessi run sends traces in this submission (see *Future*).
-
-## Jessi: known issues (not fixed before the freeze)
-
-Both are left as they are on purpose: the freeze keeps the measured system unchanged, and the second one feeds the
-insights window.
-
-**1. "Mentions JFrog" can come from page text the model never sees.**
-- **What happens:** the mention counter runs over the whole fetched page (`ci/pipeline.py`, `read_full_text`), but
-  only the first 6,000 characters are stored and sent to the model (`TEXT_MAX_CHARS`). A JFrog, Artifactory,
-  Frogbot or SwampUp match further down the page (a listicle entry, a nav or footer link, a related-posts block)
-  sets `mentions_jfrog`. That holds the item for review (`ci/route.py`) and adds +1 to its score (`ci/rank.py`,
-  `JFROG_BONUS`).
-- **Evidence:** 5 of the 351 stored items are flagged. For 1 of them the stored title and text contain no JFrog
-  term: `d776107280a9fb12` (OX Security, "Top 10 Application Security Testing Tools (2026 Edition)", 6,000 stored
-  characters). Its score was raised from 2 to 3 by the bonus; it is one of the 15 items of the 1 Nov reliability
-  check. What the match was isn't known: the full page isn't stored.
-- **Fix later:** take the flag from the stored text only, or store the matched snippet with the flag so a reviewer
-  can see it.
-
-**2. The source date of Google News items is the feed's date, not the publisher's.**
-- **What happens:** `ci/collectors/google_news.py` (`_published`) takes `published_at` from the RSS `<pubDate>`. No
-  code reads the article's own date (`article:published_time`, `datePublished`). For Google News that is when Google
-  dated the story, which can be an index or last-modified date. The date can then look recent for an old article.
-- **Why it isn't changed now:** the date decides the insights window (D37). Changing it changes which items the
-  insights analyze, after they were measured.
-- **Evidence (n = 2, checked against the publisher's page):**
-  - `08a1c43f07150ac3` (eSecurity Planet) is stored as 27 Oct 07:00Z; the page says published 11 Aug 2026.
-  - `d645b44fc2ae971b` (Netguru) is stored as 29 Oct 09:52Z; the page says published 6 Feb 2025, modified 29 Oct
-    2026.
-  - 207 of the 351 stored items come from Google News. How many of them have a wrong date isn't measured.
-- **In the UI:** the date is labelled "Feed date".
-- **Fix later:** read the page's own date during the fetch, keep the feed date beside it, and use the page date when
-  both exist.
-
-## Jessi: future (not in this submission)
-
-- **LangSmith tracing of the daily run (D48) is dropped for this submission.** `ci/tracing.py` is the switch it would
-  use (daily only, off by default, never in an eval). Today no Jessi code sends traces.
-- **Security advisories stay unvetted (D53, D56).** The store holds 0 GitHub or GitLab advisory pages (n = 351), so
-  vetting them would change nothing today. Revisit when advisory pages appear in the data.
-
----
-
-## Tech stack
-
-| Layer | Choice | Why |
-|---|---|---|
-| Orchestration | LangGraph | Stateful graph with parallel fan-out/fan-in, conditional edges and checkpointing |
-| LLM | Gemini 2.5 Flash | Extended thinking budget for the summarize step; cost-effective for daily runs |
-| Trace judge | Claude Haiku 4.5 (`claude-haiku-4-5`) | A different model family from the writer and ranker, so the judge does not grade its own work; cheap enough for every run |
-| Observability | LangSmith | One `digest_run` trace per day with judge scores and stage counts as feedback |
-| Email | Gmail API (OAuth 2.0) | Native read + send from an existing inbox, no extra infra |
-| Data modeling | Pydantic | Structured LLM output that fails loudly on schema violations |
-| Deduplication | ChromaDB + sentence-transformers | Exact-URL check over the 14-day store plus vector similarity over the last 7 days prevent resending a story |
-| Fault tolerance | tenacity + asyncio timeout | Handles transient LLM failures without manual intervention |
-| Full-text reading | trafilatura | Extracts the main article text from a fetched page |
-
----
-
-## Setup
-
-### Prerequisites
-
-- Python 3.10+
-- Google Cloud project with Gmail API enabled
-- `config/credentials.json` (OAuth 2.0 Desktop App) from the Cloud Console
-- Gemini API key
-- Anthropic API key (for the Claude trace judge)
-- LangSmith API key (optional, for tracing)
-
-### Install
-
-```bash
-pip install -r requirements.txt
-```
-
-### Configure
-
-Copy `.env.example` and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-`.env.example` also lists `ANTHROPIC_API_KEY` (the trace judge) and the LangSmith variables `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` and `LANGSMITH_PROJECT`. `requirements.txt` includes `anthropic` and `langsmith`.
-
-The active collectors have defaults in `config/settings.py`. Override them per profile in `.env` with comma-separated lists, for example `AI_MEDIUM_TAGS=ai-agents,llm,rag` and `AI_HN_QUERIES=LLM,AI agents`. Shortlist quotas, the minimum rank score and the snippet cap are in the same file.
-
-### First run — Gmail auth
-
-The first run opens a browser for OAuth consent and saves `config/token.json` for subsequent runs.
-
-```bash
-python main.py
-```
-
----
-
-## Project structure
+- **Importance.** Rubric v2 (`config/rubric_v2.md`, D29) scores competitive impact on JFrog, not the size of the
+  competitor's change. The Brief shows 3+; 1-2 go to the competitor profile and timeline; noise stays in the Log.
+- **Routing.** One autonomy control, Strict (default), Balanced or Relaxed, decides auto-publish vs review. Pricing,
+  M&A, Mentions JFrog and model failures are held at every level (D9, D34, D36).
+- **Flag** marks an item as important and nothing else: it does not approve, publish or dismiss it (D107, D108).
+- **Lens.** Each non-noise item gets the closest JFrog capability, with a phrase quoted word for word from
+  `config/jfrog_capabilities.md`. The UI shows the capability, not the claimed relation (D42, D58).
+- **Insights** connect several stories over a 7-day window (14 with fewer than 15 stories). Every claim must quote
+  its cited article word for word, checked in code (D37). On screen: one AI icon, "AI-generated — check the cited
+  sources" (D73).
+- **Prompt-injection defense** in layers: delimited article text, defanged tags, schema-checked output, quotes
+  checked in code, human review, and a regression set. It narrows what a poisoned article can do; it does not solve
+  the problem (D32, D51).
+- **Head-to-head values** were extracted by an AI model from linked public pages, are not covered by the evaluation,
+  and are captioned as such on screen (D88). One manual check is reported below.
+
+## Evaluation
+
+Every measurement was taken once, on the frozen system, and is reported as it came out (D23, D99). Small n is stated,
+not hidden. The tables below are copied from stored reports and the decision log; the reproducibility pack recomputes
+the eval numbers from saved reports with no model call: `python -m ci.repro recompute repro`.
+
+| Area | Measure | Result | n | Data | Source |
+| --- | --- | --- | --- | --- | --- |
+| **Classification** (test split, once) | Competitor accuracy | 0.92 (aws 1 of 3) | 24 | Test split, never used in tuning | D67 |
+| | Category accuracy, harness definition | 0.71 | 24 | Test split | D67 |
+| | Category accuracy, a noise prediction counted wrong | 0.58 (14 of 24) | 24 | Test split | D67 |
+| | Category settled by rules / by the LLM | 0.33 (3 of 9) / 0.93 (14 of 15) | 9 / 15 | Test split | D67, D70 |
+| | Competitor settled by rules | 9 of 9 | 9 | Test split | D70 |
+| | Noise precision / recall | 0.50 (3 of 6) / 0.60 (3 of 5) | 6 / 5 | Test split | D67 |
+| | Score exact / within 1 point | 0.76 / 0.95 | 21 | Test split, items neither side called noise | D67 |
+| | Score mean absolute error / signed error | 0.29 / -0.10 | 21 | Test split | D67 |
+| | Important items (4+) precision / recall | 1.00 / 1.00, uninformative | 1 | Test split | D67 |
+| | Mentions JFrog | not measurable | 0 | Test split | D67 |
+| **Classification** (tuning data, context only) | Category accuracy | 0.66 | 59 | Train split, tuned on | D41, D67 |
+| | Score within 1 point | 1.00 | 57 | Train split | D41 |
+| | Noise precision / recall | 0.88 / 0.74 | 16 / 19 | Train split | D41 |
+| **Daily runs** (field-by-field marks) | 1 Nov check: failed. Competitor wrong / category wrong | 0 of 15 / 1 of 15 | 15 | Run e9cae4 | D55 |
+| | 1 Nov check: items scored 4 that were wrong | 1 of 2 (held by routing, never in the Brief) | 2 | Run e9cae4 | D55 |
+| | 2 Nov check: passed, high-score condition not exercised. Competitor / category / score right | 5 of 6 / 6 of 6 / 4 of 6 | 6 | Run bed018 | D68 |
+| **Insights** (1 Nov Brief) | Claims supported / cited items correct | 11 of 12 / 12 of 12 | 12 claims | 4 insights | D60 |
+| | Quotes support the claim | 9 of 12 (4 of the 9 partial) | 12 | 4 insights | D60 |
+| | Pattern / title / summary / why it matters right | 4 of 4 / 1 of 4 / 0 of 4 / 1 of 4 | 4 | 4 insights | D60 |
+| | Insights with every field right | 0 of 4 | 4 | 4 insights | D60 |
+| | Expected patterns found: fully / partly / not | 0 / 3 / 1 | 4 patterns | Window 16-30 Oct | D60 |
+| **Lens** (1 Nov) | Axis right / capability quote right | 10 of 10 / 5 of 9 | 10 / 9 | 15 items | D58 |
+| | Relation right where one was claimed / not_related right | 0 of 8 / 6 of 6 | 8 / 6 | 15 items | D58 |
+| **Coverage** (did we collect what happened?) | Held-out events captured | 3 of 4 (feed 2 of 2, external 1 of 2) | 4 | Held-out list, 31 Oct-2 Nov | D102 |
+| | Dev list before the fix, important events | 6 of 8 (75%) | 8 | Dev list | D26 |
+| | Dev list after the fix (tuned on this list, optimistic) | 25 of 26; important 11 of 11 | 26 / 11 | Dev list | D26 |
+| **Head-to-head** (checked manually, 3 Nov 2026) | Extracted values: correct / partial / wrong | 38 / 2 / 2 | 42 | Cells with a value | D95 |
+| | Empty cells where the information exists on another page | 7 | 49 | All cells | D95 |
+| | Stored quotes found on the page (not a check of the value) | 32 of 32 | 32 | Audit | D88 |
+| **Mechanical** | Rendered prompts changed by the injection fix | 0 differences | 1,374 prompts | 351 items, 107 golden rows | D57 |
+| | Writable demo (`d6fdeed`) vs the read-only demo (`d4e219b`), live-store copy | 1 difference (`demo_writable` in /meta) | 589 responses | Before merge | 14:10 handoff |
+
+**Held-out check: 3 of 4 events captured (n = 4, weekend, no 4+ event), indication only.** (D103) The list came from
+a web search and has no 4+ event, so it says nothing about important events. The missed event (VOLTA) was not covered
+by any followed source (D101, D102).
+
+**Which category number to read.** The lead number is **0.71** (n = 24), the harness's definition, the same one the
+train reports use: it compares the predicted category with the label on every non-noise test item, including the 3
+items the model predicted as noise. Beside it, **0.58** (14 of 24) counts a noise prediction as a wrong category
+(D67).
+
+**The clearest finding.** Rules were meant to settle only safe cases (D24, D25). For competitor they did (9 of 9);
+for category they did not (3 of 9), almost always setting Security or AI & Agents to Product & Features. The fix is
+known: rules settle the competitor only, and the LLM always decides the category. It was not applied, because the
+test split is spent and the fix could not be measured before submission (D70).
+
+**Insights: facts right, conclusions overstated.** The evidence layer holds (11 of 12 claims supported, 12 of 12
+citations right), and the synthesis overstates: "escalating" without a trend, a vendor added to a convergence it is
+not part of. The lens shows the same split. The UI says so, and nothing was tuned on it (D60, D61, D73).
+
+**Lens.** Result and display: one manual check of one daily run (1 Nov, n = 15 items): axis right 10 of 10, capability quote right 5 of 9,
+not_related right 6 of 6, relation right 0 of 8 where claimed. The UI shows the capability and hides the relation, so
+the capability shown can still be wrong.
+
+Limits: this is a small, single-day check, an indication and not a rate. The lens has no golden-set labels,
+because axis and gap labels need product experts (future work, D31). The code check proves a quote exists on the
+capability sheet, not that it is the right capability. The prompts were frozen before the check, so no fix followed
+it (D57, D58).
+
+**Fingerprints of the measured system.** classify_rank `99b79890ceea` (the eval report shows `9c39b7d25f65` because
+it also hashes one mention side file; both are quoted), portable `e04716a2a1d6`, lens `1692c04ba7df`, insights
+`e99d23e4edcf`, capability sheet `e7f13e0b3456`; `gemini-3.6-flash`, temperature 0; measured on `ae8fbb5` (D67). In a clean clone the legacy
+classify_rank differs, because it hashes absolute paths; the portable fingerprint is the one that matches (D59).
+
+**Process notes a reviewer may ask about.**
+- The test-split eval ran on 2 Nov without waiting for the second daily check, a deliberate change of order decided
+  before any result was seen: the prompts were frozen, so there was nothing to fix (D66).
+- A tolerance that would have turned the 1 Nov fail into a pass was proposed after the marks and not applied (D55).
+- Not measured: ranking precision@k (not in this harness) and the faithfulness judge (D17, not built).
+- All marks are by one labeler.
+
+**Tests.** 1,239 pytest and 275 frontend tests passed at `22b45b6`, the frozen commit (D128).
+
+## Security scans
+
+Measured on `bfbd6ac` with the JFrog CLI, unless a line names another commit. Runs and code readings were done by a
+coding agent; these results were not independently verified by hand. Where a path to a finding was not proven, it is
+stated as not shown to be reachable.
+
+- **Frontend dependencies (`jf audit`):** 15 findings, 0 Applicable (6 Not Applicable, 9 Not Covered). No finding
+  is left in `next`.
+- **Python dependencies (`jf audit`, at `017e26b`):** 18 findings, 0 Applicable. `chromadb` has 1 Critical and 5
+  High, with no fixed version, and the scanner does not cover them. Per a reading of the code, they are in the
+  Chroma HTTP server, and Jessi runs no Chroma server. Not shown to be reachable.
+- **API image:** 206 findings, 1 Applicable, which, on the agent's reading of the code, is a scanner false positive.
+- **UI image, measured on `4a82f28` after moving the base to `node:22-trixie-slim`:** 227 findings (1 Critical, 87
+  High, 79 Medium, 60 Low), 2 Applicable. Before the move: 257 findings (4 Critical, 75 High, 98 Medium, 80 Low), 4
+  Applicable. The move removed CVE-2026-5450 and CVE-2026-41992, and added 18 finding IDs. The 2 Applicable
+  findings, CVE-2026-85091 and CVE-2026-119379, are evidenced in libraries bundled with Node and are not shown to be
+  reachable. The one remaining Critical, postcss CVE-2026-45623, is marked Not Applicable.
+- **Secrets:** no real secret found in git history, the images or the demo snapshot. The scanner flags 10 strings in
+  the UI image: 7 inside the upstream Node binary, and 3 random keys that Next.js generates on each build. The keys
+  are not in git, and every build creates new ones.
+- **SAST:** 14 findings, 6 Medium and 8 Low, all in `ci/`, none in `frontend/src`.
+- **Exposure:** the demo binds the UI to 127.0.0.1.
+
+## Pitfalls and known limits
+
+What went wrong, what we found, and what stays open. Each is left as it is on purpose unless it says fixed: the
+freeze keeps the measured system unchanged (D99).
+
+**Collection and extraction**
+- **The GitHub changelog feed returns only its newest 10 entries.** The coverage check found that the most important
+  event of the window, GitHub's package firewall, was caught only as a 92-character snippet, tagged industry and scored
+  4 instead of 5. We now poll the changelog page.
+- **Sites we trust but cannot read** (D39). The Hacker News, Visual Studio Magazine and Security Boulevard block every
+  fetch with a Cloudflare challenge: 0 of 15 extracted. We chose not to bypass it. Their items reached the Brief scored
+  on the headline alone, and nobody noticed until Health measured extraction per source. They are now held as
+  teaser-only.
+- **Prices rendered by JavaScript** (GitLab, Snyk, AWS) cannot be read by the fetcher. The manual check found GitLab
+  and Snyk pricing cells wrong for this reason, so the screen says "price not captured" (D95, D97).
+- **Neighbouring content leaks in.** Cloudsmith's "Other logs" entries leaked into an item (2,145 → 885 characters
+  after stripping). A stricter extraction setting cut real articles (10,438 → 652 characters), so it stays off.
+- **Google News dates are the feed's date, not the publisher's.** An old article can look recent (n = 2 checked:
+  stored 27 Oct vs published 11 Aug 2026; stored 29 Oct vs published 6 Feb 2025). Not fixed, because the date decides
+  the insights window; the UI labels it "Feed date" (D57).
+- **Cold start.** Follow-up coverage looks new until history builds up.
+
+**Classification and scoring**
+- **Rule-settled category is weak on test** (3 of 9, above). Fix known, not applied (D70).
+- **Pattern rules are brittle.** A fix for one title can silently re-break another; "GitHub as a company" vs "GitHub
+  as a place" took three review rounds. Every misfire is pinned as a regression test (D24).
+- **Ambiguous names.** The Sonatype query returned a story about the VC firm Nexus; it was correctly tagged noise.
+  New players outside the list (Socket, Aikido) are not tracked.
+- **"Mentions JFrog" can come from page text the model never sees.** The match runs over the whole fetched page, but
+  only 6,000 characters are stored. A match in a nav link or footer holds the item and adds +1 to its score (D57).
+- **The +1 Mentions JFrog bonus raised scores an analyst judged too high** (n = 2, D62), and it inflates JFrog's own
+  news (a JFrog customer-award story went from 3 to 4). Future fix: no bonus on JFrog's own news.
+- **A pricing change skipped review** (D41). "Copilot included in GitHub Enterprise" was classified AI & Agents, so it
+  auto-published instead of being held as Pricing. Routing is only as safe as the category it rests on.
+- **A funding story with no fitting score** (2 Nov). AIR Security's $50M seed for an AI-agent firewall is not a
+  tracked competitor, and the Industry column of the rubric has no cell for an adjacent startup's funding. The cause is
+  the rubric, not the labeler. A candidate for the next golden set.
+
+**Lens and insights**
+- **The lens relation is wrong where it matters most** (0 of 8). 5 of the 8 had no fitting value in the taxonomy (an
+  attack, or an existing capability with no change). The UI hides the relation and shows only the capability (D58).
+- **The lens covers part of the items.** In the 1 Nov snapshot 88 of 110 held items have no lens result; the "Why it
+  matters to JFrog" block is then hidden (D73).
+- **Insights are rewritten every day** (D63). The generator has no memory and two days' windows overlap by 6 of 7
+  days, so yesterday's pattern returns under a new title. The Brief marks insights new, continuing or strengthened by
+  shared cited stories; "strengthened" means a newly cited story, not more evidence.
+- **Insights merge patterns that mean different things.** Copilot Fusion and the GitHub package firewall were found
+  but merged into one insight (D60).
+
+**Prompt injection (open)**
+- A planted sentence passes the quote check: it proves the words are in the article, not that they are true.
+- Ignoring an instruction is up to the model; code cannot verify it. Schema checks, quote checks and review limit the
+  damage.
+- Nothing detects or strips injected text before the prompt (D51).
+
+**Product and UI**
+- **Flag approved held items** (fixed). A manual screen review found that Flag on a held item also approved it, so it
+  could reach the Brief without a decision. Flag now only marks an item as important. 0 flagged items existed in the
+  live store and the snapshot, so no reported number was affected (D107, D108).
+- **Head-to-head values are unverified** beyond the one manual check of 3 Nov; the system has no ongoing verification
+  (D88, D95).
+
+## Now vs future
+
+| Area | Built now | Future |
+| --- | --- | --- |
+| Scope | 6 competitors + Industry, from `config/competitors.yaml` (D10) | Auto-discovery of new entrants (Socket, Aikido) |
+| Sources | Public news search, vendor blogs and changelogs, GitHub releases, Hacker News | Paid feeds, earnings calls, G2, patents, an analyst-forwarding inbox; a headless browser for JavaScript sites |
+| Classification | Competitor, 7 categories, Mentions JFrog; rules first, LLM for the rest (D11) | Rules settle the competitor only; a learned classifier from analyst feedback; a new test set |
+| Importance | Rubric v2, 1-5 + noise (D29) | Weights tuned on flags and dismissals; no JFrog bonus on JFrog's own news |
+| Daily Brief | Insights + items, daily at 06:00, kept by date | Insights with a lifecycle (created once, updated, closed); email and Slack delivery |
+| Competitors | Heatmap, cards, profiles, an interim JFrog vs competitors view with unverified values (D88, D113) | The Roadmap's market views; extraction from fixed pages with measured accuracy and human-checked sources; battlecards |
+| Lens | Closest JFrog capability, quote-checked (D42) | Redesign: competitor or external event, capability match, evidence, "relevant, impact undetermined"; wider coverage |
+| Review and Log | Routing by autonomy level, analyst actions, full Log (D9, D16) | Per-analyst queues, SLAs |
+| Quality | Golden set with a frozen split, held-out coverage, daily checks, a reproducibility pack | A faithfulness judge (D17); ranking precision@k; continuous eval from analyst actions; capture–recapture coverage; a "Missed event" button; JFrog's own blog as a "self" source (D43) |
+| Observability | `run_metrics` (per step: seconds, LLM call count, status and error), run status, Health | Not built: alerts on a failed, degraded or missing run (D116); a per-call record of LLM latency, token use and errors. Model accuracy is already measured separately on the golden set. |
+| Readers | CI analysts | Role-based digests, an internal MCP server (D19) |
+| Infra | Docker Compose, SQLite, ChromaDB, one daily scheduler, a writable demo | Not built (D116, D117; see ARCHITECTURE.md): size M, with several API servers, a separate run server and RDS Postgres, when the UI must stay up through a server failure, the loss window must be under about an hour, or the run must stop slowing the API; size L, collection fanned out to Lambdas, only when collection stops fitting the schedule; hourly collection after its own check; Amazon Bedrock, subject to JFrog's policies |
+| Serving more teams | One analyst group, one review queue, no user identity | Not built: one shared pipeline with a view per team, user identity and permissions, digests where each team works; see ARCHITECTURE.md |
+| Agents | — | Not built: add agents for small, bounded processes inside the pipeline (D118) |
+| Fixes known, not applied | — | Publisher dates instead of feed dates; JFrog mention from stored text only; hiring signals (D12, dropped) |
+| Screen speed (not measured) | — | Competitors takes about a second to appear by eye on the Windows demo, and the Review page makes one item request per decided row |
+
+**Where this goes next: from a daily feed to an analysis partner.** The collected items, citations and JFrog comparison can power a chat assistant that helps analysts investigate a question, compare competitors and draft their analysis, with every answer tied to its sources. None of this is built. The first step is to learn from the analysts where their work is slowest and which decisions they need help with, so that the assistant solves real pain points. Article text is untrusted input, so the assistant also needs protection against prompt injection.
+
+## Origin, legacy code
+
+Jessi is based on `newsletter_agent`, a personal daily digest pipeline (D8). What Jessi reused is code and ideas: the
+reader, the LLM clients, the models and the ranking funnel. It did not reuse the newsletter's LangGraph orchestration:
+Jessi's pipeline in `ci/` is plain Python (D117).
+
+Jessi still imports a few files from the origin code: `modules/reader.py` (page fetch and text extraction),
+`modules/llm_clients.py` (LLM clients) and `evals/rank_split.py` (the split percentage).
+
+The rest of the newsletter code is **origin, legacy code**: `main.py`, the LangGraph graph in `modules/graph.py` and
+the other newsletter files in `modules/`, and the ranking-label tools in `evals/` (`rank_eval.py`, `label_hub.py`,
+`import_labels.py` and their helpers). That legacy path is not part of Jessi, does not run in the demo or the daily
+run, and is not covered by the evaluation above. It stays until after submission so the frozen commit hashes do not change.
+
+## Repository
 
 ```
-├── main.py               # Entry point — invokes the compiled graph (cron runs this)
-├── modules/              # Application code
-│   ├── graph.py          # LangGraph node wiring and conditional edges
-│   ├── nodes.py          # Node implementations (fetch, extract, collect, merge, dedupe, shortlist, rank, summarize, send)
-│   ├── collectors/       # Active sources: medium.py (tag RSS), hackernews.py (Algolia API)
-│   ├── reader.py         # Full-text fetching for shortlisted articles
-│   ├── article_text.py   # article_text(): the one text view of an article, shared by the summarizer and the judge
-│   ├── card_resolver.py  # Maps summarizer ids to real URLs, drops bad/duplicate ids, demotes snippet-only external cards
-│   ├── judge_llm.py      # Claude transport for the trace judge (JUDGE_MODEL_DAILY / JUDGE_MODEL_EVAL)
-│   ├── tracing.py        # LangSmith feedback and run_summary metadata for the digest_run root run
-│   ├── ranking_report.py # Ranking report + HTML labeling page
-│   ├── state.py          # DigestState TypedDict — shared across all nodes
-│   ├── models.py         # Article, ArticleCard, NewsletterData Pydantic models
-│   ├── gmail_client.py   # Gmail API wrapper (auth, read, send)
-│   ├── link_utils.py     # Real-link extraction from email HTML, tracking unwrap, dead-link check
-│   ├── article_store.py  # ChromaDB vector store — deduplication and article retention
-│   └── trace_judge.py    # Per-run LLM-as-judge with 3-stage scoring
-├── config/               # settings.py (all paths) + credentials.json, token.json, service_account.json (git-ignored)
-├── evals/                # Offline eval harness — eval.py, eval_golden.py, golden_set.json, import_labels.py
-│   ├── label_hub.py      # Labeling hub: one HTML page to grade articles from every ranking report (python -m evals.label_hub)
-│   ├── label_hub_template.html # The hub page (inline CSS/JS, pure-function logic tested through node)
-│   ├── canonicalize_labels.py  # Rewrites redirect URLs in an exported labels file to the real article URLs
-│   ├── rank_split.py     # Stable 75/25 train/test split of the ranking labels
-│   ├── rank_metrics.py   # precision@k and capped recall@k
-│   ├── rank_eval.py      # Replays the labeled articles through the ranker (python -m evals.rank_eval [--run])
-│   ├── rank_compare.py   # Baseline vs candidate rank_eval result
-│   ├── label_audit.py    # Label counts, warnings and relabel agreement
-│   ├── telegram_api.py   # Minimal Telegram Bot API client
-│   ├── telegram_select.py # What the rating bot sends each day, and the article message format
-│   ├── telegram_rater.py # Telegram rating bot: send / poll / setup (python -m evals.telegram_rater)
-│   └── human_feedback.py # Picks precision from your ratings, posted to LangSmith; backfill (python -m evals.human_feedback)
-├── tests/                # Offline unit tests — python -m tests.test_link_utils, test_collectors, test_article_text, test_card_resolver, test_summarize_ids, test_shortlist_ids, test_text_levers, test_trace_judge, test_judge_llm, test_pipeline_evidence, test_tracing, test_eval_golden, test_canonicalize_labels, test_label_hub, test_reader_arxiv, test_rank_split, test_rank_metrics, test_rank_eval, test_rank_compare, test_label_audit, test_telegram_rater, test_human_feedback (each via `python -m tests.<name>`)
-├── data/                 # Runtime data: chroma_db/ (git-ignored)
-├── deploy/               # telegram-rater.service (systemd --user unit for the rating bot poller)
-├── output/               # Logs, trace reports, eval reports (git-ignored)
-├── docs/                 # Screenshots
-└── requirements.txt
+ci/             Jessi: collectors, pipeline, classify, rank, route, lens, insights, store, API (ci/api), evals, demo
+frontend/       Next.js UI
+config/         competitors, rubric v2, the JFrog capability sheet, vetted sources, tracked pages
+demo/snapshot/  the frozen 1 Nov snapshot the demo serves
+repro/          reproducibility pack: labels without article text, the split, saved reports
+tests/          Python tests (pytest)
+tools/          lock_check.py (fingerprints of the measured system), demo_snapshot.py
+docs/           api-contract.md, docker.md, ARCHITECTURE.md, DECISIONS.md
+main.py, modules/   origin code: mostly legacy; Jessi uses modules/reader.py and modules/llm_clients.py (see above)
 ```
 
-Run everything from the repo root. All file locations come from `config/settings.py`, so the working directory no longer matters for data and credentials.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how Jessi works today, and the AWS production design (design only,
+  not built)
+- `docs/DECISIONS.md`: the main decisions, each with why and what else was considered
+- `docs/api-contract.md`: endpoints per screen
+- `docs/docker.md`: every Compose command
+
+**Trademarks.** Company names and logos are trademarks of their owners. The Roadmap concept images show real company
+names and logos with sample data; nothing on them is a finding, and no affiliation or endorsement is implied (D105).

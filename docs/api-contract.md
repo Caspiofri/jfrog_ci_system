@@ -1,6 +1,6 @@
 # API contract v1: for review, nothing implemented
 
-Oct 31, 2026 · for Ofri's review · repo at `main` f4ee625
+Oct 31, 2026 · for the author's review · repo at `main` f4ee625
 
 **Base:** the prototype's 18-dataset contract (`docs/specs/dashboard_explained.md` §5), trimmed to the D35 build list: items, competitors, h2h, activity, funnel, silent, eval, intensity, deals and insights. Pressure and gaps are included only if the capability-baseline step lands. One endpoint group per screen (D21).
 
@@ -262,7 +262,7 @@ The response to `POST`:
 - **Rows:** one row per sighting (item × run), with `status`, `stage` and `stage_reason`.
 - **`dismiss_reason`** (added 1 Nov): on every row. For a dismissed item, the reason of its latest dismiss action (`wrong_competitor`, `wrong_category`, `not_relevant` or `duplicate`); `null` on every other row, dropped rows included. `reason` is unchanged (`dismissed` for an analyst-stage dismissed row).
 - **Counts:** by status and by stage.
-- **Layout:** as the prototype; Ofri liked it as is.
+- **Layout:** as the prototype; the author liked it as is.
 - **Gaps today:**
   - Dropped rows need ❌ the drops in the store. Today they come from `output/runs/*.dropped.jsonl` 🔧, a file read that is fine for v1.
   - `rejected` (D32) rows ✅ come from `rejections`.
@@ -301,10 +301,10 @@ The response to `POST`:
 | 4.4 | `activity` | Competitors profile | 🔧 | per competitor per day, by `published_at` |
 | 4.5 | `funnel` | Health | ✅ | `published` / `held_for_review` 🔧 |
 | 4.6 | `silent` | Health | 🔧 | history: the store has 2 runs (the 14-day import and 1 daily run); the plan 2.8 rule needs ≥ 7 daily runs |
-| 4.7 | `eval` | Health | ✅ | the test eval not run yet (waits for Ofri's go) |
+| 4.7 | `eval` | Health | ✅ | the test eval not run yet (waits for the author's go) |
 | 4.8 | `intensity` | Brief | 🔧 | per day the sum of `score` and the count of non-noise items, **by discovery day** (Brief windows), 14 days |
 | 4.9 | `deals` | Competitors | 🔧 / ❌ | rows = items in `Funding/M&A/Partnerships`: `date`, `competitor`, `title`, `url` 🔧. `type` (Acquisition\|Funding\|Partnership), `actor` and `target` ❌ need an extraction step. **0 labeled, 4 stored items in the category (n=228)** |
-| 4.10 | `insights` | Brief | ✅ / ❌ | generator built and tested offline (`ci.insights`, D37): stories at 0.82, ≥ 2 stories per insight, a verbatim quote per claim checked in code. ❌ Not in the daily run, and never run live, until Ofri's expected-insights file is saved |
+| 4.10 | `insights` | Brief | ✅ / ❌ | generator built and tested offline (`ci.insights`, D37): stories at 0.82, ≥ 2 stories per insight, a verbatim quote per claim checked in code. ❌ Not in the daily run, and never run live, until the author's expected-insights file is saved |
 | 4.11 | `pressure` | Brief | ⬚ | needs `jfrog_product` |
 | 4.12 | `gaps` | Competitors | ⬚ | needs `gap` |
 
@@ -326,7 +326,7 @@ Dropped from the API under D35, to the Roadmap tab: `strength`, `convergence`, `
 
 Noise never reaches the queue; it goes to the Log (D9).
 
-## 6. Decisions (Ofri, Oct 31; PRD D36): the contract is approved
+## 6. Decisions (the author, Oct 31; PRD D36): the contract is approved
 
 - **Q-A:** low confidence (below 0.8) is held at Strict and Balanced, not Relaxed. Model failures and D32 rejections are held at every level.
 - **Q-B:** teaser-only (score ≥ 4) and junk-extraction (score ≥ 4) items are held at Strict and Balanced and published at Relaxed.
@@ -383,7 +383,7 @@ Afterwards: freezing Briefs, insights (`ci.brief`) and the deals extraction, eac
 
 ## 9. As built: Competitors, Health and anchor_kind (commits 6e35f7f, 4131c4c, fd6e933)
 
-- **`anchor_kind`** (approved by Ofri, requested in `frontend/BACKEND_REQUESTS.md`): `"import"` or `"daily"` on `/brief` → `window`, and on every `/briefs` row. The UI labels the backfill Brief and hides its "Found late" badges.
+- **`anchor_kind`** (approved by the author, requested in `frontend/BACKEND_REQUESTS.md`): `"import"` or `"daily"` on `/brief` → `window`, and on every `/briefs` row. The UI labels the backfill Brief and hides its "Found late" badges.
 - **Competitors:**
   - **Cards:** `GET /competitors` returns the cards (published items, by discovery time) plus a `deals` block. Deals are all Funding/M&A/Partnerships items with their `status`; M&A is held at every level, so they show `awaiting_review` until approved.
   - **Profile:** `GET /competitors/{key}` returns the card, head-to-head, activity (30 days, by publication day), latest published items and deals.
@@ -402,7 +402,7 @@ Afterwards: freezing Briefs, insights (`ci.brief`) and the deals extraction, eac
   - New pages: GitHub package_coverage and curation_gating, GitLab package_coverage and curation_gating, Snyk deployment.
   - Still untracked: Snyk curation_gating, AWS security_scanning and ai_mcp, Cloudsmith pricing_model, each with its reason in the config.
   - The "prices rendered client-side" note now goes on pricing cells only, and a stored leaked note is repaired on the next live run.
-- **Extraction on Health** (requested by Ofri, commit after fd6e933): `extraction.run` and `extraction.all` each give `extracted`, `n`, `rate`, plus `by_source` and `by_publisher` rows (`key`, `extracted`, `n`, `rate`, `by_status` {full, partial, snippet, junk}). Extracted means full or partial page text; n is the items kept. Why a fetch failed (e.g. a Cloudflare 403) isn't stored yet.
+- **Extraction on Health** (requested by the author, commit after fd6e933): `extraction.run` and `extraction.all` each give `extracted`, `n`, `rate`, plus `by_source` and `by_publisher` rows (`key`, `extracted`, `n`, `rate`, `by_status` {full, partial, snippet, junk}). Extracted means full or partial page text; n is the items kept. Why a fetch failed (e.g. a Cloudflare 403) isn't stored yet.
 
 ## 10. D44: the Daily Brief information hierarchy (contract for the UI, 31 Oct; as built)
 
@@ -566,7 +566,7 @@ Every `Item` gains `text_basis`, and `lens` gains `why_it_matters`:
 
 ### 10.7 Names changed from the first D44 draft (31 Oct)
 
-| First draft (Ofri's C1 list) | Adopted (frontend #3) |
+| First draft (the author's C1 list) | Adopted (frontend #3) |
 |---|---|
 | `summary.published_in_brief` | `summary.published` |
 | `summary.published_in_brief_4plus` | `summary.published_high` |
@@ -739,7 +739,7 @@ These bodies are `{"error": {code, message, details}}` with no `meta`.
   - An already flagged item answers `409 conflict` with `{status, flagged: true}`; `dropped`, `dismissed`, test-split and unclassified items answer `409` with `{status, allowed_from}`.
   - `measures` is still `ranking_miss` when the effective score is 2 or lower (else `""`), in the response and the action payload.
 - **Unflag:** allowed from the same statuses and from `dismissed` when the item is flagged (else `409` with `flagged: false`). It clears the flag only, so the item is back in its exact state before the flag: the same decision, status and Brief membership. Only `version` moves on.
-- **Other actions:** approve and dismiss work on a flagged item as on any other. Approve, dismiss, reopen and edit all leave the flag as it is (Ofri, 4 Nov: Flag and Dismiss are separate actions). A dismissed item can't be flagged anew, but its flag can be cleared.
+- **Other actions:** approve and dismiss work on a flagged item as on any other. Approve, dismiss, reopen and edit all leave the flag as it is (the author, 4 Nov: Flag and Dismiss are separate actions). A dismissed item can't be flagged anew, but its flag can be cleared.
 - **Log:** a flag isn't a decision, so a flagged item keeps the stage routing gave it (`route`, `validate`…), not `analyst`.
 - **Counts:** Brief, Health and run `items_after_actions` count statuses only, so a flag changes none of them. The live store and the demo snapshot had 0 flagged items and 0 flag actions when this changed, so no stored or reported number moved.
 - **Before D107 (until 4 Nov):** Flag on a held item also wrote `decision: approved`, and a flagged item had the status `flagged`, counted as published.
