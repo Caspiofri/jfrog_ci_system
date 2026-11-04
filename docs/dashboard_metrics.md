@@ -1,5 +1,8 @@
 # Dashboard metrics: "Newsletter agent: daily digest"
 
+> **Origin, legacy code.** This page describes the newsletter's LangSmith dashboard (`digest_run`, `main.py`). It is
+> not part of Jessi: LangSmith tracing of Jessi's daily run is not built (D57).
+
 The LangSmith dashboard (Monitoring → Dashboards) has 11 charts. Every chart reads the root `digest_run` run of the
 `newsletter-agent` project, so there is **one point per day** (the 07:00 cron run; a manual run adds an extra point).
 The values come from feedback that `modules/tracing.py` posts on that run after it finishes, plus LangSmith's own

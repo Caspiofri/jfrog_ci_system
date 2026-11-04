@@ -140,8 +140,8 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 
 **Observability lives in the repo (D48).**
 - **What:** a `run_metrics` row per run, including degraded and failed runs; stale and overdue detection; the API
-  log on disk; Health shows run history and the eval with n. LangSmith tracing is off by default, and off in every
-  eval run.
+  log on disk; Health shows run history and the eval with n. LangSmith tracing of the daily run is not built (D57);
+  tracing is forced off in every eval run, enforced in code with a test (D51).
 - **Why:** a run that never started looked like yesterday's success. Reviewers run without our accounts, so
   everything they must see is in the repo and on Health.
 
@@ -261,6 +261,14 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   follows D116's growth triggers.
 - **Why:** a reviewer opening the code would see that the earlier claim was false. Neither git nor the docs record
   why `ci/` was built without LangGraph, so no reason is stated.
+
+**Video on Thu 5 Nov at 08:00, submission after it (D119).**
+- **What:** tonight: documents, the docs-only merge, a last clean clone and a push with the repo still Private.
+  Thu: check the 06:00 run, back up, record the video on the live system, add the video link and the 5 Nov run row
+  (docs only), a last clean clone, push without force, make the repo Public, run the final check, send both links.
+  The one approved item in the video comes from the Thu 5 Nov run, which is in no measurement (updates D106).
+- **Why:** recording tomorrow shows the first 06:00 run on the frozen commit and leaves Thursday with only the video
+  and the submission. A Private push tonight keeps a safe copy on GitHub.
 
 **Jessi is a GenAI pipeline, not an agent (D118).**
 - **What:** fixed steps, validation and human review. The freeze stays, and the submission goes ahead as built. The

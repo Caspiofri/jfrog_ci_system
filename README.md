@@ -84,13 +84,15 @@ reopening of an item dismissed by mistake (D62).
 | 31 Oct | 20261031T1345Z-802913 | ok, reconstructed | 43 | | |
 | 1 Nov (demo day) | 20261101T0400Z-e9cae4 | ok | 26 | 4 | 11 |
 | 2 Nov | 20261102T0400Z-bed018 | ok | 13 | 1 | 5 |
-| 3 Nov | 20261103T0400Z-d03c41 | ok | 44 | | |
-| 4 Nov | 20261104T0400Z-20da28 | ok | 46 | | |
+| 3 Nov | 20261103T0400Z-d03c41 | ok | 44 | 7 | 25 |
+| 4 Nov | 20261104T0400Z-20da28 | ok | 46 | 15 | 19 |
+| 5 Nov | [added Thu 5 Nov, after the 06:00 run] | | | | |
 
 - 30 and 31 Oct rows are reconstructed once from the per-item log, marked "Reconstructed from the item log" on
   screen, and leave empty what the stored items cannot prove (D74). Published and held are empty there because
   routing did not exist at those runs.
 - 1 Nov: 239 fetched, 11 removed as noise. 2 Nov: 237 fetched, 7 removed as noise (D74).
+- 3 and 4 Nov: published and held are run-time values.
 - 1 Nov: at run time 3 items were published and 12 held at Strict; an analyst approved 1 held item afterwards, so
   the Brief shows 4 published and 11 held (D69).
 - 30 Oct had two collections: the 14-day import `389e71` that entered the product, and a 7-day labelling collection
@@ -130,7 +132,20 @@ docker compose --profile pipeline run --rm --entrypoint python ci -m ci.daily
 
   This command was checked on a scratch store. Insights generation after it was not run on a clean clone, because
   that needs a key.
-- **Open the UI on the live store:** [TODO BE: commands to start the API and the UI on the live store].
+- **Open the UI on the live store.** Run these from the repo root, after the daily run:
+
+  ```bash
+  docker compose --profile pipeline run -d --rm --name jessi-live-api -e CI_API_HOST=0.0.0.0 -e CI_TRUSTED_HOSTS=jessi-live-api -p 127.0.0.1:8011:8011 --entrypoint python ci -m ci.api --port 8011
+  docker compose build --build-arg CI_API_URL=http://jessi-live-api:8011 --build-arg CI_MODE=live ui
+  docker compose up -d --no-deps ui
+  ```
+
+  Open http://127.0.0.1:3000. To stop: `docker stop jessi-live-api && docker compose down`.
+  After this build, `jfrog-ci-ui:latest` points at the live API, so run `docker compose build ui` again before the
+  plain demo `docker compose up`.
+- **Only `GOOGLE_API_KEY` is needed.** Model settings come from the code. Other entries in `.env.example` and
+  `config/settings.py` are legacy from the newsletter, and `ci/` does not read them, including the Anthropic and
+  LangSmith entries and `SNIPPET_SCORE_CAP`.
 - The split file keeps the golden-set test items away from the model (D23). The scheduled run is
   `ci/daily_cron.sh` at 06:00 Israel time.
 
@@ -342,7 +357,7 @@ freeze keeps the measured system unchanged (D99).
 | Lens | Closest JFrog capability, quote-checked (D42) | Redesign: competitor or external event, capability match, evidence, "relevant, impact undetermined"; wider coverage |
 | Review and Log | Routing by autonomy level, analyst actions, full Log (D9, D16) | Per-analyst queues, SLAs |
 | Quality | Golden set with a frozen split, held-out coverage, daily checks, a reproducibility pack | A faithfulness judge (D17); ranking precision@k; continuous eval from analyst actions; capture–recapture coverage; a "Missed event" button; JFrog's own blog as a "self" source (D43) |
-| Observability | `run_metrics`, run status, Health | LangSmith tracing of the daily run (off now, D48, D57) |
+| Observability | `run_metrics`, run status, Health | Not built: LangSmith tracing of the daily run (D48, D57) |
 | Readers | CI analysts | Role-based digests, an internal MCP server (D19) |
 | Infra | Docker Compose, SQLite, ChromaDB, one daily scheduler, a writable demo | Not built: RDS when more than one API instance or a smaller loss window is needed; a bigger instance for more sources; hourly collection after its own check; Amazon Bedrock, subject to JFrog's policies (D116, D117); see ARCHITECTURE.md |
 | Agents | — | Not built: add agents for small, bounded processes inside the pipeline (D118) |
