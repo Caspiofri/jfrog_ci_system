@@ -121,7 +121,16 @@ docker compose --profile pipeline run --rm --entrypoint python ci -m ci.daily
   storing articles (169 collected, 135 stored, Linux with Docker). Without a key the run does not stop: it writes
   fallback rows, marked degraded, and ends with status degraded (exit 3). Classification, ranking and insights need
   a key, so they were not run on a clean clone. The live system runs them every day.
-- **Insights are off on a fresh store** until `insights_enabled` is set to true: [TODO BE: how to set it].
+- **Insights are off on a fresh store.** To turn them on, run this from the repo root after the setup commands,
+  before the daily run:
+
+  ```bash
+  docker compose --profile pipeline run --rm --entrypoint python ci -c "from ci.store import Store; Store().set_setting('insights_enabled', 'true')"
+  ```
+
+  This command was checked on a scratch store. Insights generation after it was not run on a clean clone, because
+  that needs a key.
+- **Open the UI on the live store:** [TODO BE: commands to start the API and the UI on the live store].
 - The split file keeps the golden-set test items away from the model (D23). The scheduled run is
   `ci/daily_cron.sh` at 06:00 Israel time.
 
@@ -317,9 +326,6 @@ freeze keeps the measured system unchanged (D99).
 - **Head-to-head values are unverified** beyond the one manual check of 3 Nov; the system has no ongoing verification
   (D88, D95).
 - **Edits show field by field in the item drawer,** not in Log rows.
-- **Tracked pages with a stale path.** 11 of 21 tracked pages on the live system store a path to a removed folder.
-  No real change would be missed. If one of those pages changes, its item goes to review with a diff against empty
-  text, and that page then corrects itself. The demo is not affected.
 
 ## Now vs future
 
