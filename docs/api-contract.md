@@ -113,7 +113,7 @@ Used by the Brief, the Competitors profile, Review and Log.
 
 | Group | Method & path | Datasets it serves |
 |---|---|---|
-| shared | `GET /api/v1/meta` | competitors, categories, axes, levels, reason codes, the latest Brief date, the latest daily run |
+| shared | `GET /api/v1/meta` | competitors, categories, axes, levels, reason codes, the latest Brief date, the latest daily run, `demo_writable` (12.3) |
 | shared | `GET /api/v1/items/{item_id}` | the item drawer: `Item` + classification method, ranking adjustments, sightings, rejections, actions |
 | **Brief** | `GET /api/v1/brief?date=` | `items` (the Brief window), `insights`, `intensity`, KPI counts; `pressure` ⬚ |
 | Brief | `GET /api/v1/briefs?limit=&offset=` | past Briefs (day navigation) |
@@ -663,11 +663,24 @@ Every `meta` block says which data it serves. Every success body and every route
 
 | Status | `error.code` | When |
 |---|---|---|
-| 403 | `demo_read_only` | Any POST, PUT, PATCH or DELETE in demo mode, before any route runs |
+| 403 | `demo_read_only` | In a read-only demo: any POST, PUT, PATCH or DELETE. In a writable demo (12.3): any write that is not an analyst action. Before any route runs |
+| 403 | `insights_frozen_demo` | `POST /brief/{date}/insights/refresh` in demo mode, writable or not (D111): no LLM call in the demo |
 | 403 | `csrf_refused` | A cross-site write (`Origin` / `Sec-Fetch-Site`) in either mode |
 | 400 | `untrusted_host` | A `Host` header other than localhost, 127.0.0.1, ::1 or a name in `CI_TRUSTED_HOSTS` |
 
-These three bodies are `{"error": {code, message, details}}` with no `meta`.
+These bodies are `{"error": {code, message, details}}` with no `meta`.
+
+### 12.3 Writable demo (4 Nov, D111)
+
+- **`GET /meta` → `demo_writable`** (bool, top level of the body): `true` when the demo serves a writable temporary copy
+  (actions work and reset on restart); `false` in a read-only demo (set by `CI_DEMO_READ_ONLY=1`, or the fallback when
+  the startup guard fails) and always in live mode.
+- **Writes allowed in a writable demo** (each writes only the temporary copy): approve, dismiss, reopen, flag,
+  `DELETE /items/{id}/flag`, `PATCH /items/{id}` (its candidate labels go to the copy too), `PUT
+  /settings/autonomy-level`, `POST /sources/trust`, `DELETE /sources/trust/{host}`, and the changed-cell decisions.
+  Any other write answers 403 `demo_read_only`; Refresh insights answers 403 `insights_frozen_demo`.
+- **Not moved by actions:** `GET /health`, `/run-metrics`, `/run-metrics/{run_id}`, `/runs` and `/evals/test` read the
+  snapshot itself, so their bodies are the same before and after any action (`items_after_actions` included).
 
 ## 13. Analyst actions: reopen and per-field edit notes (1 Nov; as built)
 

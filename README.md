@@ -13,9 +13,13 @@ git clone <this repo> && cd agent_backbone
 docker compose up --build        # first build takes a few minutes
 ```
 
-Open **http://127.0.0.1:3000**. The UI runs on a **demo snapshot**: a frozen, read-only copy of a real daily run
+Open **http://127.0.0.1:3000**. The UI runs on a **demo snapshot**: a frozen copy of a real daily run
 (`demo/snapshot/`), built by `python -m ci.demo build`. A "Demo snapshot" marker shows in the header. Nothing is
-simulated, no model is called, and writes (approve, dismiss, trust, refresh) are refused. Full article text is never in
+simulated and no model is called. The actions work (approve, dismiss, edit, flag, reopen, trust, the autonomy level):
+each start copies the snapshot to a temporary folder inside the container, every action writes only there, and a
+restart resets them all; `demo/snapshot/` itself is never written. Health and evaluation numbers read the snapshot's
+saved summaries, so actions do not move them. Insights are frozen: Refresh insights needs a live LLM connection and is
+refused. For a read-only demo, start it with `CI_DEMO_READ_ONLY=1 docker compose up`. Full article text is never in
 the snapshot: items keep the D34 field allowlist and a 280-character excerpt. The API is on
 http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
 

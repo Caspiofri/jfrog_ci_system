@@ -166,20 +166,27 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                labels_path: Path = eval_golden.LABELS_PATH, sheet_path: Path = lens_mod.SHEET_PATH,
                brief_config_path: Path = svc.BRIEF_CONFIG_PATH, demo: dict | None = None,
                trusted_hosts: frozenset[str] | None = None) -> FastAPI:
-    """demo: a snapshot manifest from ci.demo.load(). The API then reads that snapshot read-only, refuses writes,
-    calls no model and keeps its clock at the snapshot time (D34, D59)."""
+    """demo: a snapshot manifest from ci.demo.load() (read-only) or ci.demo.prepare() (writable when its guard
+    passed, D111). The API then calls no model and keeps its clock at the snapshot time (D34, D59). Read-only, it
+    reads the snapshot immutable and refuses writes; writable, actions write only the manifest's temporary copy
+    (stores and candidate labels), while Health, evaluation and run numbers read the snapshot itself."""
     cfg = cfg or ci_config.load()
     min_score = svc.brief_min_score(brief_config_path)
     app = FastAPI(title="JFrog CI API", version=API_VERSION)
     app.add_middleware(CSRFMiddleware)  # no login, so a cross-site page must not change state
     app.add_middleware(TrustedHostMiddleware, hosts=trusted_hosts)  # outermost: DNS rebinding (D59)
-    read_only = demo is not None
+    demo_writable = bool(demo is not None and demo.get("writable"))
+    read_only = demo is not None and not demo_writable
+    snapshot_dir = None
     if demo is not None:
         from ci import demo as demo_mod
 
         store_path, changes_path = demo["store_path"], demo["changes_path"]
+        snapshot_dir = Path(demo.get("snapshot_dir") or Path(demo["store_path"]).parent)
+        if demo_writable:  # D111: Edit's candidate labels go to the copy, never to evals/ in the checkout
+            labels_out = demo["labels_out"]
         now, insights_llm, embed_fn = demo_mod.clock(demo), None, None
-        app.add_middleware(demo_mod.ReadOnlyMiddleware, date=demo.get("date"))
+        app.add_middleware(demo_mod.ReadOnlyMiddleware, date=demo.get("date"), writable=demo_writable)
     snapshot = None if demo is None else {k: demo.get(k) for k in ("date", "as_of", "label", "built_at", "commit")}
 
     def meta() -> dict:
@@ -226,7 +233,8 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
             runs = sorted(s.runs, key=lambda r: r["started_at"])
         return ok({**svc.meta_lists(cfg), "level": s.level, "latest_brief_date": anchors[-1][0] if anchors else None,
                    "latest_run_id": runs[-1]["run_id"] if runs else None,
-                   "insights_enabled": insights_enabled()})
+                   "insights_enabled": insights_enabled(),
+                   "demo_writable": demo_writable})  # D111: actions work here and reset on restart
 
     @app.get("/api/v1/items/{item_id}")
     def get_item(item_id: str):
@@ -753,7 +761,22 @@ def create_app(*, store_path: Path = STORE_PATH, runs_dir: Path = RUNS_DIR, chan
                            store=open_store, evals_dir=evals_dir, coverage_dir=coverage_dir,
                            events_path=events_path, changes_out_dir=changes_out_dir, labels_path=labels_path,
                            read_only=read_only,
-                           demo_dir=None if demo is None else Path(demo["store_path"]).parent)  # D83: Health summaries
+                           demo_dir=snapshot_dir)  # D83: Health summaries
     competitors_api.register(app, deps)
+    if demo_writable:  # D111: Health and evaluation numbers read the untouched snapshot, so actions never move them
+        from ci import demo as demo_mod
+
+        pristine = Path(snapshot_dir) / demo_mod.STORE_FILE
+
+        def pristine_store() -> Store:
+            return Store(pristine, read_only=True)
+
+        def pristine_snap() -> tuple[Store, Snapshot]:
+            store = pristine_store()
+            return store, Snapshot.read(store, cfg, now())
+
+        deps = SimpleNamespace(**{**vars(deps), "snap": pristine_snap, "store": pristine_store, "read_only": True,
+                                  "store_path": pristine,
+                                  "changes_path": Path(snapshot_dir) / demo_mod.CHANGES_FILE})
     health_api.register(app, deps)
     return app

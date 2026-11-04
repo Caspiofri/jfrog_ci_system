@@ -33,11 +33,19 @@ def log_config(path: Path = LOG_PATH) -> dict:
 
 def build_app(demo_dir: Path | None = None):
     """The live app: Refresh insights (D37) gets the Gemini model and the embedding function the daily run uses.
-    With demo_dir, the demo app on that snapshot: no model, no embedding model, no key needed (ci.demo)."""
+    With demo_dir, the demo app on that snapshot: no model, no embedding model, no key needed (ci.demo). Writable on
+    a fresh temporary copy by default (D111); read-only with CI_DEMO_READ_ONLY=1 or when the startup guard fails."""
     if demo_dir is not None:
         from ci import demo
 
-        return create_app(demo=demo.load(demo_dir))
+        m = demo.prepare(demo_dir)
+        if m["writable"]:  # printed: uvicorn's logging is set up only after this
+            g = m["guard"]
+            print(f"demo: WRITABLE on a temporary copy ({m['copy_dir']}); startup guard: 0 rows changed in "
+                  f"{g['tables']} tables ({g['rows']} rows); every action resets on restart", flush=True)
+        else:
+            print(f"demo: READ-ONLY ({m['read_only_reason']}); writes answer 403 demo_read_only", flush=True)
+        return create_app(demo=m)
     from ci.dedupe import default_embedding_fn
     from ci.llm import GeminiLLM
 
@@ -56,7 +64,8 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="python -m ci.api", description=__doc__)
     ap.add_argument("--port", type=int, default=8010)
     ap.add_argument("--demo", type=Path, metavar="SNAPSHOT_DIR", default=os.environ.get("CI_DEMO_DIR") or None,
-                    help="serve this read-only demo snapshot (python -m ci.demo build) instead of the live store")
+                    help="serve this demo snapshot (python -m ci.demo build) instead of the live store: writable on a "
+                         "temporary copy, or read-only with CI_DEMO_READ_ONLY=1")
     args = ap.parse_args(argv)
     host = listen_host()
     if host != HOST:

@@ -1,6 +1,8 @@
 # Jessi (JFrog CI tool). Build and run commands: docs/docker.md.
 #   docker compose up                                demo: the API on a frozen snapshot + the web UI, no API key:
 #                                                    http://127.0.0.1:3000 (UI) and http://127.0.0.1:8011/api/v1 (API)
+#                                                    writable on a temporary copy inside the container (D111): actions
+#                                                    work and reset on every start; CI_DEMO_READ_ONLY=1 for read-only
 #   docker compose run --rm ci                       one CI run (collect -> dedupe -> full text -> output/runs/<run_id>.jsonl)
 #   docker compose run --rm eval --split train       golden-set eval -> output/evals/<timestamp>.json
 #   docker compose up -d labeling                    labeling page on http://127.0.0.1:8000/ only
@@ -10,7 +12,8 @@
 # caches outlive the container. Before their first start:
 #   mkdir -p output data && touch evals/golden_set.jsonl
 #   export APP_UID=$(id -u)    (or APP_UID=... in .env): the container user must own what it writes to the mounts;
-#                              without it the image user is uid 1000, which is fine for the demo, which writes nothing
+#                              without it the image user is uid 1000, which is fine for the demo, which writes only
+#                              to its temporary copy inside the container, never to a mount
 
 x-app: &app
   image: jfrog-ci:latest
@@ -48,7 +51,9 @@ x-app: &app
         create_host_path: false
 
 services:
-  # ---- demo (the default `docker compose up`): read-only, no LLM, no key, no host state
+  # ---- demo (the default `docker compose up`): no LLM, no key, no host state. Writable on a fresh copy of the snapshot
+  # in the container's temp folder (D111): actions write only there and reset on every start; Health and evaluation
+  # numbers keep reading the snapshot. CI_DEMO_READ_ONLY=1 (shell or .env) serves it read-only instead.
   api:
     image: jfrog-ci:latest
     build:
@@ -58,7 +63,8 @@ services:
         APP_UID: ${APP_UID:-1000}
     entrypoint: ["python", "-m", "ci.api", "--port", "8011"]
     environment:
-      CI_DEMO_DIR: /app/demo/snapshot  # in the image (demo/snapshot, committed); read-only
+      CI_DEMO_DIR: /app/demo/snapshot  # in the image (demo/snapshot, committed); only ever read, copied at each start
+      CI_DEMO_READ_ONLY: ${CI_DEMO_READ_ONLY:-0}  # 1: read-only demo, every write answers 403 demo_read_only
       CI_API_HOST: 0.0.0.0  # inside the container only; the host sees it on 127.0.0.1 (ports below)
       CI_TRUSTED_HOSTS: api  # the ui container calls http://api:8011; localhost and 127.0.0.1 are always allowed
     ports:
