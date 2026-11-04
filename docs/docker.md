@@ -30,10 +30,11 @@ fails the start with `bind source path does not exist` (compose is told not to c
 create it root-owned and the app could not write to it). A missing `evals/golden_set.jsonl` is not an error for the
 labeling page, which creates it on the first label, but the eval needs labels to score.
 
-`APP_UID` is required: the image user gets that uid, so it can write to those directories, which you own. Compose
-refuses any command (build, up, ps, down) without it (`required variable APP_UID is missing a value`). Set it in the
-shell as above, or put `APP_UID=1001` (your `id -u`) in `.env`, which compose also reads for `${...}` values. It is a
-build setting, so after changing it run `docker compose build` again.
+Set `APP_UID` to your uid: the image user gets that uid, so it can write to those directories, which you own.
+Compose does not refuse a command without it: it falls back to 1000, which is enough for the demo (it writes only
+inside the container) but not for the pipeline services if your uid is not 1000. Set it in the shell as above, or put
+`APP_UID=1001` (your `id -u`) in `.env`, which compose also reads for `${...}` values. It is a build setting, so
+after changing it run `docker compose build` again.
 
 ## Build and run (native: arm64 on the Pi, amd64 on a laptop)
 

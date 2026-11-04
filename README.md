@@ -78,18 +78,19 @@ reopening of an item dismissed by mistake (D62).
 
 **Real daily runs, up to submission day** (from the `run_metrics` table; D74, D79, D106):
 
-| Date | Run | Status | Fetched | New | Noise | Published | Held for review |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 30 Oct | 20261030T1312Z-389e71 (14-day import) | [TODO BE] | [TODO BE] | [TODO BE] | | | |
-| 31 Oct | 20261031T1345Z-802913 | [TODO BE] | [TODO BE] | | | | |
-| 1 Nov (demo day) | 20261101T0400Z-e9cae4 | ok | 239 | 26 | 11 | 4 | 11 |
-| 2 Nov | 20261102T0400Z-bed018 | ok | 237 | 13 | 7 | 1 | 5 |
-| 3 Nov | [TODO BE] | | | | | | |
-| 4 Nov | [TODO BE] | | | | | | |
-| 5 Nov | [TODO BE, if before submission] | | | | | | |
+| Date | Run | Status | New items | Published | Held for review |
+| --- | --- | --- | --- | --- | --- |
+| 30 Oct | 20261030T1312Z-389e71 (14-day import) | ok, reconstructed | 282 | | |
+| 31 Oct | 20261031T1345Z-802913 | ok, reconstructed | 43 | | |
+| 1 Nov (demo day) | 20261101T0400Z-e9cae4 | ok | 26 | 4 | 11 |
+| 2 Nov | 20261102T0400Z-bed018 | ok | 13 | 1 | 5 |
+| 3 Nov | 20261103T0400Z-d03c41 | ok | 44 | | |
+| 4 Nov | 20261104T0400Z-20da28 | ok | 46 | | |
 
 - 30 and 31 Oct rows are reconstructed once from the per-item log, marked "Reconstructed from the item log" on
-  screen, and leave empty what the stored items cannot prove (D74).
+  screen, and leave empty what the stored items cannot prove (D74). Published and held are empty there because
+  routing did not exist at those runs.
+- 1 Nov: 239 fetched, 11 removed as noise. 2 Nov: 237 fetched, 7 removed as noise (D74).
 - 1 Nov: at run time 3 items were published and 12 held at Strict; an analyst approved 1 held item afterwards, so
   the Brief shows 4 published and 11 held (D69).
 - 30 Oct had two collections: the 14-day import `389e71` that entered the product, and a 7-day labelling collection
@@ -106,17 +107,23 @@ A live run collects real news and calls Gemini. The free tier allows 20 requests
 use a paid key or Vertex AI.
 
 ```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env                                  # set GOOGLE_API_KEY (or the Vertex settings)
-cp repro/split_assignments.json evals/                # the frozen golden-set split; without it the run stops
-python -m ci.daily                                    # one daily run into data/ci/ci.sqlite
-python -m ci.api --port 8011                          # the API on the live store
-cd frontend && npm install && CI_API_URL=http://127.0.0.1:8011 npm run dev
+export APP_UID=$(id -u)
+mkdir -p output data && touch evals/golden_set.jsonl
+cp repro/split_assignments.json evals/   # the frozen split; do not run ci.eval_golden to make a new one
+cp .env.example .env                     # then set GOOGLE_API_KEY in .env, before the first run
+docker compose --profile pipeline build ci
+docker compose --profile pipeline run --rm --entrypoint python ci -m ci.daily
 ```
 
-The split file keeps the golden-set test items away from the model (D23). The scheduled run is
-`ci/daily_cron.sh` at 06:00 Israel time. [TODO BE: confirm these steps on a clean clone.]
+- **Do not run the plain `ci` service first.** It only collects and marks every URL as seen, so a daily run after it
+  finds 0 new items and still reports ok.
+- **What was checked.** Without an API key, we checked these steps on a clean clone only through collecting and
+  storing articles (169 collected, 135 stored, Linux with Docker). Without a key the run does not stop: it writes
+  fallback rows, marked degraded, and ends with status degraded (exit 3). Classification, ranking and insights need
+  a key, so they were not run on a clean clone. The live system runs them every day.
+- **Insights are off on a fresh store** until `insights_enabled` is set to true: [TODO BE: how to set it].
+- The split file keeps the golden-set test items away from the model (D23). The scheduled run is
+  `ci/daily_cron.sh` at 06:00 Israel time.
 
 ## Screens
 
@@ -310,6 +317,9 @@ freeze keeps the measured system unchanged (D99).
 - **Head-to-head values are unverified** beyond the one manual check of 3 Nov; the system has no ongoing verification
   (D88, D95).
 - **Edits show field by field in the item drawer,** not in Log rows.
+- **Tracked pages with a stale path.** 11 of 21 tracked pages on the live system store a path to a removed folder.
+  No real change would be missed. If one of those pages changes, its item goes to review with a diff against empty
+  text, and that page then corrects itself. The demo is not affected.
 
 ## Now vs future
 
