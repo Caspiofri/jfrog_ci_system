@@ -1,4 +1,4 @@
-// npm test: the (i) next to "What needs my decision?" carries Ofri's routing-rules explanations as written, each
+// npm test: the (i) next to "What needs my decision?" carries the author's routing-rules explanations as written, each
 // under the same name its chip uses (HOLD_LABEL in src/lib/format.ts).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

@@ -1,4 +1,4 @@
-# D9 vetted sources (Q3, D34): approved by Ofri on 31 Oct 2026 as seeded (10 first-party, 20 trade press).
+# D9 vetted sources (Q3, D34): approved in a manual review on 31 Oct 2026 as seeded (10 first-party, 20 trade press).
 # A host matches when the item URL's host is the listed host or a subdomain of it (updates.snyk.io matches snyk.io).
 first_party:   # competitor-owned hosts (feeds, repos, blogs, docs, status pages)
   - github.blog

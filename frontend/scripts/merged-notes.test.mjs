@@ -1,4 +1,4 @@
-// npm test: Ofri's notes on the merged system (display only).
+// npm test: the author's notes on the merged system (display only).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -49,7 +49,7 @@ test("Roadmap: a slot appears only when its image loads; labelled; no placeholde
   assert.deepEqual([...r.matchAll(/slug: "([^"]+)",\s*wide: true/g)].map((m) => m[1]), ["topics", "reactions"]);
 });
 
-test("Roadmap (D104): the seven concepts, in Ofri's order and words; the six images are the prototype's, unedited", () => {
+test("Roadmap (D104): the seven concepts, in the author's order and words; the six images are the prototype's, unedited", () => {
   const r = src("app/roadmap/page.tsx");
   const slugs = [...r.matchAll(/slug: "([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(slugs, ["strength-radar", "convergence", "topics", "reactions", "pressure", "emerging", "deal-extraction"]);

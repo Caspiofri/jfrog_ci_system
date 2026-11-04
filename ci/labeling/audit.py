@@ -1,6 +1,6 @@
 """Label audit: does each golden label meet the current standard (rubric v2 plus the fields added since)?
 
-The checks read only Ofri's own label, never a system prediction. `issues` is the one definition of the standard;
+The checks read only the human label, never a system prediction. `issues` is the one definition of the standard;
 the labeling page, its API, this CLI and the golden-set eval all use it.
 
     python -m ci.labeling.audit [--labels evals/golden_set.jsonl]

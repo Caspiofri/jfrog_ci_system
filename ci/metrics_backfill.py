@@ -13,7 +13,7 @@ was added on 31 Oct at 14:32 UTC, after both runs) and the blocks no table keeps
 validation, steps). Nothing is estimated.
 
 Refused: a run that already has a row (never overwritten), a run not in the store, and a run whose Israel date has
-another run in the store or in output/runs (D74: list the run ids, do not choose or merge). Ofri's override, per run:
+another run in the store or in output/runs (D74: list the run ids, do not choose or merge). A manual override, per run:
 --not-this-run names each other run of the date that gets no row; it must name exactly those runs, and they are
 recorded in `reconstructed.other_runs_same_date`. Decided on 3 Nov: 30 Oct belongs to the import 20261030T1312Z-389e71;
 20261030T0836Z-5d06a9, a labelling collection never imported into the store, gets no row. The write is one INSERT into
@@ -63,7 +63,7 @@ def same_day_runs(db: sqlite3.Connection, run: dict, runs_dir: Path) -> list[str
 
 def reconstruct(db: sqlite3.Connection, run_id: str, runs_dir: Path = RUNS_DIR, now: datetime | None = None,
                 not_this_run: dict[str, str] | None = None) -> dict:
-    """not_this_run: {other run id on the same date: why it gets no row}, Ofri's override (D74)."""
+    """not_this_run: {other run id on the same date: why it gets no row}, the reviewer's override (D74)."""
     db.row_factory = sqlite3.Row
     row = db.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
     if row is None:
@@ -124,8 +124,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--run", required=True)
     ap.add_argument("--runs-dir", type=Path, default=RUNS_DIR)
     ap.add_argument("--not-this-run", action="append", default=[], metavar="RUN_ID",
-                    help="another run on the same date that gets no row (Ofri's override, D74)")
-    ap.add_argument("--note", default="never imported into the store; gets no metrics row (Ofri, 3 Nov, D74)",
+                    help="another run on the same date that gets no row (the reviewer's override, D74)")
+    ap.add_argument("--note", default="never imported into the store; gets no metrics row (manual review, 3 Nov, D74)",
                     help="why the --not-this-run runs get no row")
     ap.add_argument("--lock-dir", type=Path, default=None, help="where the collect run lock lives (default: data/ci)")
     ap.add_argument("--write", action="store_true")

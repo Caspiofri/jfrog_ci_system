@@ -1,4 +1,4 @@
-"""Labeling page API: serves a run's packets and writes Ofri's labels to the golden set (PRD D11, D14). No LLM."""
+"""Labeling page API: serves a run's packets and writes manual labels to the golden set (PRD D11, D14). No LLM."""
 import json
 import logging
 import os
@@ -49,7 +49,7 @@ class LabelIn(BaseModel):
     score: int | None = Field(default=None, ge=1, le=5)
     noise: bool = False
     mentions_jfrog: bool = False
-    basis: Literal["full", "partial"]  # did Ofri read the full article, or only part of it, before labeling
+    basis: Literal["full", "partial"]  # did the reviewer read the full article, or only part of it, before labeling
     # the shown text was not the article (boilerplate, nav, another page); category/score/competitor still describe
     # the real article. Old labels without it read back as None.
     bad_extraction: bool | None = None  # None = not answered: stored as False, except where the queue requires it
@@ -162,7 +162,7 @@ def rubric_meanings(path: Path | None = None) -> dict[str, str]:
 
 def blind(item: dict) -> dict:
     """The item without the automatic extraction verdict: a "junk" status shows as full/partial by length, and the
-    detector's reasons are dropped. Ofri's Bad extraction flags measure that detector, so they must not see it."""
+    detector's reasons are dropped. Manual Bad extraction flags measure that detector, so they must not see it."""
     item = {k: v for k, v in item.items() if k != "extraction_reasons"}
     if item.get("text_status") == "junk":
         item["text_status"] = "full" if len(item.get("text") or "") >= FULL_TEXT_MIN_CHARS else "partial"

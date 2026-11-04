@@ -1,4 +1,4 @@
-"""Cross-run relabel queue: Ofri re-reviews older golden labels by hand under rubric v2.
+"""Cross-run relabel queue: the reviewer re-reviews older golden labels by hand under rubric v2.
 
 The queue lists existing labels, not items: every label saved before a cutoff plus named extras, as
 {id, run_id} pairs in a fixed order. Each card's item comes from its own run file, and saves go to that run.
@@ -174,7 +174,7 @@ def main(argv: list[str] | None = None) -> None:
                     help="title (or id:<id>) to put first; repeatable, in order")
     ap.add_argument("--include-title", action="append", default=[], dest="include",
                     help="title (or id:<id>) to add although saved after the cutoff; repeatable")
-    ap.add_argument("--include-reason", default="Ofri asked for it")
+    ap.add_argument("--include-reason", default="requested in a manual review")
     ap.add_argument("--queue-id", default="rubric-v2")
     ap.add_argument("--labels", type=Path, default=EVALS_DIR / "golden_set.jsonl")
     ap.add_argument("--runs-dir", type=Path, default=OUTPUT_DIR / "runs")

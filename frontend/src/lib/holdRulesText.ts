@@ -1,5 +1,5 @@
 // The (i) next to "What needs my decision?" in the Review queue: the routing rules in plain words, from DOC's
-// routing-rules document as Ofri gave it (3 Nov); Mentions JFrog reworded by Ofri at review. Explanations kept verbatim. Keyed by hold-reason code: the name shown
+// routing-rules document as the author gave it (3 Nov); Mentions JFrog reworded by the author at review. Explanations kept verbatim. Keyed by hold-reason code: the name shown
 // is the chip's own label (HOLD_LABEL in format.ts), so each reason has one name across the app. No imports, so `npm test` runs it.
 
 export const HOLD_RULES_INTRO =
