@@ -199,7 +199,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   submission day.
 - **Why:** a reviewer must see the product in one command, without a key. Read-only "does not look good and the
   system cannot really be experienced" (Ofri, 4 Nov); the copy is isolated, so actions cannot pollute measured data.
-- **Considered:** read-only (D110), reversed the same day under a time box with the frozen commit as the fallback.
+- **Considered:** read-only (D110), reversed the same day under a time box with `d4e219b` as the fallback. The final freeze is `fbc9677` (D115).
 - **Conditions:** allowed only with proofs: a guard showing that startup changes 0 rows on the copy, no write
   leaving the copy, live behaviour unchanged, and Health and evaluation numbers reading saved summaries.
 
@@ -221,6 +221,8 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   clean clone, LOCK OK. From then: documents, the repro pack and cleanup that touches nothing measured, each followed
   by tests and lock_check.
 - **Why:** freeze what was checked, on the artifact that will be submitted.
+- **Final freeze (D115):** `fbc9677` (the D113 and D114 display rounds merged), after a Windows check of its bundle.
+  The live API was restarted on it after a backup, with 0 existing rows changed. Only documents change after it.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in ARCHITECTURE.md.
@@ -244,6 +246,8 @@ Each UI round changed display only; nothing measured moved.
 - **D113:** from an outside reader: "Items in this Brief" instead of "Today in numbers" (wrong on a past Brief),
   "Cumulative insights" instead of "Weekly", JFrog vs competitors marked as an interim view, "Checked manually" with
   its date.
+- **D114:** the four "Items in this Brief" tiles share one box so labels and numbers line up; no text or number
+  changed.
 
 ## Stage 2
 

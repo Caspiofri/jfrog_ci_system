@@ -24,9 +24,9 @@ git clone <this repo> jessi && cd jessi
 docker compose up --build
 ```
 
-Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
+This README describes the frozen commit `fbc9677` (D115). Open **http://127.0.0.1:3000**. The API is on http://127.0.0.1:8011/api/v1 (contract: `docs/api-contract.md`).
 
-- The first build takes a few minutes: 7:21 min on the Windows clean clone of the frozen commit.
+- The first build takes a few minutes: 7:21 min on a Windows clean clone of `d4e219b`, the earlier freeze.
 - No `.env` and no key are needed. The demo calls no model.
 - On Windows the image user defaults to uid 1000. If you set it anyway, in CMD it is `set APP_UID=1000`, in
   PowerShell `$env:APP_UID=1000`.
@@ -209,7 +209,7 @@ the eval numbers from saved reports with no model call: `python -m ci.repro reco
 | | Empty cells where the information exists on another page | 7 | 49 | All cells | D95 |
 | | Stored quotes found on the page (not a check of the value) | 32 of 32 | 32 | Audit | D88 |
 | **Mechanical** | Rendered prompts changed by the injection fix | 0 differences | 1,374 prompts | 351 items, 107 golden rows | D57 |
-| | Writable demo vs frozen commit, live-store copy | 1 difference (`demo_writable` in /meta) | 589 responses | Before merge | 14:10 handoff |
+| | Writable demo (`d6fdeed`) vs the read-only demo (`d4e219b`), live-store copy | 1 difference (`demo_writable` in /meta) | 589 responses | Before merge | 14:10 handoff |
 
 **Held-out check: 3 of 4 events captured (n = 4, weekend, no 4+ event), indication only.** (D103) The list came from
 a web search and has no 4+ event, so it says nothing about important events. The missed event (VOLTA) was not covered
@@ -231,7 +231,7 @@ not part of. The lens shows the same split. The UI says so, and nothing was tune
 
 **Fingerprints of the measured system.** classify_rank `99b79890ceea` (the eval report shows `9c39b7d25f65` because
 it also hashes one mention side file; both are quoted), portable `e04716a2a1d6`, lens `1692c04ba7df`, insights
-`e99d23e4edcf`, capability sheet `e7f13e0b3456`; `gemini-3.6-flash`, temperature 0 (D67). In a clean clone the legacy
+`e99d23e4edcf`, capability sheet `e7f13e0b3456`; `gemini-3.6-flash`, temperature 0; measured on `ae8fbb5` (D67). In a clean clone the legacy
 classify_rank differs, because it hashes absolute paths; the portable fingerprint is the one that matches (D59).
 
 **Process notes a reviewer may ask about.**
@@ -241,7 +241,7 @@ classify_rank differs, because it hashes absolute paths; the portable fingerprin
 - Not measured: ranking precision@k (not in this harness) and the faithfulness judge (D17, not built).
 - All marks are by one labeler.
 
-**Tests.** 1,239 Python tests and 270 frontend tests pass at `d6fdeed` (BE, 4 Nov 16:31). [TODO BE: update for the
+**Tests.** 1,239 Python tests and 275 frontend tests pass at `fbc9677` (BE, 4 Nov 19:33). [TODO BE: update for the
 final commit.]
 
 ## Pitfalls and known limits
