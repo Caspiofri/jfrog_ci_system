@@ -4,8 +4,8 @@
 
 Jessi is JFrog's Engine for Strategic Signals & Intelligence (D46).
 
-The CI tool's web UI: Next.js + Tailwind + shadcn/ui + Recharts (D3). Every number comes from the CI API
-(`docs/plans/2026-10-31-api-contract.md`); no screen has sample data except the Roadmap tab.
+The CI tool's web UI: Next.js + Tailwind + shadcn/ui + Recharts (D3). Every number comes from the CI API;
+no screen has sample data except the Roadmap tab.
 
 ## Run (dev)
 

@@ -86,7 +86,7 @@ reopening of an item dismissed by mistake (D62).
 | 2 Nov | 20261102T0400Z-bed018 | ok | 13 | 1 | 5 |
 | 3 Nov | 20261103T0400Z-d03c41 | ok | 44 | 7 | 25 |
 | 4 Nov | 20261104T0400Z-20da28 | ok | 46 | 15 | 19 |
-| 5 Nov | [added Thu 5 Nov, after the 06:00 run] | | | | |
+| 5 Nov | 20261105T0400Z-8228e6 | ok | 28 | 8 | 13 |
 
 - 30 and 31 Oct rows are reconstructed once from the per-item log, marked "Reconstructed from the item log" on
   screen, and leave empty what the stored items cannot prove (D74). Published and held are empty there because
