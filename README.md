@@ -5,8 +5,8 @@ every day on what six competitors (Cloudsmith, Sonatype, GitHub, GitLab, Snyk, A
 say, and shows how JFrog compares. It is a GenAI pipeline with fixed steps, validation and human review. Every item
 and every insight links to its source, and every number in this README is reported with its n.
 
-![Daily Brief](docs/screenshots/brief.png)
-*Live, 5 Nov. Daily Brief: insights, then the items cleared since the previous Brief.*
+![Daily Brief](docs/screenshots/brief-top.png)
+*Live, 5 Nov. Daily Brief: counts, AI-generated insights with their sources, then the cleared items.*
 
 **Video:** https://www.youtube.com/watch?v=Qmr7043pfQE
 
@@ -163,6 +163,9 @@ system accurate and measurable (D15, D21).
 | **Log** | What was collected, and where did it stop? | Every collected item, dropped ones included, with status, reason and the stage it stopped at (D21) |
 | **Health** | Does the system work? | Run history, the funnel, extraction per source, the test-split eval and held-out coverage, each with n and "Measured on" (D48, D80, D83) |
 | **Roadmap** | What comes next? | 7 concept images, each labelled "Concept, sample data" (D105) |
+
+![Daily Brief](docs/screenshots/brief.png)
+*Live, 5 Nov. Cleared items in the Brief, including one approved by an analyst.*
 
 ![Competitors](docs/screenshots/competitors.png)
 *Live, 5 Nov. Items cleared per competitor and category.*
