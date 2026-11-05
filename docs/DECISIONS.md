@@ -42,7 +42,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 - **Why:** reviewing every item burns analyst time; publishing everything risks wrong claims. Autonomy is earned:
   start strict, relax as measured precision rises. At Strict the 14-day import held a median 2.5 items a day (max 24,
   n = 228 non-noise items over 14 days), so Strict is affordable.
-- **Considered:** a confidence slider. Rejected: classifier confidence takes only four values and rule-settled items
+- **Considered:** a confidence slider. Rejected: on the 14-day import, classifier confidence took only four values and rule-settled items
   sit at a fixed 0.85, so a slider mostly toggled the rule items.
 - **Open:** the default level is a question for the hiring manager.
 
@@ -78,7 +78,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 - **Considered:** Noise counted as 1 (D28), reversed by D29.
 
 **Model split: Gemini writes and ranks (D5, corrected by D116 and D117).**
-- **Why:** already proven in the newsletter agent; a judge from another family does not grade its own work.
+- **Why:** already proven in the newsletter agent.
 - **Corrected:** D5 said Bedrock or an LLM gateway is a config change for production. The AWS design (D116) finds a
   switch touches four files, and D117 replaces D5's future infra list with D116's growth triggers: no Kubernetes,
   queues or workers.
@@ -89,7 +89,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   demo.
 - **Corrected:** D3 said "FastAPI over the LangGraph pipeline". The `ci/` pipeline is plain Python: `run_daily()`
   calls the steps in order, with thread pools during collection. LangGraph is imported only in `modules/graph.py`,
-  used by the legacy newsletter path (checked on `fbc9677`, D117). No reason for building it this way is recorded.
+  used by the legacy newsletter path (checked on `fbc9677`, D117).
 
 ## The JFrog comparison
 
@@ -107,8 +107,8 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   it (D57, D58).
 
 **Head-to-head values stay, captioned as unverified (D87, D88, D95).**
-- **What:** values extracted by an AI model from linked public pages, shown with a caption that no person reviewed
-  them and that the evaluation does not cover them. One manual check on 3 Nov: 38 of 42 values correct, 2 partial,
+- **What:** values extracted by an AI model from linked public pages, shown with a caption that they have no
+  automatic verification or evaluation. One manual check on 3 Nov: 38 of 42 values correct, 2 partial,
   2 wrong; 7 of 49 cells empty where the information exists elsewhere.
 - **Why:** the gap was verification, not provenance: the values come from a real running pipeline. Stating the gap
   keeps the comparison the brief asks for and stays honest.
@@ -181,7 +181,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 ## Evaluation
 
 **Tune on train, report test, once (D17, D23, D66).**
-- **What:** a 60-item golden set with deliberate noise, a 75/25 split locked per story, every test run fingerprinted.
+- **What:** a 107-item golden set with deliberate noise, a 75/25 split locked per story, every test run fingerprinted.
   The test split ran once on the locked code; it is now spent.
 - **Why:** tuning never sees the test set, and the fingerprint proves it.
 - **Deviation, stated:** the test eval ran before the second daily check was marked. Decided before any result was
@@ -209,8 +209,8 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 - **What:** the 1 Nov 2026 Brief, with the two analyst actions made later kept and dated. Each start copies the
   snapshot; actions write only there and reset on restart. Insights are frozen. The README lists the real runs up to
   submission day.
-- **Why:** a reviewer must see the product in one command, without a key. Read-only "does not look good and the
-  system cannot really be experienced" (the author, 4 Nov); the copy is isolated, so actions cannot pollute measured data.
+- **Why:** a reviewer must see the product in one command, without a key. Read-only stops a reviewer from trying the
+  analyst workflow; the copy is isolated, so actions cannot pollute measured data.
 - **Considered:** read-only (D110).
 - **Conditions:** allowed only with proofs: a guard showing that startup changes 0 rows on the copy, no write
   leaving the copy, live behaviour unchanged, and Health and evaluation numbers reading saved summaries.
@@ -249,20 +249,18 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   Deploy: build once, scan with Xray, push to Artifactory, the server pulls and runs. Cutover after a 7-day shadow
   run, with the Pi kept as rollback for one more week. RDS when more than one API instance or a smaller loss window
   is needed.
-- **Why:** each service carries what it does and why it beat the simpler option, so every choice can be defended in
-  plain words. Artifactory and Xray follow from the requirement that everything running has been scanned; this has
+- **Why:** each service carries what it does and why it beat the simpler option.
+  Artifactory and Xray follow from the requirement that everything running has been scanned; this has
   not been built for Jessi, and the scan and push were run in Stage 2 on the forked app.
 - **Stated openly:** about one hour of possible loss, and the single instance is a single point of failure. Size S
   needs the configuration and script changes listed in ARCHITECTURE.md, none built. The cost of about $125 a month is
   an unverified estimate. Running the design against the code showed that "no change to the app code" was not true as
   first written, so the list states the real changes.
-- **Considered:** Kubernetes, ECS and Step Functions; left out because they could not be defended.
-- **Renamed:** in the approved design, "step 1" is now "Size S" under "Moving to production", and "step 2" is
-  "Size M"; the design adds sizes S, M and L and "Serving more teams" (ARCHITECTURE.md).
+- **Considered:** Kubernetes, ECS and Step Functions; left out because this workload does not justify them.
 
 **Product name Jessi (D46).** JFrog's Engine for Strategic Signals & Intelligence.
 
-**The video is recorded on the live system (D119).** Its one approved item comes from the Thu 5 Nov run, which is in no measurement.
+**The video's live parts use the live system (D119).** Its one approved item comes from the Thu 5 Nov run, which is in no measurement.
 
 **Jessi is a GenAI pipeline, not an agent (D118).**
 - **What:** fixed steps, validation and human review. The
