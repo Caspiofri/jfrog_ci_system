@@ -181,7 +181,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 ## Evaluation
 
 **Tune on train, report test, once (D17, D23, D66).**
-- **What:** a 107-item golden set with deliberate noise, a 75/25 split locked per story, every test run fingerprinted.
+- **What:** a 107-item golden set with deliberate noise, a split locked per story (78 train, 29 test), every test run fingerprinted.
   The test split ran once on the locked code; it is now spent.
 - **Why:** tuning never sees the test set, and the fingerprint proves it.
 - **Deviation, stated:** the test eval ran before the second daily check was marked. Decided before any result was

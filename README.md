@@ -8,7 +8,7 @@ and every insight links to its source, and every number in this README is report
 ![Daily Brief](docs/screenshots/brief.png)
 *live (5 Nov)*
 
-**Video:** [placeholder: demo video link]
+**Video:** https://www.youtube.com/watch?v=Qmr7043pfQE
 
 Contents: [Run the demo](#run-the-demo-no-api-key) · [The writable demo](#the-writable-demo-and-how-it-resets) ·
 [Frozen insights](#insights-are-frozen-in-the-demo) · [Snapshot and live system](#the-demo-is-a-snapshot-the-live-system-keeps-running) ·
