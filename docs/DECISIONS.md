@@ -1,10 +1,7 @@
 # Decisions
 
-The main design decisions behind Jessi, each with what was decided, why, and what else was considered. The full log
-(D1 to D128, newest first, with dates) is the PRD's decision log; numbers here are copied from it. IDs match the PRD,
-so a reader can look each one up.
-
-BE is the coding agent that ran the checks and reported these results.
+The main design decisions behind Jessi, each with what was decided, why, and what else was considered.
+IDs refer to the project's internal decision log, which is not in this repo.
 
 Sections: [Product](#product) · [Routing and analyst actions](#routing-and-analyst-actions) ·
 [Classification and scoring](#classification-and-scoring) · [The JFrog comparison](#the-jfrog-comparison) ·
@@ -45,7 +42,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 - **Why:** reviewing every item burns analyst time; publishing everything risks wrong claims. Autonomy is earned:
   start strict, relax as measured precision rises. At Strict the 14-day import held a median 2.5 items a day (max 24,
   n = 228 non-noise items over 14 days), so Strict is affordable.
-- **Considered:** a confidence slider. Rejected: classifier confidence takes only four values and rule-settled items
+- **Considered:** a confidence slider. Rejected: on the 14-day import, classifier confidence took only four values and rule-settled items
   sit at a fixed 0.85, so a slider mostly toggled the rule items.
 - **Open:** the default level is a question for the hiring manager.
 
@@ -80,8 +77,8 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   feed vs keep in the competitor's timeline. Fewer levels label more consistently than a 0-10 scale (D14).
 - **Considered:** Noise counted as 1 (D28), reversed by D29.
 
-**Model split: Gemini writes and ranks, Claude judges (D5, corrected by D116 and D117).**
-- **Why:** already proven in the origin project; a judge from another family does not grade its own work.
+**Model split: Gemini writes and ranks (D5, corrected by D116 and D117).**
+- **Why:** already proven in the newsletter agent.
 - **Corrected:** D5 said Bedrock or an LLM gateway is a config change for production. The AWS design (D116) finds a
   switch touches four files, and D117 replaces D5's future infra list with D116's growth triggers: no Kubernetes,
   queues or workers.
@@ -92,7 +89,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   demo.
 - **Corrected:** D3 said "FastAPI over the LangGraph pipeline". The `ci/` pipeline is plain Python: `run_daily()`
   calls the steps in order, with thread pools during collection. LangGraph is imported only in `modules/graph.py`,
-  used by the legacy newsletter path (per BE on `fbc9677`, D117). No reason for building it this way is recorded.
+  used by the legacy newsletter path (checked on `fbc9677`, D117).
 
 ## The JFrog comparison
 
@@ -110,8 +107,8 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   it (D57, D58).
 
 **Head-to-head values stay, captioned as unverified (D87, D88, D95).**
-- **What:** values extracted by an AI model from linked public pages, shown with a caption that no person reviewed
-  them and that the evaluation does not cover them. One manual check on 3 Nov: 38 of 42 values correct, 2 partial,
+- **What:** values extracted by an AI model from linked public pages, shown with a caption that they have no
+  automatic verification or evaluation. One manual check on 3 Nov: 38 of 42 values correct, 2 partial,
   2 wrong; 7 of 49 cells empty where the information exists elsewhere.
 - **Why:** the gap was verification, not provenance: the values come from a real running pipeline. Stating the gap
   keeps the comparison the brief asks for and stays honest.
@@ -125,7 +122,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   HTML escaping in the UI; insight citations checked against the stored text. Synthetic poisoned articles are pinned
   as regression tests.
 - **Why:** pages we do not control feed the LLM, and a page can hide instructions that inflate a score or plant a
-  false claim. JFrog sells AI-agent security, so this will come up. The LLM has no tools, so the worst case is wrong
+  false claim. The LLM has no tools, so the worst case is wrong
   output, not an action; review routing is the backstop.
 - **Stated openly:** the quote check proves a quote exists in the stored text, not that it is true, so a planted
   sentence passes it. The problem is narrowed, not solved.
@@ -179,13 +176,12 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   hover.
 - **Why:** insights are what turns a news feed into intelligence. Leading with the least reliable part is acceptable
   only because the screen says how far to trust it.
-- **Considered:** an "Experimental" label. Removed: it read as "not reliable" for the whole section, more than 11 of
-  12 supported claims shows.
+- **Considered:** an "Experimental" label (D61), replaced by the AI-generated label (D73).
 
 ## Evaluation
 
 **Tune on train, report test, once (D17, D23, D66).**
-- **What:** a 60-item golden set with deliberate noise, a 75/25 split locked per story, every test run fingerprinted.
+- **What:** a 107-item golden set with deliberate noise, a split locked per story (78 train, 29 test), every test run fingerprinted.
   The test split ran once on the locked code; it is now spent.
 - **Why:** tuning never sees the test set, and the fingerprint proves it.
 - **Deviation, stated:** the test eval ran before the second daily check was marked. Decided before any result was
@@ -204,7 +200,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 
 **Everything measured stays what was measured (D99).**
 - **What:** from 3 Nov, prompts, rules, rubric, labels, stored rows, eval reports and the demo snapshot are frozen.
-  Each exception is a named decision with a proof (D107, D111).
+  Each exception is a named decision with a proof.
 - **Why:** a change after measurement leaves every reported number describing an older version.
 
 ## Demo and delivery
@@ -213,17 +209,16 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 - **What:** the 1 Nov 2026 Brief, with the two analyst actions made later kept and dated. Each start copies the
   snapshot; actions write only there and reset on restart. Insights are frozen. The README lists the real runs up to
   submission day.
-- **Why:** a reviewer must see the product in one command, without a key. Read-only "does not look good and the
-  system cannot really be experienced" (the author, 4 Nov); the copy is isolated, so actions cannot pollute measured data.
-- **Considered:** read-only (D110), reversed the same day under a time box with `d4e219b` as the fallback. It was frozen at `fbc9677` (D115).
+- **Why:** a reviewer must see the product in one command, without a key. Read-only stops a reviewer from trying the
+  analyst workflow; the copy is isolated, so actions cannot pollute measured data.
+- **Considered:** read-only (D110).
 - **Conditions:** allowed only with proofs: a guard showing that startup changes 0 rows on the copy, no write
   leaving the copy, live behaviour unchanged, and Health and evaluation numbers reading saved summaries.
 
 **Build first, then verify the exact system that is submitted (D47, D57).**
-- **What:** build days ended with a code freeze, a clean-clone test and a demo snapshot freeze. After that: fixes
-  found in verification, docs, screenshots and video. No new features, and no change to classify, rank, lens or
-  insights prompts and rules.
-- **Why:** with the test eval one day away, finishing and verifying was worth more than any further change.
+- **What:** build days ended with a code freeze, a clean-clone test and a demo snapshot freeze. After that: no
+  change to classify, rank, lens or insights prompts and rules.
+- **Why:** finishing and verifying was worth more than any further change.
 
 **A portable fingerprint beside the legacy one (D59).**
 - **What:** the legacy classify_rank fingerprint hashes absolute paths, so a fresh clone gets a different value. A
@@ -234,15 +229,13 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 
 **Freeze at a checked commit (D109).**
 - **What:** tagged after every planned check passed on the bundle a reviewer would clone: review actions, a Windows
-  clean clone, LOCK OK. From then: documents, the repro pack and cleanup that touches nothing measured, each followed
-  by tests and lock_check.
+  clean clone, fingerprints unchanged.
 - **Why:** freeze what was checked, on the artifact that will be submitted.
-- **Cleanup (D120):** personal details and local paths were removed from the current published files where no frozen file changes. Frozen and measured files and git history were left as they are.
-- **Next.js upgrade (D123, D124):** `jf audit` found 3 Applicable findings in next 15.5.4, one of them Critical. We made one exception to the code freeze and upgraded next to 15.5.28, which also closes the next findings the scanner could not decide on. Only `frontend/package.json` and `frontend/package-lock.json` changed, and nothing fingerprinted.
+- **Next.js upgrade (D123, D124):** `jf audit` found 3 Applicable findings in next 15.5.4, one of them Critical. We made an exception to the code freeze and upgraded next to 15.5.28, which also closes the next findings the scanner could not decide on. Only `frontend/package.json` and `frontend/package-lock.json` changed, and nothing fingerprinted.
   - **Why:** the UI binds to 127.0.0.1, so the practical risk today is low, but the production design exposes it behind an ALB.
 - **UI base image (D125):** we moved the UI image from node:22-slim to node:22-trixie-slim, changing only `docker/ui.Dockerfile`. Findings in the UI image: Critical 4 to 1, High 75 to 87, total 257 to 227, Applicable 4 to 2, with 18 new finding IDs.
   - **Why:** it removes two Applicable system-package findings, including a Critical one, at the cost of more High findings. The API image already uses the same Debian release, and the client files are identical.
-- **Final code freeze (D128):** `22b45b6`, tag `freeze-20261105`, a normal merge of `4a82f28`, with an identical tree. 1,239 pytest and 275 frontend tests pass; LOCK OK with classify_rank `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences. The Windows check of `4a82f28` passed. Earlier freezes: `fbc9677` (D115), `017e26b` (D122), `f73b549` (D127). Only documents change from here.
+- **Final code freeze (D128):** `22b45b6`, tag `freeze-20261105`, a normal merge of `4a82f28`, with an identical tree. 1,239 pytest and 275 frontend tests pass; fingerprints unchanged, classify_rank `99b79890ceea`; 7 snapshot files identical; repro recomputes with 0 differences. The Windows clean clone of `4a82f28` passed. Earlier freezes: `fbc9677` (D115), `017e26b` (D122), `f73b549` (D127). Only documents change from here.
 
 **No AWS for the submission (D4).**
 - **Why:** credentials block reviewers from running it. The production design is in
@@ -256,46 +249,25 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
   Deploy: build once, scan with Xray, push to Artifactory, the server pulls and runs. Cutover after a 7-day shadow
   run, with the Pi kept as rollback for one more week. RDS when more than one API instance or a smaller loss window
   is needed.
-- **Why:** each service carries what it does and why it beat the simpler option, so every choice can be defended in
-  plain words. Artifactory and Xray follow from the requirement that everything running has been scanned; this has
+- **Why:** each service carries what it does and why it beat the simpler option.
+  Artifactory and Xray follow from the requirement that everything running has been scanned; this has
   not been built for Jessi, and the scan and push were run in Stage 2 on the forked app.
 - **Stated openly:** about one hour of possible loss, and the single instance is a single point of failure. Size S
   needs the configuration and script changes listed in ARCHITECTURE.md, none built. The cost of about $125 a month is
   an unverified estimate. Running the design against the code showed that "no change to the app code" was not true as
   first written, so the list states the real changes.
-- **Considered:** Kubernetes, ECS and Step Functions; left out because they could not be defended.
-- **Renamed:** in the approved design, "step 1" is now "Size S" under "Moving to production", and "step 2" is
-  "Size M"; the design adds sizes S, M and L and "Serving more teams" (ARCHITECTURE.md).
+- **Considered:** Kubernetes, ECS and Step Functions; left out because this workload does not justify them.
 
 **Product name Jessi (D46).** JFrog's Engine for Strategic Signals & Intelligence.
 
-**The documents describe what was built (D117).**
-- **What:** the documents state that `ci/` is plain Python and does not use LangGraph, and the future infra list
-  follows D116's growth triggers.
-- **Why:** a reviewer opening the code would see that the earlier claim was false. Neither git nor the docs record
-  why `ci/` was built without LangGraph, so no reason is stated.
-
-**Video on Thu 5 Nov at 08:00, submission after it (D119).**
-- **What:** the evening before submission: documents, the docs-only merge, a last clean clone and a push with the repo still Private.
-  Thu: check the 06:00 run, back up, record the video on the live system, add the video link and the 5 Nov run row
-  (docs only), a last clean clone, push without force, make the repo Public, run the final check, send both links.
-  The one approved item in the video comes from the Thu 5 Nov run, which is in no measurement (updates D106).
-- **Why:** recording tomorrow shows the first 06:00 run on the frozen commit and leaves Thursday with only the video
-  and the submission. A Private push that evening keeps a safe copy on GitHub.
+**The video's live parts use the live system (D119, D129).** They include a flag, a score edit and an approval on one item, and a dismissal on another, all from the Thu 5 Nov run, which is in no measurement.
 
 **Jessi is a GenAI pipeline, not an agent (D118).**
-- **What:** fixed steps, validation and human review. The freeze stays, and the submission goes ahead as built. The
+- **What:** fixed steps, validation and human review. The
   documents say what was reused from the newsletter agent: code and ideas, not the LangGraph orchestration.
 - **Future, not built:** add agents for small, bounded processes inside the pipeline.
 - **Why:** the brief asks for a working GenAI tool, not an agent. Moving to an agent now would reopen the freeze, and
   the checks would no longer describe what is submitted.
-
-**The README states a vision, not built and with no date (D126).**
-- **What:** from a daily feed to an analysis partner: a chat assistant for analysts that uses the collected items,
-  citations and JFrog comparison. The first step is to learn the analysts' pain points; the assistant also needs
-  protection against prompt injection. No screen or code change.
-- **Why:** the submission should not read as if the system stays as it is. No analysts have been interviewed, so
-  the direction is stated as a vision, not as a validated need.
 
 ## Screens
 

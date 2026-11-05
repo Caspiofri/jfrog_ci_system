@@ -2,12 +2,12 @@
 
 Two parts:
 
-1. **[How Jessi works today](#part-1-how-jessi-works-today)**: what runs now, from the code and the PRD.
+1. **[How Jessi works today](#part-1-how-jessi-works-today)**: what runs now, from the code.
    **Runs today.**
 2. **[Production on AWS](#part-2-production-on-aws)**: a design only. **None of it is built or tested for Jessi.**
    The submission runs on one Raspberry Pi and with `docker compose up --build`.
 
-Decision IDs (Dnn) refer to [DECISIONS.md](DECISIONS.md) and the PRD's decision log.
+Decision IDs (Dnn) refer to [DECISIONS.md](DECISIONS.md) and the project's internal decision log, which is not in this repo.
 
 ---
 
@@ -84,11 +84,11 @@ the hold reasons and the current autonomy level (`ci/route.py`); analyst decisio
 | Pipeline | Plain Python: `run_daily()` calls the steps in order, collect → dedupe → full text → classify (rules first, then Gemini Flash) → rank → route → JFrog lens → insights. Collection uses thread pools. It does not use LangGraph | D5, D25, D117 |
 | One run at a time | A file lock per job (`ci/runlock.py`) | — |
 | Store | SQLite files on the Pi's disk: `ci.sqlite`, `changes.sqlite`, `seen_urls.sqlite`. ChromaDB, also on disk, holds the dedupe embeddings and is used only by the run, never by the API | D6 |
-| Live API and UI | They run outside Docker: `python -m ci.api --port 8011` and `next start` on port 3017, both on 127.0.0.1 | D3 |
+| Live API and UI | They run outside Docker: `python -m ci.api --port 8011` and `next start` on port 3018, both on 127.0.0.1 | D3 |
 | Demo | `docker compose up` serves a frozen snapshot with no API key. Actions write to a temporary copy. The Compose `api` and `ui` services are demo-only | D2, D111 |
 | Access | SSH tunnel or Tailscale. No user login | — |
 | Safety on the API | The API accepts only known Host names (`TrustedHostMiddleware`, against DNS rebinding) and refuses cross-site writes (CSRF guard). Both live in `ci/csrf.py` | D59 |
-| Backups | A file copy before any write to the live store | — |
+| Backups | A backup copy before a manual write to the live store | — |
 | LLM keys | In `.env` on the Pi | — |
 
 Limits of this setup: it is one machine, and a missed run alerts nobody. It shows on the Health page only when someone opens it.
@@ -96,7 +96,7 @@ Limits of this setup: it is one machine, and a missed run alerts nobody. It show
 ### 1.3 Data model
 
 Three SQLite files under `data/ci/`, plus ChromaDB for dedupe embeddings. Table names and columns are from the
-stores' schemas; per BE on 4 Nov, the live `ci.sqlite` has 14 tables and 1,916 rows, and `changes.sqlite` 5 tables
+stores' schemas; checked on 4 Nov, the live `ci.sqlite` has 14 tables and 1,916 rows, and `changes.sqlite` 5 tables
 and 114 rows (D115).
 
 **`ci.sqlite`: items and everything decided about them**
@@ -114,7 +114,7 @@ and 114 rows (D115).
 | `lens` | item × run | status (ok, rejected, failed), axis, capability quote, relation, why, reason |
 | `insights` | generation | Brief date, trigger (daily or refresh), level, status, fingerprint, model, the insights and their window. Every generation is kept; the latest is shown |
 | `item_state` | item | the analyst's decision (approved, dismissed), the flag, edits to competitor, category or score. Routing is derived; this only overrides it |
-| `analyst_actions` | action | append-only history: approve, dismiss, edit, flag, unflag, trust, untrust, with before and after values (D62) |
+| `analyst_actions` | action | append-only history: approve, dismiss, reopen, edit, flag, unflag, trust, untrust, with before and after values (D62) |
 | `trusted_sources` | host | sources an analyst trusted, on top of `config/vetted_sources.yaml` (D34) |
 | `settings` | key | the autonomy level, `insights_enabled` |
 
@@ -138,15 +138,14 @@ lens and insights quote), `vetted_sources.yaml`, `tracked_pages.yaml`, `brief.ya
 ## Part 2. Production on AWS
 
 > **Status. Design only: none of it is built or tested for Jessi.** The submission runs on the Pi and with
-> `docker compose up --build`. Source: the approved AWS production design (D116). Section 1 of that design, what
-> runs today, is in Part 1 above; sections 2 to 7 follow here with their numbers.
+> `docker compose up --build`. Source: the production design decision (D116).
 
 Jessi's workload is small. The source for every number in this paragraph is `run_metrics` in the live store (`data/ci/ci.sqlite`), read on 4 Nov 2026.
 
 - **Run size.** A daily run collected 237–258 items, and 13–46 of them were new and sent to the model (n = 5 daily runs, 31 Oct to 4 Nov).
-- **LLM calls.** Gemini calls per run, as counted by `CountingLLM` in `ci/daily.py`, were 5–13 (n = 4, 1 to 4 Nov; the 31 Oct run did not record the count). Claude judge calls, if any, are not in that count.
+- **LLM calls.** Gemini calls per run, as counted by `CountingLLM` in `ci/daily.py`, were 5–13 (n = 4, 1 to 4 Nov; the 31 Oct run did not record the count).
 - **Run time.** A run took 2.7–6.2 minutes from start to finish (n = 5).
-- **A fresh store is much heavier.** The first import sent 256 items to the model, against 13–46 on a normal day. That run did not record its LLM calls, and its 24-hour span between start and finish is not a run time. A clean clone on 4 Nov collected 169 items and stored 135, and with no key it wrote fallback rows for 128 of them (per BE, 19:52). That no-key run counted 37 attempted LLM calls (n = 1). None of them reached a model API, so they are attempts, not real calls, but they show the scale against 5–13 on a normal day. So a first run on an empty store sends several times more items to the model, and makes several times more calls, than a normal day.
+- **A fresh store is much heavier.** The first import sent 256 items to the model, against 13–46 on a normal day. That run did not record its LLM calls, and its 24-hour span between start and finish is not a run time. A clean clone on 4 Nov collected 169 items and stored 135, and with no key it wrote fallback rows for 128 of them. That no-key run counted 37 attempted LLM calls (n = 1). None of them reached a model API, so they are attempts, not real calls, but they show the scale against 5–13 on a normal day. So a first run on an empty store sends several times more items to the model, and makes several times more calls, than a normal day.
 
 So size S, the first production deployment, moves today's stack onto one EC2 instance and changes no Python or frontend code, as far as checked. It does need the configuration and script changes listed in section 2.1. Each later step starts when a stated trigger is reached.
 
@@ -164,7 +163,7 @@ flowchart LR
     NAT[NAT gateway<br/>one fixed outbound address]
   end
   ALB -->|port 3000, UI only| EC2
-  EC2 --> NAT --> WEB[(Public sources,<br/>Gemini and Claude APIs)]
+  EC2 --> NAT --> WEB[(Public sources,<br/>Gemini API)]
   PS[SSM Parameter Store<br/>API keys] --> EC2
   BK[AWS Backup<br/>hourly disk snapshot] --> EC2
   EC2 -->|run metric| CW[CloudWatch alarm] --> SNS[SNS email to the team]
@@ -206,7 +205,7 @@ Not covered by size S: the app has no users, so even behind a login, the Log doe
 | Backup | **AWS Backup** | **What it does:** it runs a backup plan that takes a snapshot of the whole disk every hour and deletes old ones. A snapshot is a full copy of the disk at that moment, so SQLite, ChromaDB and the run files are all covered. **Why:** the simpler option is a cron line that calls the snapshot command, but that is code we own, and it stops if the instance dies. In size M the same plan can back up RDS. A snapshot of a running disk behaves like a sudden power cut, and SQLite is built to recover from that |
 | Alerts | **CloudWatch** alarm, then **SNS** email | A run that starts and fails alerts at once, through its own failure metric. A degraded run (exit 3) alerts the same way, because a degraded morning means a Brief built partly on fallback rows. A second alarm fires when the success metric has been missing for 26 hours, meaning a run never started or never finished. That alarm also covers the whole instance going down. Design only: the metric is not sent today |
 | Deploy | Build once, scan with **Xray**, push to **Artifactory**, then the server pulls the image and runs it | Requirement: everything running in production has been scanned. Choice: Artifactory and Xray rather than ECR, because the scan and the registry sit on one platform. This is a design and has not been built for Jessi. The scan and push steps were run in Stage 2 on the forked app. Jessi's submission runs with `docker compose up --build` |
-| LLM | Direct API calls to Gemini and Claude, as today | See section 4 |
+| LLM | Direct API calls to Gemini, as today | See section 4 |
 | Region | JFrog's standard | The region follows where JFrog's other internal tools run, data-residency rules, and which Bedrock models are available there |
 
 **Stated openly:**
@@ -245,7 +244,7 @@ Section 5 turns these triggers into three sizes.
 
 **Not built:** add agents for small, bounded processes inside the pipeline (D118).
 
-Left out of the design: Kubernetes, ECS and Step Functions, because they could not be defended for this workload
+Left out of the design: Kubernetes, ECS and Step Functions, because this workload does not justify them
 (D116).
 
 ### 5. Sizes S, M and L (design only, not built)

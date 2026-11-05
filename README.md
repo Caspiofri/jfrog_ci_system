@@ -5,9 +5,10 @@ every day on what six competitors (Cloudsmith, Sonatype, GitHub, GitLab, Snyk, A
 say, and shows how JFrog compares. It is a GenAI pipeline with fixed steps, validation and human review. Every item
 and every insight links to its source, and every number in this README is reported with its n.
 
-[Screenshot placeholder: Daily Brief, top of the page — `docs/screenshots/brief.png`]
+![Daily Brief](docs/screenshots/brief.png)
+*live (5 Nov)*
 
-**Video:** [placeholder: demo video link]
+**Video:** https://www.youtube.com/watch?v=Qmr7043pfQE
 
 Contents: [Run the demo](#run-the-demo-no-api-key) · [The writable demo](#the-writable-demo-and-how-it-resets) ·
 [Frozen insights](#insights-are-frozen-in-the-demo) · [Snapshot and live system](#the-demo-is-a-snapshot-the-live-system-keeps-running) ·
@@ -86,13 +87,13 @@ reopening of an item dismissed by mistake (D62).
 | 2 Nov | 20261102T0400Z-bed018 | ok | 13 | 1 | 5 |
 | 3 Nov | 20261103T0400Z-d03c41 | ok | 44 | 7 | 25 |
 | 4 Nov | 20261104T0400Z-20da28 | ok | 46 | 15 | 19 |
-| 5 Nov | [added Thu 5 Nov, after the 06:00 run] | | | | |
+| 5 Nov | 20261105T0400Z-8228e6 | ok | 28 | 8 | 13 |
 
 - 30 and 31 Oct rows are reconstructed once from the per-item log, marked "Reconstructed from the item log" on
   screen, and leave empty what the stored items cannot prove (D74). Published and held are empty there because
   routing did not exist at those runs.
 - 1 Nov: 239 fetched, 11 removed as noise. 2 Nov: 237 fetched, 7 removed as noise (D74).
-- 3 and 4 Nov: published and held are run-time values.
+- 3 to 5 Nov: published and held are run-time values.
 - 1 Nov: at run time 3 items were published and 12 held at Strict; an analyst approved 1 held item afterwards, so
   the Brief shows 4 published and 11 held (D69).
 - 30 Oct had two collections: the 14-day import `389e71` that entered the product, and a 7-day labelling collection
@@ -163,15 +164,29 @@ system accurate and measurable (D15, D21).
 | **Health** | Does the system work? | Run history, the funnel, extraction per source, the test-split eval and held-out coverage, each with n and "Measured on" (D48, D80, D83) |
 | **Roadmap** | What comes next? | 7 concept images, each labelled "Concept, sample data" (D105) |
 
-[Screenshot placeholder: Competitors — `docs/screenshots/competitors.png`]
+![Competitors](docs/screenshots/competitors.png)
+*live (5 Nov)*
 
-[Screenshot placeholder: Review queue — `docs/screenshots/review.png`]
+![competitors-comparison](docs/screenshots/competitors-comparison.png)
+*live (5 Nov)*
 
-[Screenshot placeholder: Log — `docs/screenshots/log.png`]
+![competitor-profile](docs/screenshots/competitor-profile.png)
+*live (5 Nov)*
 
-[Screenshot placeholder: Health — `docs/screenshots/health.png`]
+![competitor-profile-comparison](docs/screenshots/competitor-profile-comparison.png)
+*live (5 Nov)*
 
-[Screenshot placeholder: Roadmap — `docs/screenshots/roadmap.png`]
+![Review queue](docs/screenshots/review.png)
+*demo snapshot (1 Nov)*
+
+![Log](docs/screenshots/log.png)
+*demo snapshot (1 Nov)*
+
+![Health](docs/screenshots/health.png)
+*demo snapshot (1 Nov)*
+
+![Roadmap](docs/screenshots/roadmap.png)
+*demo snapshot (1 Nov)*
 
 ## How it works
 
@@ -391,7 +406,7 @@ freeze keeps the measured system unchanged (D99).
 | Fixes known, not applied | — | Publisher dates instead of feed dates; JFrog mention from stored text only; hiring signals (D12, dropped) |
 | Screen speed (not measured) | — | Competitors takes about a second to appear by eye on the Windows demo, and the Review page makes one item request per decided row |
 
-**Where this goes next: from a daily feed to an analysis partner.** The collected items, citations and JFrog comparison can power a chat assistant that helps analysts investigate a question, compare competitors and draft their analysis, with every answer tied to its sources. None of this is built. The first step is to learn from the analysts where their work is slowest and which decisions they need help with, so that the assistant solves real pain points. Article text is untrusted input, so the assistant also needs protection against prompt injection.
+**Where this goes next: from a daily feed to an analysis partner.** The collected items, citations and JFrog comparison can power a chat assistant that helps analysts investigate a question, compare competitors and draft their analysis, with every answer tied to its sources. None of this is built. The first step is to learn from the analysts where their work is slowest and which decisions they need help with, so that the assistant solves real pain points. Article text is untrusted input, so the assistant also needs protection against prompt injection. No analysts have been interviewed, so this is a vision, not a validated need.
 
 ## Origin, legacy code
 
