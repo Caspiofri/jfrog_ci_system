@@ -163,7 +163,7 @@ flowchart LR
     NAT[NAT gateway<br/>one fixed outbound address]
   end
   ALB -->|port 3000, UI only| EC2
-  EC2 --> NAT --> WEB[(Public sources,<br/>Gemini and Claude APIs)]
+  EC2 --> NAT --> WEB[(Public sources,<br/>Gemini API)]
   PS[SSM Parameter Store<br/>API keys] --> EC2
   BK[AWS Backup<br/>hourly disk snapshot] --> EC2
   EC2 -->|run metric| CW[CloudWatch alarm] --> SNS[SNS email to the team]

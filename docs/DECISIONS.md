@@ -260,7 +260,7 @@ Sections: [Product](#product) · [Routing and analyst actions](#routing-and-anal
 
 **Product name Jessi (D46).** JFrog's Engine for Strategic Signals & Intelligence.
 
-**The video's live parts use the live system (D119).** Its one approved item comes from the Thu 5 Nov run, which is in no measurement.
+**The video's live parts use the live system (D119, D129).** They include a flag, a score edit and an approval on one item, and a dismissal on another, all from the Thu 5 Nov run, which is in no measurement.
 
 **Jessi is a GenAI pipeline, not an agent (D118).**
 - **What:** fixed steps, validation and human review. The
