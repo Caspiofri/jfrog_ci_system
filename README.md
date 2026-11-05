@@ -6,7 +6,7 @@ say, and shows how JFrog compares. It is a GenAI pipeline with fixed steps, vali
 and every insight links to its source, and every number in this README is reported with its n.
 
 ![Daily Brief](docs/screenshots/brief.png)
-*live (5 Nov)*
+*Live, 5 Nov. Daily Brief: insights, then the items cleared since the previous Brief.*
 
 **Video:** https://www.youtube.com/watch?v=Qmr7043pfQE
 
@@ -165,28 +165,28 @@ system accurate and measurable (D15, D21).
 | **Roadmap** | What comes next? | 7 concept images, each labelled "Concept, sample data" (D105) |
 
 ![Competitors](docs/screenshots/competitors.png)
-*live (5 Nov)*
+*Live, 5 Nov. Items cleared per competitor and category.*
 
 ![competitors-comparison](docs/screenshots/competitors-comparison.png)
-*live (5 Nov)*
+*Live, 5 Nov. JFrog vs competitors, per capability. AI-extracted from public pages, with no automatic verification or evaluation; checked once by hand.*
 
 ![competitor-profile](docs/screenshots/competitor-profile.png)
-*live (5 Nov)*
+*Live, 5 Nov. One competitor's profile: activity and focus.*
 
 ![competitor-profile-comparison](docs/screenshots/competitor-profile-comparison.png)
-*live (5 Nov)*
+*Live, 5 Nov. The comparison inside a competitor's profile.*
 
 ![Review queue](docs/screenshots/review.png)
-*demo snapshot (1 Nov)*
+*Demo snapshot, 1 Nov. Review queue: held items, each with its reason, and the analyst's actions.*
 
 ![Log](docs/screenshots/log.png)
-*demo snapshot (1 Nov)*
+*Demo snapshot, 1 Nov. Log: every collected item, with its status, reason and stage.*
 
 ![Health](docs/screenshots/health.png)
-*demo snapshot (1 Nov)*
+*Demo snapshot, 1 Nov. Health: test-split results with n, and the held-out coverage check.*
 
 ![Roadmap](docs/screenshots/roadmap.png)
-*demo snapshot (1 Nov)*
+*Demo snapshot, 1 Nov. Roadmap: concepts with sample data, not built.*
 
 ## How it works
 
