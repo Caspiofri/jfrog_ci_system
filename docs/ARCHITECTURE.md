@@ -2,12 +2,12 @@
 
 Two parts:
 
-1. **[How Jessi works today](#part-1-how-jessi-works-today)**: what runs now, from the code and the PRD.
+1. **[How Jessi works today](#part-1-how-jessi-works-today)**: what runs now, from the code.
    **Runs today.**
 2. **[Production on AWS](#part-2-production-on-aws)**: a design only. **None of it is built or tested for Jessi.**
    The submission runs on one Raspberry Pi and with `docker compose up --build`.
 
-Decision IDs (Dnn) refer to [DECISIONS.md](DECISIONS.md) and the PRD's decision log.
+Decision IDs (Dnn) refer to [DECISIONS.md](DECISIONS.md) and the project's internal decision log, which is not in this repo.
 
 ---
 
@@ -96,7 +96,7 @@ Limits of this setup: it is one machine, and a missed run alerts nobody. It show
 ### 1.3 Data model
 
 Three SQLite files under `data/ci/`, plus ChromaDB for dedupe embeddings. Table names and columns are from the
-stores' schemas; per BE on 4 Nov, the live `ci.sqlite` has 14 tables and 1,916 rows, and `changes.sqlite` 5 tables
+stores' schemas; checked on 4 Nov, the live `ci.sqlite` has 14 tables and 1,916 rows, and `changes.sqlite` 5 tables
 and 114 rows (D115).
 
 **`ci.sqlite`: items and everything decided about them**
@@ -146,7 +146,7 @@ Jessi's workload is small. The source for every number in this paragraph is `run
 - **Run size.** A daily run collected 237–258 items, and 13–46 of them were new and sent to the model (n = 5 daily runs, 31 Oct to 4 Nov).
 - **LLM calls.** Gemini calls per run, as counted by `CountingLLM` in `ci/daily.py`, were 5–13 (n = 4, 1 to 4 Nov; the 31 Oct run did not record the count). Claude judge calls, if any, are not in that count.
 - **Run time.** A run took 2.7–6.2 minutes from start to finish (n = 5).
-- **A fresh store is much heavier.** The first import sent 256 items to the model, against 13–46 on a normal day. That run did not record its LLM calls, and its 24-hour span between start and finish is not a run time. A clean clone on 4 Nov collected 169 items and stored 135, and with no key it wrote fallback rows for 128 of them (per BE, 19:52). That no-key run counted 37 attempted LLM calls (n = 1). None of them reached a model API, so they are attempts, not real calls, but they show the scale against 5–13 on a normal day. So a first run on an empty store sends several times more items to the model, and makes several times more calls, than a normal day.
+- **A fresh store is much heavier.** The first import sent 256 items to the model, against 13–46 on a normal day. That run did not record its LLM calls, and its 24-hour span between start and finish is not a run time. A clean clone on 4 Nov collected 169 items and stored 135, and with no key it wrote fallback rows for 128 of them (19:52). That no-key run counted 37 attempted LLM calls (n = 1). None of them reached a model API, so they are attempts, not real calls, but they show the scale against 5–13 on a normal day. So a first run on an empty store sends several times more items to the model, and makes several times more calls, than a normal day.
 
 So size S, the first production deployment, moves today's stack onto one EC2 instance and changes no Python or frontend code, as far as checked. It does need the configuration and script changes listed in section 2.1. Each later step starts when a stated trigger is reached.
 

@@ -2,7 +2,7 @@
 
 Oct 31, 2026 · for the author's review · repo at `main` f4ee625
 
-**Base:** the prototype's 18-dataset contract (`docs/specs/dashboard_explained.md` §5), trimmed to the D35 build list: items, competitors, h2h, activity, funnel, silent, eval, intensity, deals and insights. Pressure and gaps are included only if the capability-baseline step lands. One endpoint group per screen (D21).
+**Base:** the prototype's 18-dataset contract, trimmed to the D35 build list: items, competitors, h2h, activity, funnel, silent, eval, intensity, deals and insights. Pressure and gaps are included only if the capability-baseline step lands. One endpoint group per screen (D21).
 
 **Decisions it applies:** D31 (Found-late badge, Brief windows since the previous Brief, card counts by discovery time), D32 (untrusted text), D33 (0.82 linking only), D34 (three autonomy levels, Trust this source, the demo field allowlist) and D35 (only charts with pipeline data).
 
@@ -326,7 +326,7 @@ Dropped from the API under D35, to the Roadmap tab: `strength`, `convergence`, `
 
 Noise never reaches the queue; it goes to the Log (D9).
 
-## 6. Decisions (the author, Oct 31; PRD D36): the contract is approved
+## 6. Decisions (the author, Oct 31; D36): the contract is approved
 
 - **Q-A:** low confidence (below 0.8) is held at Strict and Balanced, not Relaxed. Model failures and D32 rejections are held at every level.
 - **Q-B:** teaser-only (score ≥ 4) and junk-extraction (score ≥ 4) items are held at Strict and Balanced and published at Relaxed.
