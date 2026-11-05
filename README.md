@@ -5,7 +5,8 @@ every day on what six competitors (Cloudsmith, Sonatype, GitHub, GitLab, Snyk, A
 say, and shows how JFrog compares. It is a GenAI pipeline with fixed steps, validation and human review. Every item
 and every insight links to its source, and every number in this README is reported with its n.
 
-[Screenshot placeholder: Daily Brief, top of the page — `docs/screenshots/brief.png`]
+![Daily Brief](docs/screenshots/brief.png)
+*live (5 Nov)*
 
 **Video:** [placeholder: demo video link]
 
@@ -92,7 +93,7 @@ reopening of an item dismissed by mistake (D62).
   screen, and leave empty what the stored items cannot prove (D74). Published and held are empty there because
   routing did not exist at those runs.
 - 1 Nov: 239 fetched, 11 removed as noise. 2 Nov: 237 fetched, 7 removed as noise (D74).
-- 3 and 4 Nov: published and held are run-time values.
+- 3 to 5 Nov: published and held are run-time values.
 - 1 Nov: at run time 3 items were published and 12 held at Strict; an analyst approved 1 held item afterwards, so
   the Brief shows 4 published and 11 held (D69).
 - 30 Oct had two collections: the 14-day import `389e71` that entered the product, and a 7-day labelling collection
@@ -163,15 +164,29 @@ system accurate and measurable (D15, D21).
 | **Health** | Does the system work? | Run history, the funnel, extraction per source, the test-split eval and held-out coverage, each with n and "Measured on" (D48, D80, D83) |
 | **Roadmap** | What comes next? | 7 concept images, each labelled "Concept, sample data" (D105) |
 
-[Screenshot placeholder: Competitors — `docs/screenshots/competitors.png`]
+![Competitors](docs/screenshots/competitors.png)
+*live (5 Nov)*
 
-[Screenshot placeholder: Review queue — `docs/screenshots/review.png`]
+![competitors-comparison](docs/screenshots/competitors-comparison.png)
+*live (5 Nov)*
 
-[Screenshot placeholder: Log — `docs/screenshots/log.png`]
+![competitor-profile](docs/screenshots/competitor-profile.png)
+*live (5 Nov)*
 
-[Screenshot placeholder: Health — `docs/screenshots/health.png`]
+![competitor-profile-comparison](docs/screenshots/competitor-profile-comparison.png)
+*live (5 Nov)*
 
-[Screenshot placeholder: Roadmap — `docs/screenshots/roadmap.png`]
+![Review queue](docs/screenshots/review.png)
+*demo snapshot (1 Nov)*
+
+![Log](docs/screenshots/log.png)
+*demo snapshot (1 Nov)*
+
+![Health](docs/screenshots/health.png)
+*demo snapshot (1 Nov)*
+
+![Roadmap](docs/screenshots/roadmap.png)
+*demo snapshot (1 Nov)*
 
 ## How it works
 
